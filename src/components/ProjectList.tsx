@@ -1,6 +1,7 @@
 import { Component, For, Show } from 'solid-js';
 import type { Project } from '../types/project';
-import { openUrl } from '../services/api';
+import { openUrl, createProjectBackup, syncProject } from '../services/api';
+import { open } from '@tauri-apps/plugin-dialog';
 
 interface ProjectListProps {
   projects: Project[];
