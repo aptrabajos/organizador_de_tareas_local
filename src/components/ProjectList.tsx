@@ -1,4 +1,5 @@
 import { Component, For, Show } from 'solid-js';
+import toast from 'solid-toast';
 import type { Project } from '../types/project';
 import { openUrl, createProjectBackup, syncProject } from '../services/api';
 import { open } from '@tauri-apps/plugin-dialog';
