@@ -42,7 +42,13 @@ export async function openUrl(url: string): Promise<void> {
   await invoke('open_url', { url });
 }
 
-export async function createProjectBackup(projectId: number): Promise<string> {
+export interface BackupData {
+  content: string;
+  path: string;
+  filename: string;
+}
+
+export async function createProjectBackup(projectId: number): Promise<BackupData> {
   return await invoke('create_project_backup', { projectId });
 }
 
