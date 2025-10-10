@@ -13,11 +13,13 @@ interface ProjectListProps {
 
 const ProjectList: Component<ProjectListProps> = (props) => {
   const handleBackup = async (project: Project) => {
+    const toastId = toast.loading('Creando backup...');
     try {
       const backupPath = await createProjectBackup(project.id);
-      alert(`Backup creado exitosamente en:\n${backupPath}`);
+      toast.success(`Backup creado en:\n${backupPath}`, { id: toastId, duration: 5000 });
     } catch (error) {
-      alert(`Error al crear backup: ${error}`);
+      console.error('Error en backup:', error);
+      toast.error(`Error al crear backup: ${error}`, { id: toastId });
     }
   };
 
