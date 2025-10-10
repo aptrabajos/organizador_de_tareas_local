@@ -2,7 +2,7 @@ use crate::db::Database;
 use crate::models::{CreateProjectDTO, Project, UpdateProjectDTO};
 use std::process::Command;
 use std::fs;
-use std::path::Path;
+use std::path::PathBuf;
 use tauri::State;
 use chrono::Local;
 
