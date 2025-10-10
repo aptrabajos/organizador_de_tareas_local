@@ -41,3 +41,14 @@ export async function openTerminal(path: string): Promise<void> {
 export async function openUrl(url: string): Promise<void> {
   await invoke('open_url', { url });
 }
+
+export async function createProjectBackup(projectId: number): Promise<string> {
+  return await invoke('create_project_backup', { projectId });
+}
+
+export async function syncProject(
+  sourcePath: string,
+  destinationPath: string
+): Promise<string> {
+  return await invoke('sync_project', { sourcePath, destinationPath });
+}
