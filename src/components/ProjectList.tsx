@@ -35,13 +35,20 @@ const ProjectList: Component<ProjectListProps> = (props) => {
         return; // Usuario canceló
       }
 
-      const result = await syncProject(
-        project.local_path,
-        destinationPath as string
-      );
-      alert(result);
+      const toastId = toast.loading('Sincronizando archivos...');
+      try {
+        const result = await syncProject(
+          project.local_path,
+          destinationPath as string
+        );
+        toast.success(result, { id: toastId, duration: 5000 });
+      } catch (error) {
+        console.error('Error en sync:', error);
+        toast.error(`Error al sincronizar: ${error}`, { id: toastId });
+      }
     } catch (error) {
-      alert(`Error al sincronizar: ${error}`);
+      console.error('Error abriendo selector:', error);
+      toast.error(`Error al abrir selector de carpetas: ${error}`);
     }
   };
 
