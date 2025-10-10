@@ -16,8 +16,9 @@ const ProjectList: Component<ProjectListProps> = (props) => {
   const handleBackup = async (project: Project) => {
     const toastId = toast.loading('Creando backup...');
     try {
-      const backupPath = await createProjectBackup(project.id);
-      toast.success(`Backup creado en:\n${backupPath}`, {
+      const backupData = await createProjectBackup(project.id);
+      await writeTextFile(backupData.path, backupData.content);
+      toast.success(`Backup creado en:\n${backupData.path}`, {
         id: toastId,
         duration: 5000,
       });
