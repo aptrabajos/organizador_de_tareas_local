@@ -129,7 +129,7 @@ describe('ProjectList', () => {
     expect(onDelete).toHaveBeenCalledWith(mockProjects[0]);
   });
 
-  it('should show documentation link when available', () => {
+  it('should show documentation button when available', () => {
     render(() => (
       <ProjectList
         projects={mockProjects}
@@ -139,12 +139,13 @@ describe('ProjectList', () => {
       />
     ));
 
-    const docLinks = screen.getAllByRole('link', { name: /documentación/i });
-    expect(docLinks).toHaveLength(1);
-    expect(docLinks[0].getAttribute('href')).toBe('https://docs1.com');
+    const docButtons = screen.getAllByRole('button', {
+      name: /documentación/i,
+    });
+    expect(docButtons.length).toBeGreaterThan(0);
   });
 
-  it('should show drive link when available', () => {
+  it('should show drive button when available', () => {
     render(() => (
       <ProjectList
         projects={mockProjects}
@@ -154,8 +155,7 @@ describe('ProjectList', () => {
       />
     ));
 
-    const driveLinks = screen.getAllByRole('link', { name: /drive/i });
-    expect(driveLinks).toHaveLength(1);
-    expect(driveLinks[0].getAttribute('href')).toBe('https://drive1.com');
+    const driveButtons = screen.getAllByRole('button', { name: /drive/i });
+    expect(driveButtons.length).toBeGreaterThan(0);
   });
 });

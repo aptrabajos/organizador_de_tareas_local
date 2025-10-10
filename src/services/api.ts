@@ -1,5 +1,4 @@
 import { invoke } from '@tauri-apps/api/core';
-import { open } from '@tauri-apps/plugin-shell';
 import type {
   Project,
   CreateProjectDTO,
@@ -40,5 +39,5 @@ export async function openTerminal(path: string): Promise<void> {
 }
 
 export async function openUrl(url: string): Promise<void> {
-  await open(url);
+  await invoke('open_url', { url });
 }

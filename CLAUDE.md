@@ -6,29 +6,52 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a TypeScript/JavaScript template repository with configured tooling for linting, formatting, and testing. It serves as a foundation for new projects with quality control infrastructure already in place.
+Gestor de Proyectos - Aplicación de escritorio nativa para Linux (Manjaro) que permite gestionar proyectos locales de manera visual y eficiente.
 
-**Stack:**
-- TypeScript: `^5.7.3` (via `@types/node`)
-- ESLint: `^9.37.0` with TypeScript plugin
-- Prettier: `^3.6.2`
+**Stack Frontend:**
+
+- SolidJS: `^1.9.3`
+- TypeScript: `^5.7.3`
+- TailwindCSS: `^3.4.17`
+- Vite: `^6.0.5`
 - Vitest: `^2.1.9`
+
+**Stack Backend:**
+
+- Rust with Tauri: `^2.1.0`
+- SQLite (rusqlite): `^0.32`
+- Serde for JSON serialization
+
+**Package Manager:**
+
+- **IMPORTANT: Este proyecto usa `pnpm`, NO npm**
 
 ---
 
 ## Development Commands
 
+**IMPORTANTE: Usar `pnpm` en lugar de `npm`**
+
 ### Linting & Formatting
+
 ```bash
-npm run lint           # Run ESLint
-npm run lint:fix       # Run ESLint with auto-fix
-npm run format         # Format code with Prettier
+pnpm run lint           # Run ESLint
+pnpm run lint:fix       # Run ESLint with auto-fix
+pnpm run format         # Format code with Prettier
 ```
 
 ### Testing
+
 ```bash
-npm test               # Run tests once
-npm run test:watch     # Run tests in watch mode
+pnpm test               # Run tests once
+pnpm run test:watch     # Run tests in watch mode
+```
+
+### Development
+
+```bash
+pnpm run tauri:dev      # Run app in development mode
+pnpm run tauri:build    # Build production app
 ```
 
 ---
@@ -51,9 +74,9 @@ The project includes MCP servers configured in [.mcp.json](.mcp.json):
 
 Before completing any code task:
 
-1. **Run ESLint** on modified files (`npm run lint:fix`)
-2. **Format code** with Prettier (`npm run format`)
-3. **Run tests** to ensure nothing breaks (`npm test`)
+1. **Run ESLint** on modified files (`pnpm run lint:fix`)
+2. **Format code** with Prettier (`pnpm run format`)
+3. **Run tests** to ensure nothing breaks (`pnpm test`)
 4. **Fix any errors** before marking task complete
 
 Use the configured MCP servers for automated workflows.
@@ -71,6 +94,7 @@ Use the configured MCP servers for automated workflows.
 ## Project Structure
 
 Currently minimal structure with configuration files:
+
 - `.eslintrc.cjs` - ESLint configuration
 - `.prettierrc.json` - Prettier configuration
 - `.mcp.json` - MCP server definitions
@@ -83,6 +107,7 @@ Currently minimal structure with configuration files:
 ## Adding Dependencies
 
 When adding new dependencies:
+
 1. Propose the package and version before installing
 2. Verify compatibility with existing tooling
 3. Update this CLAUDE.md if it becomes a core dependency

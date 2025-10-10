@@ -37,46 +37,31 @@ const ProjectList: Component<ProjectListProps> = (props) => {
 
               <div class="mt-3 flex flex-wrap gap-2">
                 <Show when={project.documentation_url}>
-                  <a
-                    href={project.documentation_url!}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      openUrl(project.documentation_url!);
-                    }}
+                  <button
+                    onClick={() => openUrl(project.documentation_url!)}
                     class="rounded bg-blue-100 px-2 py-1 text-xs text-blue-700 hover:bg-blue-200"
+                    type="button"
                   >
                     📖 Documentación
-                  </a>
+                  </button>
                 </Show>
                 <Show when={project.ai_documentation_url}>
-                  <a
-                    href={project.ai_documentation_url!}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      openUrl(project.ai_documentation_url!);
-                    }}
+                  <button
+                    onClick={() => openUrl(project.ai_documentation_url!)}
                     class="rounded bg-purple-100 px-2 py-1 text-xs text-purple-700 hover:bg-purple-200"
+                    type="button"
                   >
                     🤖 Docs IA
-                  </a>
+                  </button>
                 </Show>
                 <Show when={project.drive_link}>
-                  <a
-                    href={project.drive_link!}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      openUrl(project.drive_link!);
-                    }}
+                  <button
+                    onClick={() => openUrl(project.drive_link!)}
                     class="rounded bg-green-100 px-2 py-1 text-xs text-green-700 hover:bg-green-200"
+                    type="button"
                   >
                     📂 Drive
-                  </a>
+                  </button>
                 </Show>
               </div>
 

@@ -62,6 +62,7 @@ describe('ProjectForm', () => {
         description: 'New Description',
         local_path: '/home/user/new',
         documentation_url: '',
+        ai_documentation_url: '',
         drive_link: '',
       });
     });
@@ -157,7 +158,7 @@ describe('ProjectForm', () => {
     await user.type(screen.getByLabelText(/descripción/i), 'Description');
     await user.type(screen.getByLabelText(/ruta local/i), '/path');
     await user.type(
-      screen.getByLabelText(/documentación/i),
+      screen.getByLabelText(/^URL Documentación$/i),
       'https://docs.com'
     );
     await user.type(
@@ -173,6 +174,7 @@ describe('ProjectForm', () => {
         description: 'Description',
         local_path: '/path',
         documentation_url: 'https://docs.com',
+        ai_documentation_url: '',
         drive_link: 'https://drive.com',
       });
     });

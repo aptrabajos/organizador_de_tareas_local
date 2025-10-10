@@ -30,6 +30,7 @@ fn main() {
             commands::delete_project,
             commands::search_projects,
             commands::open_terminal,
+            commands::open_url,
         ])
         .run(tauri::generate_context!())
         .expect("Error al ejecutar la aplicación Tauri");
