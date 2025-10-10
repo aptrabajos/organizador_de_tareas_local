@@ -11,6 +11,34 @@ interface ProjectListProps {
 }
 
 const ProjectList: Component<ProjectListProps> = (props) => {
+  const handleBackup = async (project: Project) => {
+    try {
+      const backupPath = await createProjectBackup(project.id);
+      alert(`Backup creado exitosamente en:\n${backupPath}`);
+    } catch (error) {
+      alert(`Error al crear backup: ${error}`);
+    }
+  };
+
+  const handleSync = async (project: Project) => {
+    try {
+      const destinationPath = await open({
+        directory: true,
+        multiple: false,
+        title: 'Selecciona carpeta de destino para sincronización',
+      });
+
+      if (!destinationPath) {
+        return; // Usuario canceló
+      }
+
+      const result = await syncProject(project.local_path, destinationPath as string);
+      alert(result);
+    } catch (error) {
+      alert(`Error al sincronizar: ${error}`);
+    }
+  };
+
   return (
     <Show
       when={props.projects.length > 0}
