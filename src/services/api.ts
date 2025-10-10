@@ -48,7 +48,9 @@ export interface BackupData {
   filename: string;
 }
 
-export async function createProjectBackup(projectId: number): Promise<BackupData> {
+export async function createProjectBackup(
+  projectId: number
+): Promise<BackupData> {
   return await invoke('create_project_backup', { projectId });
 }
 
