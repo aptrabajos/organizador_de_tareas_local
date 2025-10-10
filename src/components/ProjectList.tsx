@@ -16,7 +16,10 @@ const ProjectList: Component<ProjectListProps> = (props) => {
     const toastId = toast.loading('Creando backup...');
     try {
       const backupPath = await createProjectBackup(project.id);
-      toast.success(`Backup creado en:\n${backupPath}`, { id: toastId, duration: 5000 });
+      toast.success(`Backup creado en:\n${backupPath}`, {
+        id: toastId,
+        duration: 5000,
+      });
     } catch (error) {
       console.error('Error en backup:', error);
       toast.error(`Error al crear backup: ${error}`, { id: toastId });
