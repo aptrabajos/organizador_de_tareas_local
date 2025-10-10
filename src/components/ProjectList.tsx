@@ -32,7 +32,10 @@ const ProjectList: Component<ProjectListProps> = (props) => {
         return; // Usuario canceló
       }
 
-      const result = await syncProject(project.local_path, destinationPath as string);
+      const result = await syncProject(
+        project.local_path,
+        destinationPath as string
+      );
       alert(result);
     } catch (error) {
       alert(`Error al sincronizar: ${error}`);
@@ -94,12 +97,28 @@ const ProjectList: Component<ProjectListProps> = (props) => {
                 </Show>
               </div>
 
-              <div class="mt-4 flex gap-2">
+              <div class="mt-4 flex flex-wrap gap-2">
                 <button
                   onClick={() => props.onOpenTerminal(project)}
                   class="flex-1 rounded bg-purple-600 px-3 py-2 text-sm font-medium text-white hover:bg-purple-700"
                 >
                   🚀 Trabajar
+                </button>
+                <button
+                  onClick={() => handleBackup(project)}
+                  class="rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                  aria-label="Crear backup"
+                  title="Crear backup en Markdown"
+                >
+                  💾
+                </button>
+                <button
+                  onClick={() => handleSync(project)}
+                  class="rounded bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700"
+                  aria-label="Sincronizar"
+                  title="Sincronizar con rsync"
+                >
+                  🔄
                 </button>
                 <button
                   onClick={() => props.onEdit(project)}
