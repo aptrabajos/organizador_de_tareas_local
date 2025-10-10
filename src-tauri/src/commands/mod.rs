@@ -208,11 +208,14 @@ pub async fn create_project_backup(
 
     // Crear nombre del archivo
     let filename = format!("{}_BACKUP.md", project.name.replace(" ", "_"));
-    let backup_path = Path::new(&project.local_path).join(&filename);
+    let backup_path = PathBuf::from(&project.local_path).join(&filename);
 
-    // Escribir archivo
+    // Escribir archivo con permisos correctos
     fs::write(&backup_path, markdown_content)
-        .map_err(|e| format!("Error escribiendo archivo: {}", e))?;
+        .map_err(|e| {
+            eprintln!("Error escribiendo en {:?}: {}", backup_path, e);
+            format!("Error escribiendo archivo: {} - Verifica los permisos de la carpeta", e)
+        })?;
 
     let result_path = backup_path
         .to_str()
