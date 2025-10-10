@@ -1,10 +1,8 @@
 use crate::db::Database;
 use crate::models::{CreateProjectDTO, Project, UpdateProjectDTO};
 use std::process::Command;
-use std::fs;
 use std::path::PathBuf;
-use tauri::{AppHandle, State};
-use tauri_plugin_fs::FsExt;
+use tauri::State;
 use chrono::Local;
 
 #[tauri::command]
