@@ -1,0 +1,42 @@
+{
+  "mcpServers": {
+    "taskmaster-ai": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "--package=task-master-ai", "task-master-ai"],
+      "env": {}
+    },
+    "playwright": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@playwright/mcp@latest"],
+      "env": {}
+    },
+    "context7": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp"],
+      "env": {}
+    },
+    "lint-fix": {
+      "type": "stdio",
+      "command": "bash",
+      "args": ["-lc", "eslint . --fix && prettier --write ."]
+    },
+    "run-tests": {
+      "type": "stdio",
+      "command": "bash",
+      "args": ["-lc", "npm run -s test || true"]
+    },
+    "git-checkpoint": {
+      "type": "stdio",
+      "command": "bash",
+      "args": ["-lc", "git add . && git commit -m \"checkpoint: auto after tool use $(date -Iseconds)\" || true"]
+    },
+    "final-checkpoint": {
+      "type": "stdio",
+      "command": "bash",
+      "args": ["-lc", "eslint . && npm run -s test && git add . && git commit -m \"checkpoint: final after response $(date -Iseconds)\" || true"]
+    }
+  }
+}
