@@ -1,7 +1,10 @@
 use crate::db::Database;
 use crate::models::{CreateProjectDTO, Project, UpdateProjectDTO};
 use std::process::Command;
+use std::fs;
+use std::path::Path;
 use tauri::State;
+use chrono::Local;
 
 #[tauri::command]
 pub async fn create_project(
