@@ -1,4 +1,5 @@
 import { Component, createSignal, onMount, Show } from 'solid-js';
+import { Toaster } from 'solid-toast';
 import { createProjectStore } from './stores/projectStore';
 import SearchBar from './components/SearchBar';
 import ProjectList from './components/ProjectList';
