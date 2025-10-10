@@ -217,7 +217,7 @@ pub async fn create_project_backup(
 
     // Permitir acceso a la ruta del proyecto
     if !fs_scope.is_allowed(&backup_path) {
-        fs_scope.allow_file(&backup_path);
+        let _ = fs_scope.allow_file(&backup_path);
     }
 
     // Escribir archivo usando std::fs (ahora con permisos otorgados por el scope)
