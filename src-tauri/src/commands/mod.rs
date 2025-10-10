@@ -132,13 +132,19 @@ pub async fn open_url(url: String) -> Result<(), String> {
     Ok(())
 }
 
+#[derive(serde::Serialize)]
+pub struct BackupData {
+    content: String,
+    path: String,
+    filename: String,
+}
+
 #[tauri::command]
 pub async fn create_project_backup(
-    app: AppHandle,
     db: State<'_, Database>,
     project_id: i64,
-) -> Result<String, String> {
-    println!("Creando backup del proyecto ID: {}", project_id);
+) -> Result<BackupData, String> {
+    println!("Generando datos de backup del proyecto ID: {}", project_id);
 
     // Obtener datos del proyecto
     let project = db
@@ -212,28 +218,18 @@ pub async fn create_project_backup(
     let filename = format!("{}_BACKUP.md", project.name.replace(" ", "_"));
     let backup_path = PathBuf::from(&project.local_path).join(&filename);
 
-    // Usar el scope de filesystem de Tauri para escribir el archivo
-    let fs_scope = app.fs_scope();
-
-    // Permitir acceso a la ruta del proyecto
-    if !fs_scope.is_allowed(&backup_path) {
-        let _ = fs_scope.allow_file(&backup_path);
-    }
-
-    // Escribir archivo usando std::fs (ahora con permisos otorgados por el scope)
-    fs::write(&backup_path, markdown_content)
-        .map_err(|e| {
-            eprintln!("Error escribiendo en {:?}: {}", backup_path, e);
-            format!("Error escribiendo archivo: {} - Verifica los permisos de la carpeta", e)
-        })?;
-
     let result_path = backup_path
         .to_str()
         .ok_or("Error convirtiendo ruta")?
         .to_string();
 
-    println!("Backup creado en: {}", result_path);
-    Ok(result_path)
+    println!("Datos de backup generados para: {}", result_path);
+
+    Ok(BackupData {
+        content: markdown_content,
+        path: result_path,
+        filename,
+    })
 }
 
 #[tauri::command]
