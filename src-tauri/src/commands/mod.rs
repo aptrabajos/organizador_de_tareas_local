@@ -3,7 +3,7 @@ use crate::models::{CreateProjectDTO, Project, UpdateProjectDTO};
 use std::process::Command;
 use std::fs;
 use std::path::PathBuf;
-use tauri::State;
+use tauri::{AppHandle, Manager, State};
 use chrono::Local;
 
 #[tauri::command]
