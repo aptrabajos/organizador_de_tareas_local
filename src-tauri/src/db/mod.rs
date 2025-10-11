@@ -66,22 +66,24 @@ impl Database {
         let conn = self.conn.lock().unwrap();
 
         conn.execute(
-            "INSERT INTO projects (name, description, local_path, documentation_url, ai_documentation_url, drive_link)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            "INSERT INTO projects (name, description, local_path, documentation_url, ai_documentation_url, drive_link, notes, image_data)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
             params![
                 project.name,
                 project.description,
                 project.local_path,
                 project.documentation_url,
                 project.ai_documentation_url,
-                project.drive_link
+                project.drive_link,
+                project.notes,
+                project.image_data
             ],
         )?;
 
         let id = conn.last_insert_rowid();
 
         let project = conn.query_row(
-            "SELECT id, name, description, local_path, documentation_url, ai_documentation_url, drive_link,
+            "SELECT id, name, description, local_path, documentation_url, ai_documentation_url, drive_link, notes, image_data,
                     created_at, updated_at FROM projects WHERE id = ?1",
             params![id],
             |row| {
@@ -93,9 +95,11 @@ impl Database {
                     documentation_url: row.get(4)?,
                     ai_documentation_url: row.get(5)?,
                     drive_link: row.get(6)?,
+                    notes: row.get(7)?,
+                    image_data: row.get(8)?,
                     links: None, // Los enlaces se cargan por separado
-                    created_at: row.get(7)?,
-                    updated_at: row.get(8)?,
+                    created_at: row.get(9)?,
+                    updated_at: row.get(10)?,
                 })
             },
         )?;
