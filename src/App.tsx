@@ -56,16 +56,25 @@ const App: Component = () => {
   };
 
   const handleFormSubmit = async (data: ProjectFormData) => {
+    console.log("🔧 [APP] handleFormSubmit iniciado con datos:", data);
+    console.log("🔧 [APP] editingProject:", editingProject());
     try {
       if (editingProject()) {
+        console.log("🔧 [APP] Llamando a store.updateProject...");
         await store.updateProject(editingProject()!.id, data);
+        console.log("✅ [APP] store.updateProject exitoso");
       } else {
+        console.log("🔧 [APP] Llamando a store.createProject...");
         await store.createProject(data);
+        console.log("✅ [APP] store.createProject exitoso");
       }
+      console.log("🔧 [APP] Cerrando formulario...");
       setShowForm(false);
       setEditingProject(null);
-    } catch (_err) {
-      alert('Error al guardar el proyecto');
+      console.log("✅ [APP] Formulario cerrado exitosamente");
+    } catch (err) {
+      console.error("❌ [APP] Error en handleFormSubmit:", err);
+      alert('Error al guardar el proyecto: ' + (err instanceof Error ? err.message : 'Error desconocido'));
     }
   };
 

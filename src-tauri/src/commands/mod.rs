@@ -32,8 +32,25 @@ pub async fn update_project(
     id: i64,
     updates: UpdateProjectDTO,
 ) -> Result<Project, String> {
-    db.update_project(id, updates)
-        .map_err(|e| format!("Error updating project: {}", e))
+    println!("🔧 [UPDATE] Iniciando actualización del proyecto ID: {}", id);
+    println!("📝 [UPDATE] Datos recibidos: {:?}", updates);
+    
+    let result = db.update_project(id, updates)
+        .map_err(|e| {
+            println!("❌ [UPDATE] Error en base de datos: {}", e);
+            format!("Error updating project: {}", e)
+        });
+    
+    match &result {
+        Ok(project) => {
+            println!("✅ [UPDATE] Proyecto actualizado exitosamente: '{}'", project.name);
+        }
+        Err(error) => {
+            println!("❌ [UPDATE] Error al actualizar proyecto: {}", error);
+        }
+    }
+    
+    result
 }
 
 #[tauri::command]
@@ -142,12 +159,17 @@ pub async fn create_project_backup(
     db: State<'_, Database>,
     project_id: i64,
 ) -> Result<BackupData, String> {
-    println!("Generando datos de backup del proyecto ID: {}", project_id);
+    println!("🔵 [BACKUP] Iniciando backup del proyecto ID: {}", project_id);
 
     // Obtener datos del proyecto
     let project = db
         .get_project(project_id)
-        .map_err(|e| format!("Error obteniendo proyecto: {}", e))?;
+        .map_err(|e| {
+            println!("❌ [BACKUP] Error obteniendo proyecto: {}", e);
+            format!("Error obteniendo proyecto: {}", e)
+        })?;
+    
+    println!("✅ [BACKUP] Proyecto encontrado: '{}' ({})", project.name, project.local_path);
 
     // Crear contenido del markdown
     let now = Local::now();
@@ -221,13 +243,147 @@ pub async fn create_project_backup(
         .ok_or("Error convirtiendo ruta")?
         .to_string();
 
-    println!("Datos de backup generados para: {}", result_path);
+    println!("📄 [BACKUP] Nombre de archivo: {}", filename);
+    println!("📁 [BACKUP] Ruta sugerida: {}", result_path);
+    println!("📊 [BACKUP] Tamaño del contenido: {} bytes", markdown_content.len());
+    println!("✅ [BACKUP] Datos de backup generados exitosamente");
 
     Ok(BackupData {
         content: markdown_content,
         path: result_path,
         filename,
     })
+}
+
+#[tauri::command]
+pub async fn write_file_to_path(
+    file_path: String,
+    content: String,
+) -> Result<String, String> {
+    println!("📝 [WRITE] Escribiendo archivo: {}", file_path);
+    
+    use std::fs::write;
+    use std::path::Path;
+    
+    // Crear directorio padre si no existe
+    if let Some(parent) = Path::new(&file_path).parent() {
+        std::fs::create_dir_all(parent)
+            .map_err(|e| format!("Error creando directorio: {}", e))?;
+    }
+    
+    // Escribir archivo
+    write(&file_path, content)
+        .map_err(|e| format!("Error escribiendo archivo: {}", e))?;
+    
+    println!("✅ [WRITE] Archivo escrito exitosamente: {}", file_path);
+    
+    Ok(format!("Archivo escrito en: {}", file_path))
+}
+
+#[tauri::command]
+pub async fn sync_project_to_backup(
+    source_path: String,
+    project_name: String,
+) -> Result<String, String> {
+    println!("🔄 [RSYNC] Iniciando sincronización:");
+    println!("   📂 Origen: {}", source_path);
+    
+    let backup_path = format!("/mnt/sda1/{}", project_name);
+    println!("   📁 Destino: {}", backup_path);
+    
+    // Crear directorio de destino si no existe
+    std::fs::create_dir_all(&backup_path)
+        .map_err(|e| format!("Error creando directorio de destino: {}", e))?;
+    
+    // Crear .rsyncignore básico si no existe en el proyecto origen
+    let rsyncignore_path = format!("{}/.rsyncignore", source_path);
+    if !std::path::Path::new(&rsyncignore_path).exists() {
+        println!("📝 [RSYNC] Creando .rsyncignore básico para proyecto nuevo");
+        let basic_rsyncignore = r#"# Archivos y directorios a ignorar en la sincronización rsync
+
+# Dependencias de Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Archivos de build y distribución
+dist/
+build/
+out/
+.next/
+.nuxt/
+.vuepress/dist/
+
+# Archivos temporales
+.tmp/
+temp/
+*.tmp
+*.temp
+
+# Logs
+*.log
+logs/
+
+# Archivos de sistema
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# Archivos de IDE/Editor
+.vscode/settings.json
+.idea/
+*.sublime-*
+
+# Archivos de Git
+.git/
+.gitignore
+
+# Archivos de cache
+.cache/
+.parcel-cache/
+
+# Archivos de testing
+coverage/
+.nyc_output/
+
+# Archivos de backup
+*.backup
+*.bak
+"#;
+        
+        std::fs::write(&rsyncignore_path, basic_rsyncignore)
+            .map_err(|e| format!("Error creando .rsyncignore: {}", e))?;
+        println!("✅ [RSYNC] .rsyncignore creado exitosamente");
+    }
+    
+           // Ejecutar rsync con archivo de exclusión
+           let output = std::process::Command::new("rsync")
+               .args([
+                   "-av",           // Archivo, verboso
+                   "--delete",      // Eliminar archivos que no están en origen
+                   "--progress",    // Mostrar progreso
+                   "--exclude-from=.rsyncignore", // Usar archivo de exclusión
+                   &format!("{}/", source_path), // Origen con / al final
+                   &backup_path,    // Destino
+               ])
+               .current_dir(&source_path) // Establecer directorio de trabajo para .rsyncignore
+               .output()
+               .map_err(|e| format!("Error ejecutando rsync: {}", e))?;
+    
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("Rsync falló: {}", stderr));
+    }
+    
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    println!("✅ [RSYNC] Sincronización completada exitosamente");
+    println!("📊 [RSYNC] Output: {}", stdout);
+    
+    Ok(format!("Proyecto sincronizado: {} -> {}", source_path, backup_path))
 }
 
 #[tauri::command]

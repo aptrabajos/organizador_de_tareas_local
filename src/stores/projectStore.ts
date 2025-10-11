@@ -39,12 +39,17 @@ export function createProjectStore() {
   }
 
   async function updateProject(id: number, updates: UpdateProjectDTO) {
+    console.log("🔧 [STORE] Iniciando actualización del proyecto:", id, updates);
     setIsLoading(true);
     setError(null);
     try {
+      console.log("📡 [STORE] Llamando a API updateProject...");
       await api.updateProject(id, updates);
+      console.log("✅ [STORE] API updateProject exitosa, recargando proyectos...");
       await loadProjects();
+      console.log("✅ [STORE] Proyectos recargados exitosamente");
     } catch (err) {
+      console.error("❌ [STORE] Error en updateProject:", err);
       setError(err instanceof Error ? err.message : 'Error desconocido');
       throw err;
     } finally {

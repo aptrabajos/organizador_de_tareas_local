@@ -1,6 +1,16 @@
 # 📂 Gestor de Proyectos
 
-Aplicación de escritorio nativa para Linux (Manjaro) que permite gestionar proyectos locales de manera visual y eficiente.
+**Aplicación de escritorio nativa** para Linux (Manjaro) que permite gestionar proyectos locales de manera visual y eficiente.
+
+## ⚠️ IMPORTANTE
+
+Esta es una **aplicación de escritorio nativa**, **NO una aplicación web**:
+- ✅ Se ejecuta con: `pnpm run tauri:dev`
+- ✅ Se abre automáticamente una **ventana nativa**
+- ❌ **NO acceder** a `http://localhost:1420` desde el navegador
+- 📝 Ver logs en la **terminal** donde ejecutaste el comando
+
+**Para más detalles de desarrollo, ver:** [`GUIA-DESARROLLO.md`](./GUIA-DESARROLLO.md)
 
 ## ✨ Características
 
@@ -52,23 +62,51 @@ La app detecta automáticamente el terminal instalado:
 
 ## 🚀 Desarrollo
 
+### Iniciar Aplicación (Modo Desarrollo)
+
+**Método 1: Script Automático (Recomendado)**
 ```bash
-# Instalar dependencias
-npm install
+# Script que verifica instancias, libera puertos e inicia la app
+./start-app.sh
+```
 
-# Modo desarrollo (hot reload)
-npm run tauri dev
+**Método 2: Manual**
+```bash
+# Instalar dependencias (primera vez)
+pnpm install
 
-# Tests Rust
+# Iniciar aplicación (se abre ventana nativa)
+pnpm run tauri:dev
+
+# Los logs aparecen en esta misma terminal
+# La ventana de la app se abre automáticamente en ~5-10 segundos
+```
+
+**⚠️ Si el puerto 1420 está ocupado:**
+```bash
+# Detener todas las instancias
+pkill -f "gestor-proyectos"
+lsof -ti:1420 | xargs kill -9 2>/dev/null
+
+# Iniciar de nuevo
+pnpm run tauri:dev
+```
+
+### Testing
+
+```bash
+# Tests Frontend
+pnpm test
+
+# Tests Rust (Backend)
 cd src-tauri && cargo test
 
-# Tests Frontend
-npm test
-
 # Lint y formato
-npm run lint
-npm run format
+pnpm run lint
+pnpm run format
 ```
+
+**📖 Para guía detallada de desarrollo, ver:** [`GUIA-DESARROLLO.md`](./GUIA-DESARROLLO.md)
 
 ## 📦 Build y Distribución
 
@@ -136,6 +174,17 @@ Las contribuciones son bienvenidas. Por favor:
 ## 📸 Screenshots
 
 _(Agregar screenshots cuando la UI esté lista)_
+
+---
+
+## 📚 Documentación Adicional
+
+- [`ARQUITECTURA.md`](./ARQUITECTURA.md) - **Arquitectura completa del proyecto** (¿Qué es Vite? ¿Cómo funciona todo?)
+- [`GUIA-DESARROLLO.md`](./GUIA-DESARROLLO.md) - Guía completa de desarrollo
+- [`LOGS-CAPTURADOS.md`](./LOGS-CAPTURADOS.md) - Logs de verificación y debugging
+- [`TROUBLESHOOTING.md`](./TROUBLESHOOTING.md) - Problemas conocidos y soluciones
+- [`CLAUDE.md`](./CLAUDE.md) - Guía para desarrollo con Claude
+- [`start-app.sh`](./start-app.sh) - Script helper para iniciar la app
 
 ---
 

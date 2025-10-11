@@ -6,7 +6,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Gestor de Proyectos - Aplicación de escritorio nativa para Linux (Manjaro) que permite gestionar proyectos locales de manera visual y eficiente.
+Gestor de Proyectos - **Aplicación de escritorio nativa** para Linux (Manjaro) que permite gestionar proyectos locales de manera visual y eficiente.
+
+### ⚠️ IMPORTANTE: NO es una aplicación web
+
+- Esta es una **aplicación de escritorio nativa** construida con Tauri
+- **NO acceder** a `http://localhost:1420` desde el navegador
+- El puerto 1420 es usado internamente por Vite (para servir UI a Tauri)
+- La aplicación se abre como una **ventana nativa del sistema**
+- Los logs del backend Rust aparecen en la **terminal**, no en el navegador
 
 **Stack Frontend:**
 
@@ -50,8 +58,26 @@ pnpm run test:watch     # Run tests in watch mode
 ### Development
 
 ```bash
-pnpm run tauri:dev      # Run app in development mode
-pnpm run tauri:build    # Build production app
+# IMPORTANTE: Asegurarse que no hay instancias corriendo primero
+pkill -f "gestor-proyectos" 2>/dev/null
+
+# Iniciar aplicación (se abre ventana nativa)
+pnpm run tauri:dev      
+
+# Ver logs en tiempo real (en archivo separado)
+pnpm run tauri:dev > /tmp/gestor-app.log 2>&1 &
+tail -f /tmp/gestor-app.log
+
+# Build para producción
+pnpm run tauri:build
+```
+
+**Problema común: Puerto 1420 ocupado**
+```bash
+# Solución: Limpiar procesos y puerto
+pkill -f "gestor-proyectos"
+lsof -ti:1420 | xargs kill -9 2>/dev/null
+pnpm run tauri:dev
 ```
 
 ---

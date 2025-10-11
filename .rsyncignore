@@ -1,0 +1,72 @@
+# Archivos y directorios a ignorar en la sincronización rsync
+
+# Dependencias de Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Archivos de build y distribución
+dist/
+build/
+out/
+.next/
+.nuxt/
+.vuepress/dist/
+
+# Archivos temporales
+.tmp/
+temp/
+*.tmp
+*.temp
+
+# Logs
+*.log
+logs/
+
+# Archivos de sistema
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# Archivos de IDE/Editor
+.vscode/settings.json
+.idea/
+*.sublime-*
+
+# Archivos de Git
+.git/
+.gitignore
+
+# Archivos de Tauri build
+src-tauri/target/
+src-tauri/Cargo.lock
+
+# Archivos de cache
+.cache/
+.parcel-cache/
+
+# Archivos de testing
+coverage/
+.nyc_output/
+
+# Archivos de documentación generada
+docs/_build/
+
+# Archivos de backup
+*.backup
+*.bak
+
+# Archivos de configuración local
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Archivos de lock de package managers (mantener solo uno)
+package-lock.json
+yarn.lock
+# Mantener pnpm-lock.yaml ya que usamos pnpm

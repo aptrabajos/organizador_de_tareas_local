@@ -1,9 +1,9 @@
 import { Component, For, Show } from 'solid-js';
 import toast from 'solid-toast';
 import type { Project } from '../types/project';
-import { openUrl, createProjectBackup, syncProject } from '../services/api';
+import { openUrl, createProjectBackup, syncProject, syncProjectToBackup } from '../services/api';
 import { open } from '@tauri-apps/plugin-dialog';
-import { writeTextFile } from '@tauri-apps/plugin-fs';
+import { invoke } from '@tauri-apps/api/core';
 
 interface ProjectListProps {
   projects: Project[];
@@ -14,46 +14,87 @@ interface ProjectListProps {
 
 const ProjectList: Component<ProjectListProps> = (props) => {
   const handleBackup = async (project: Project) => {
-    const toastId = toast.loading('Creando backup...');
     try {
-      const backupData = await createProjectBackup(project.id);
-      await writeTextFile(backupData.path, backupData.content);
-      toast.success(`Backup creado en:\n${backupData.path}`, {
-        id: toastId,
-        duration: 5000,
+      // Pedir al usuario que seleccione la carpeta destino
+      const destinationFolder = await open({
+        directory: true,
+        multiple: false,
+        title: 'Selecciona carpeta donde guardar el backup',
+        defaultPath: project.local_path, // Sugerencia: carpeta del proyecto
       });
+
+      if (!destinationFolder) {
+        return; // Usuario canceló
+      }
+
+      const toastId = toast.loading('Creando backup...');
+      try {
+        const backupData = await createProjectBackup(project.id);
+        // Construir ruta completa con la carpeta elegida
+        const fullPath = `${destinationFolder}/${backupData.filename}`;
+        await writeTextFile(fullPath, backupData.content);
+        toast.success(`✅ Backup creado en:\n${fullPath}`, {
+          id: toastId,
+          duration: 5000,
+        });
+      } catch (error) {
+        console.error('Error al crear backup:', error);
+        toast.error(`Error al crear backup: ${error}`, { id: toastId });
+      }
     } catch (error) {
-      console.error('Error en backup:', error);
-      toast.error(`Error al crear backup: ${error}`, { id: toastId });
+      console.error('Error abriendo selector:', error);
+      toast.error(`Error al abrir selector de carpetas: ${error}`);
+    }
+  };
+
+  const handleBackupToMnt = async (project: Project) => {
+    try {
+      // Crear carpeta del proyecto en /mnt/sda1 y guardar backup ahí
+      const projectFolder = `/mnt/sda1/${project.name}`;
+      const toastId = toast.loading(`Creando backup en ${projectFolder}...`);
+      
+      try {
+        const backupData = await createProjectBackup(project.id);
+        const fullPath = `${projectFolder}/${backupData.filename}`;
+        
+        // Usar el comando personalizado de Tauri (crea la carpeta automáticamente)
+        await invoke('write_file_to_path', {
+          filePath: fullPath,
+          content: backupData.content,
+        });
+        
+        toast.success(`✅ Backup creado en:\n${fullPath}`, {
+          id: toastId,
+          duration: 5000,
+        });
+      } catch (error) {
+        console.error('Error al crear backup:', error);
+        toast.error(`Error al crear backup: ${error}`, { id: toastId });
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      toast.error(`Error: ${error}`);
     }
   };
 
   const handleSync = async (project: Project) => {
     try {
-      const destinationPath = await open({
-        directory: true,
-        multiple: false,
-        title: 'Selecciona carpeta de destino para sincronización',
-      });
-
-      if (!destinationPath) {
-        return; // Usuario canceló
-      }
-
-      const toastId = toast.loading('Sincronizando archivos...');
+      // Sincronizar directamente al backup en /mnt/sda1 con rsync
+      const toastId = toast.loading(`Sincronizando ${project.name} con rsync...`);
+      
       try {
-        const result = await syncProject(
-          project.local_path,
-          destinationPath as string
-        );
-        toast.success(result, { id: toastId, duration: 5000 });
+        const result = await syncProjectToBackup(project.local_path, project.name);
+        toast.success(`✅ ${result}`, {
+          id: toastId,
+          duration: 5000,
+        });
       } catch (error) {
-        console.error('Error en sync:', error);
+        console.error('Error al sincronizar con rsync:', error);
         toast.error(`Error al sincronizar: ${error}`, { id: toastId });
       }
     } catch (error) {
-      console.error('Error abriendo selector:', error);
-      toast.error(`Error al abrir selector de carpetas: ${error}`);
+      console.error('Error:', error);
+      toast.error(`Error: ${error}`);
     }
   };
 
@@ -123,9 +164,17 @@ const ProjectList: Component<ProjectListProps> = (props) => {
                   onClick={() => handleBackup(project)}
                   class="rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
                   aria-label="Crear backup"
-                  title="Crear backup en Markdown"
+                  title="Crear backup - Elegir carpeta"
                 >
                   💾
+                </button>
+                <button
+                  onClick={() => handleBackupToMnt(project)}
+                  class="rounded bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+                  aria-label="Backup a disco"
+                  title="Backup directo a /mnt/sda1"
+                >
+                  💿
                 </button>
                 <button
                   onClick={() => handleSync(project)}

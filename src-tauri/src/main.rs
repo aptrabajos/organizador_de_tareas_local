@@ -34,6 +34,8 @@ fn main() {
             commands::open_terminal,
             commands::open_url,
             commands::create_project_backup,
+            commands::write_file_to_path,
+            commands::sync_project_to_backup,
             commands::sync_project,
         ])
         .run(tauri::generate_context!())

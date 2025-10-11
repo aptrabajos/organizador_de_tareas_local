@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "identifier": "com.gestor.proyectos",
   "build": {
-    "beforeDevCommand": "npm run dev",
-    "beforeBuildCommand": "npm run build",
+    "beforeDevCommand": "pnpm run dev",
+    "beforeBuildCommand": "pnpm run build",
     "devUrl": "http://localhost:1420",
     "frontendDist": "../dist"
   },
@@ -26,16 +26,40 @@
       "capabilities": [
         {
           "identifier": "main-capability",
-          "description": "Capability for the main window",
+          "description": "Capability for the main window with full filesystem access",
           "windows": ["main"],
           "permissions": [
             "core:default",
             "shell:allow-open",
             "dialog:allow-open",
             "dialog:default",
-            "fs:default",
-            "fs:allow-read",
-            "fs:allow-write",
+            {
+              "identifier": "fs:default",
+              "allow": [
+                {"path": "$HOME/**"},
+                {"path": "/mnt/**"},
+                {"path": "/tmp/**"},
+                {"path": "/home/**"}
+              ]
+            },
+            {
+              "identifier": "fs:allow-read",
+              "allow": [
+                {"path": "$HOME/**"},
+                {"path": "/mnt/**"},
+                {"path": "/tmp/**"},
+                {"path": "/home/**"}
+              ]
+            },
+            {
+              "identifier": "fs:allow-write",
+              "allow": [
+                {"path": "$HOME/**"},
+                {"path": "/mnt/**"},
+                {"path": "/tmp/**"},
+                {"path": "/home/**"}
+              ]
+            },
             "fs:allow-exists"
           ]
         }

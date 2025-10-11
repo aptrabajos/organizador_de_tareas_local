@@ -60,3 +60,10 @@ export async function syncProject(
 ): Promise<string> {
   return await invoke('sync_project', { sourcePath, destinationPath });
 }
+
+export async function syncProjectToBackup(
+  sourcePath: string,
+  projectName: string
+): Promise<string> {
+  return await invoke('sync_project_to_backup', { sourcePath, projectName });
+}

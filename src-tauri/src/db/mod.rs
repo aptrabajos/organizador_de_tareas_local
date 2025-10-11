@@ -106,14 +106,29 @@ impl Database {
     }
 
     pub fn get_project(&self, id: i64) -> Result<Project> {
-        let conn = self.conn.lock().unwrap();
+        println!("🔍 [DB] get_project iniciado para ID: {}", id);
+        
+        // Intentar obtener la conexión con timeout
+        let conn = match self.conn.try_lock() {
+            Ok(conn) => conn,
+            Err(_) => {
+                println!("❌ [DB] No se pudo obtener lock de conexión - posible deadlock");
+                return Err(rusqlite::Error::SqliteFailure(
+                    rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_BUSY),
+                    None
+                ));
+            }
+        };
 
-        conn.query_row(
+        println!("🔒 [DB] Conexión obtenida exitosamente");
+
+        let result = conn.query_row(
             "SELECT id, name, description, local_path, documentation_url, ai_documentation_url, drive_link,
                     created_at, updated_at FROM projects WHERE id = ?1",
             params![id],
             |row| {
-                Ok(Project {
+                println!("📊 [DB] Leyendo fila de base de datos...");
+                let project = Project {
                     id: row.get(0)?,
                     name: row.get(1)?,
                     description: row.get(2)?,
@@ -123,13 +138,40 @@ impl Database {
                     drive_link: row.get(6)?,
                     created_at: row.get(7)?,
                     updated_at: row.get(8)?,
-                })
+                };
+                println!("✅ [DB] Proyecto leído de BD: '{}'", project.name);
+                Ok(project)
             },
-        )
+        );
+
+        match &result {
+            Ok(proj) => {
+                println!("✅ [DB] get_project exitoso: '{}'", proj.name);
+            }
+            Err(e) => {
+                println!("❌ [DB] Error en get_project: {}", e);
+            }
+        }
+
+        result
     }
 
     pub fn update_project(&self, id: i64, updates: UpdateProjectDTO) -> Result<Project> {
-        let conn = self.conn.lock().unwrap();
+        println!("🗄️ [DB] Iniciando update_project en base de datos para ID: {}", id);
+        
+        // Intentar obtener la conexión con timeout
+        let conn = match self.conn.try_lock() {
+            Ok(conn) => conn,
+            Err(_) => {
+                println!("❌ [DB] No se pudo obtener lock de conexión en update_project - posible deadlock");
+                return Err(rusqlite::Error::SqliteFailure(
+                    rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_BUSY),
+                    None
+                ));
+            }
+        };
+
+        println!("🔒 [DB] Conexión obtenida exitosamente para update_project");
 
         let mut query_parts = vec![];
         let mut params: Vec<Box<dyn rusqlite::ToSql>> = vec![];
@@ -167,10 +209,36 @@ impl Database {
             query_parts.join(", ")
         );
 
-        let params_ref: Vec<&dyn rusqlite::ToSql> = params.iter().map(|p| p.as_ref()).collect();
-        conn.execute(&query, params_ref.as_slice())?;
+        println!("🗄️ [DB] Query SQL: {}", query);
+        println!("🗄️ [DB] Número de parámetros: {}", params.len());
 
-        self.get_project(id)
+        let params_ref: Vec<&dyn rusqlite::ToSql> = params.iter().map(|p| p.as_ref()).collect();
+        
+        match conn.execute(&query, params_ref.as_slice()) {
+            Ok(rows_affected) => {
+                println!("🗄️ [DB] UPDATE ejecutado exitosamente, filas afectadas: {}", rows_affected);
+            }
+            Err(e) => {
+                println!("🗄️ [DB] ERROR en UPDATE: {}", e);
+                return Err(e);
+            }
+        }
+
+        // Liberar la conexión antes de llamar a get_project
+        println!("🔓 [DB] Liberando conexión después del UPDATE");
+        drop(conn); // Liberar explícitamente la conexión
+        
+        println!("🔍 [DB] Obteniendo proyecto actualizado con ID: {}", id);
+        let result = self.get_project(id);
+        match &result {
+            Ok(project) => {
+                println!("✅ [DB] Proyecto obtenido exitosamente: '{}'", project.name);
+            }
+            Err(e) => {
+                println!("❌ [DB] Error al obtener proyecto: {}", e);
+            }
+        }
+        result
     }
 
     pub fn delete_project(&self, id: i64) -> Result<()> {

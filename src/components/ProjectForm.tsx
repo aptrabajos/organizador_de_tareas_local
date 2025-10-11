@@ -38,18 +38,34 @@ const ProjectForm: Component<ProjectFormProps> = (props) => {
   const handleSubmit = (e: SubmitEvent) => {
     e.preventDefault();
 
+    console.log("🔧 [FRONTEND] Formulario enviado - INICIO");
+    console.log("🔧 [FRONTEND] Evento:", e);
+    console.log("🔧 [FRONTEND] Props:", props);
+    console.log("📝 [FRONTEND] Datos del formulario:", {
+      name: name(),
+      description: description(),
+      local_path: localPath(),
+      documentation_url: documentationUrl(),
+      ai_documentation_url: aiDocumentationUrl(),
+      drive_link: driveLink(),
+    });
+
     if (!name().trim() || !description().trim() || !localPath().trim()) {
+      console.log("❌ [FRONTEND] Validación falló - campos requeridos vacíos");
       return;
     }
 
-    props.onSubmit({
+    const formData = {
       name: name().trim(),
       description: description().trim(),
       local_path: localPath().trim(),
       documentation_url: documentationUrl().trim(),
       ai_documentation_url: aiDocumentationUrl().trim(),
       drive_link: driveLink().trim(),
-    });
+    };
+
+    console.log("✅ [FRONTEND] Enviando datos:", formData);
+    props.onSubmit(formData);
   };
 
   return (
