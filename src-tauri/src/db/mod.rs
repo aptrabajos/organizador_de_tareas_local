@@ -27,9 +27,19 @@ impl Database {
             [],
         )?;
 
-        // Migración: agregar columna ai_documentation_url si no existe
+        // Migraciones: agregar columnas si no existen
         let _ = conn.execute(
             "ALTER TABLE projects ADD COLUMN ai_documentation_url TEXT",
+            [],
+        );
+
+        let _ = conn.execute(
+            "ALTER TABLE projects ADD COLUMN notes TEXT",
+            [],
+        );
+
+        let _ = conn.execute(
+            "ALTER TABLE projects ADD COLUMN image_data TEXT",
             [],
         );
 
