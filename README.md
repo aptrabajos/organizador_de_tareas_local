@@ -5,10 +5,11 @@
 ## ⚠️ IMPORTANTE
 
 Esta es una **aplicación de escritorio nativa**, **NO una aplicación web**:
-- ✅ Se ejecuta con: `pnpm run tauri:dev`
-- ✅ Se abre automáticamente una **ventana nativa**
-- ❌ **NO acceder** a `http://localhost:1420` desde el navegador
-- 📝 Ver logs en la **terminal** donde ejecutaste el comando
+
+- [ ] ✅ Se ejecuta con: `pnpm run tauri:dev`
+- [ ] ✅ Se abre automáticamente una **ventana nativa**
+- [ ] ❌ **NO acceder** a `http://localhost:1420` desde el navegador
+- [ ] 📝 Ver logs en la **terminal** donde ejecutaste el comando
 
 **Para más detalles de desarrollo, ver:** [`GUIA-DESARROLLO.md`](./GUIA-DESARROLLO.md)
 
@@ -24,12 +25,14 @@ Esta es una **aplicación de escritorio nativa**, **NO una aplicación web**:
 ## 🛠️ Stack Tecnológico
 
 ### Frontend
+
 - **SolidJS** - Framework reactivo ultrarrápido (sin Virtual DOM)
 - **TypeScript** - Type safety
 - **TailwindCSS** - Styling moderno
 - **Vite** - Build tool y dev server
 
 ### Backend
+
 - **Rust** - Lenguaje de sistemas de alto rendimiento
 - **Tauri 2.1** - Framework para apps de escritorio nativas
 - **SQLite** (rusqlite) - Base de datos embebida
@@ -38,6 +41,7 @@ Esta es una **aplicación de escritorio nativa**, **NO una aplicación web**:
 ## 📦 Prerequisitos
 
 ### Sistema (Manjaro Linux)
+
 ```bash
 # Instalar Rust
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
@@ -51,7 +55,9 @@ sudo pacman -S nodejs npm
 ```
 
 ### Emuladores de terminal soportados
+
 La app detecta automáticamente el terminal instalado:
+
 - konsole (KDE)
 - gnome-terminal (GNOME)
 - alacritty
@@ -65,12 +71,14 @@ La app detecta automáticamente el terminal instalado:
 ### Iniciar Aplicación (Modo Desarrollo)
 
 **Método 1: Script Automático (Recomendado)**
+
 ```bash
 # Script que verifica instancias, libera puertos e inicia la app
 ./start-app.sh
 ```
 
 **Método 2: Manual**
+
 ```bash
 # Instalar dependencias (primera vez)
 pnpm install
@@ -83,6 +91,7 @@ pnpm run tauri:dev
 ```
 
 **⚠️ Si el puerto 1420 está ocupado:**
+
 ```bash
 # Detener todas las instancias
 pkill -f "gestor-proyectos"
@@ -153,9 +162,11 @@ gestor_proyecto/
 ## 🔧 Configuración
 
 ### Base de datos
+
 Se crea automáticamente en: `~/.local/share/gestor-proyectos/projects.db`
 
 ### Personalización
+
 Edita `src-tauri/tauri.conf.json` para cambiar configuración de la app.
 
 ## 📝 Licencia
@@ -165,6 +176,7 @@ MIT
 ## 🤝 Contribuir
 
 Las contribuciones son bienvenidas. Por favor:
+
 1. Fork el proyecto
 2. Crea una rama para tu feature (`git checkout -b feature/AmazingFeature`)
 3. Commit tus cambios (`git commit -m 'Add: AmazingFeature'`)
