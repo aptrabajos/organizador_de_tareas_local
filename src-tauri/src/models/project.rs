@@ -61,4 +61,6 @@ pub struct UpdateProjectDTO {
     pub documentation_url: Option<String>,
     pub ai_documentation_url: Option<String>,
     pub drive_link: Option<String>,
+    pub notes: Option<String>,
+    pub image_data: Option<String>,
 }
