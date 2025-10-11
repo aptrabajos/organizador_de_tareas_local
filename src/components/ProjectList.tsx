@@ -102,7 +102,7 @@ const ProjectList: Component<ProjectListProps> = (props) => {
     <Show
       when={props.projects.length > 0}
       fallback={
-        <div class="py-12 text-center text-gray-500">
+        <div class="py-12 text-center text-gray-500 dark:text-gray-400">
           <p class="text-lg">No hay proyectos disponibles</p>
           <p class="mt-2 text-sm">Crea tu primer proyecto para comenzar</p>
         </div>
@@ -111,13 +111,13 @@ const ProjectList: Component<ProjectListProps> = (props) => {
       <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         <For each={props.projects}>
           {(project) => (
-            <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md">
-              <h3 class="text-lg font-semibold text-gray-900">
+            <div class="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 shadow-sm transition-shadow hover:shadow-md">
+              <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
                 {project.name}
               </h3>
-              <p class="mt-1 text-sm text-gray-600">{project.description}</p>
+              <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">{project.description}</p>
 
-              <div class="mt-3 space-y-1 text-xs text-gray-500">
+              <div class="mt-3 space-y-1 text-xs text-gray-500 dark:text-gray-400">
                 <p class="truncate" title={project.local_path}>
                   📁 {project.local_path}
                 </p>

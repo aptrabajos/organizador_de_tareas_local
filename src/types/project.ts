@@ -1,3 +1,12 @@
+export interface ProjectLink {
+  id: number;
+  project_id: number;
+  type: 'repository' | 'documentation' | 'staging' | 'production' | 'design' | 'api' | 'other';
+  title: string;
+  url: string;
+  created_at: string;
+}
+
 export interface Project {
   id: number;
   name: string;
@@ -6,6 +15,7 @@ export interface Project {
   documentation_url?: string;
   ai_documentation_url?: string;
   drive_link?: string;
+  links?: ProjectLink[];
   created_at: string;
   updated_at: string;
 }

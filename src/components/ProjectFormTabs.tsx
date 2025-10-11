@@ -1,0 +1,64 @@
+import { Component, createSignal, Show } from 'solid-js';
+import type { Project } from '../types/project';
+import ProjectForm from './ProjectForm';
+import ProjectLinks from './ProjectLinks';
+
+interface ProjectFormTabsProps {
+  project?: Project;
+  onSubmit: (data: any) => void;
+  onCancel: () => void;
+}
+
+const ProjectFormTabs: Component<ProjectFormTabsProps> = (props) => {
+  const [activeTab, setActiveTab] = createSignal<'details' | 'links'>('details');
+
+  return (
+    <div class="space-y-4">
+      {/* Pestañas */}
+      <div class="border-b border-gray-200 dark:border-gray-700">
+        <nav class="-mb-px flex space-x-8">
+          <button
+            onClick={() => setActiveTab('details')}
+            class={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeTab() === 'details'
+                ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
+            }`}
+          >
+            📝 Detalles
+          </button>
+          <Show when={props.project?.id}>
+            <button
+              onClick={() => setActiveTab('links')}
+              class={`py-2 px-1 border-b-2 font-medium text-sm ${
+                activeTab() === 'links'
+                  ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                  : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
+              }`}
+            >
+              🔗 Enlaces
+            </button>
+          </Show>
+        </nav>
+      </div>
+
+      {/* Contenido de las pestañas */}
+      <Show when={activeTab() === 'details'}>
+        <ProjectForm
+          project={props.project}
+          onSubmit={props.onSubmit}
+          onCancel={props.onCancel}
+        />
+      </Show>
+
+      <Show when={activeTab() === 'links' && props.project?.id}>
+        <ProjectLinks
+          projectId={props.project!.id}
+          projectName={props.project!.name}
+        />
+      </Show>
+    </div>
+  );
+};
+
+export default ProjectFormTabs;

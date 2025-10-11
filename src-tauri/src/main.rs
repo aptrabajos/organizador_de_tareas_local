@@ -37,6 +37,10 @@ fn main() {
             commands::write_file_to_path,
             commands::sync_project_to_backup,
             commands::sync_project,
+            commands::create_project_link,
+            commands::get_project_links,
+            commands::update_project_link,
+            commands::delete_project_link,
         ])
         .run(tauri::generate_context!())
         .expect("Error al ejecutar la aplicación Tauri");

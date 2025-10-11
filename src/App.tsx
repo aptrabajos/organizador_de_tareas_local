@@ -3,7 +3,10 @@ import { Toaster } from 'solid-toast';
 import { createProjectStore } from './stores/projectStore';
 import SearchBar from './components/SearchBar';
 import ProjectList from './components/ProjectList';
-import ProjectForm, { type ProjectFormData } from './components/ProjectForm';
+import ProjectFormTabs from './components/ProjectFormTabs';
+import { type ProjectFormData } from './components/ProjectForm';
+import ThemeToggle from './components/ThemeToggle';
+import { ThemeProvider } from './contexts/ThemeContext';
 import type { Project } from './types/project';
 
 const App: Component = () => {
@@ -84,24 +87,27 @@ const App: Component = () => {
   };
 
   return (
-    <div class="min-h-screen bg-gray-50">
-      <Toaster position="top-right" />
-      {/* Header */}
-      <header class="border-b border-gray-200 bg-white shadow-sm">
-        <div class="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
-          <div class="flex items-center justify-between">
-            <h1 class="text-2xl font-bold text-gray-900">
-              Gestor de Proyectos
-            </h1>
-            <button
-              onClick={handleNewProject}
-              class="rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-            >
-              + Nuevo Proyecto
-            </button>
+    <ThemeProvider>
+      <div class="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
+        <Toaster position="top-right" />
+        <ThemeToggle />
+        
+        {/* Header */}
+        <header class="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm">
+          <div class="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between">
+              <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
+                Gestor de Proyectos
+              </h1>
+              <button
+                onClick={handleNewProject}
+                class="rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:bg-blue-500 dark:hover:bg-blue-600"
+              >
+                + Nuevo Proyecto
+              </button>
+            </div>
           </div>
-        </div>
-      </header>
+        </header>
 
       {/* Main Content */}
       <main class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
@@ -112,7 +118,7 @@ const App: Component = () => {
 
         {/* Error Message */}
         <Show when={store.error()}>
-          <div class="mb-4 rounded-lg bg-red-50 p-4 text-red-800">
+          <div class="mb-4 rounded-lg bg-red-50 dark:bg-red-900/20 p-4 text-red-800 dark:text-red-200">
             <p class="font-medium">Error:</p>
             <p>{store.error()}</p>
           </div>
@@ -121,7 +127,7 @@ const App: Component = () => {
         {/* Loading State */}
         <Show when={store.isLoading()}>
           <div class="py-12 text-center">
-            <p class="text-gray-600">Cargando proyectos...</p>
+            <p class="text-gray-600 dark:text-gray-400">Cargando proyectos...</p>
           </div>
         </Show>
 
@@ -138,12 +144,12 @@ const App: Component = () => {
 
       {/* Modal Form */}
       <Show when={showForm()}>
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
-          <div class="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg bg-white p-6 shadow-xl">
-            <h2 class="mb-4 text-xl font-semibold text-gray-900">
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 dark:bg-opacity-70 p-4">
+          <div class="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg bg-white dark:bg-gray-800 p-6 shadow-xl">
+            <h2 class="mb-4 text-xl font-semibold text-gray-900 dark:text-white">
               {editingProject() ? 'Editar Proyecto' : 'Nuevo Proyecto'}
             </h2>
-            <ProjectForm
+            <ProjectFormTabs
               project={editingProject() || undefined}
               onSubmit={handleFormSubmit}
               onCancel={handleFormCancel}
@@ -151,7 +157,8 @@ const App: Component = () => {
           </div>
         </div>
       </Show>
-    </div>
+      </div>
+    </ThemeProvider>
   );
 };
 

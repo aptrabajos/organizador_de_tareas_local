@@ -71,7 +71,7 @@ const ProjectForm: Component<ProjectFormProps> = (props) => {
   return (
     <form onSubmit={handleSubmit} class="space-y-4">
       <div>
-        <label for="name" class="block text-sm font-medium text-gray-700">
+        <label for="name" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
           Nombre *
         </label>
         <input
@@ -79,7 +79,7 @@ const ProjectForm: Component<ProjectFormProps> = (props) => {
           type="text"
           value={name()}
           onInput={(e) => setName(e.currentTarget.value)}
-          class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+          class="mt-1 w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-3 py-2 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800"
           required
         />
       </div>
@@ -87,7 +87,7 @@ const ProjectForm: Component<ProjectFormProps> = (props) => {
       <div>
         <label
           for="description"
-          class="block text-sm font-medium text-gray-700"
+          class="block text-sm font-medium text-gray-700 dark:text-gray-300"
         >
           Descripción *
         </label>
@@ -96,13 +96,13 @@ const ProjectForm: Component<ProjectFormProps> = (props) => {
           value={description()}
           onInput={(e) => setDescription(e.currentTarget.value)}
           rows={3}
-          class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+          class="mt-1 w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-3 py-2 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800"
           required
         />
       </div>
 
       <div>
-        <label for="local_path" class="block text-sm font-medium text-gray-700">
+        <label for="local_path" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
           Ruta Local *
         </label>
         <input
@@ -110,7 +110,7 @@ const ProjectForm: Component<ProjectFormProps> = (props) => {
           type="text"
           value={localPath()}
           onInput={(e) => setLocalPath(e.currentTarget.value)}
-          class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+          class="mt-1 w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-3 py-2 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800"
           placeholder="/home/usuario/proyecto"
           required
         />
@@ -119,7 +119,7 @@ const ProjectForm: Component<ProjectFormProps> = (props) => {
       <div>
         <label
           for="documentation_url"
-          class="block text-sm font-medium text-gray-700"
+          class="block text-sm font-medium text-gray-700 dark:text-gray-300"
         >
           URL Documentación
         </label>
@@ -128,7 +128,7 @@ const ProjectForm: Component<ProjectFormProps> = (props) => {
           type="url"
           value={documentationUrl()}
           onInput={(e) => setDocumentationUrl(e.currentTarget.value)}
-          class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+          class="mt-1 w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-3 py-2 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800"
           placeholder="https://docs.ejemplo.com"
         />
       </div>
@@ -136,7 +136,7 @@ const ProjectForm: Component<ProjectFormProps> = (props) => {
       <div>
         <label
           for="ai_documentation_url"
-          class="block text-sm font-medium text-gray-700"
+          class="block text-sm font-medium text-gray-700 dark:text-gray-300"
         >
           URL Documentación IA
         </label>
@@ -145,13 +145,13 @@ const ProjectForm: Component<ProjectFormProps> = (props) => {
           type="url"
           value={aiDocumentationUrl()}
           onInput={(e) => setAiDocumentationUrl(e.currentTarget.value)}
-          class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+          class="mt-1 w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-3 py-2 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800"
           placeholder="https://ai-docs.ejemplo.com"
         />
       </div>
 
       <div>
-        <label for="drive_link" class="block text-sm font-medium text-gray-700">
+        <label for="drive_link" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
           Link Google Drive
         </label>
         <input
@@ -159,7 +159,7 @@ const ProjectForm: Component<ProjectFormProps> = (props) => {
           type="url"
           value={driveLink()}
           onInput={(e) => setDriveLink(e.currentTarget.value)}
-          class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+          class="mt-1 w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-3 py-2 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800"
           placeholder="https://drive.google.com/..."
         />
       </div>
@@ -167,14 +167,14 @@ const ProjectForm: Component<ProjectFormProps> = (props) => {
       <div class="flex gap-3 pt-4">
         <button
           type="submit"
-          class="flex-1 rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+          class="flex-1 rounded-lg bg-blue-600 dark:bg-blue-500 px-4 py-2 text-white hover:bg-blue-700 dark:hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
         >
           Guardar
         </button>
         <button
           type="button"
           onClick={() => props.onCancel()}
-          class="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+          class="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
         >
           Cancelar
         </button>

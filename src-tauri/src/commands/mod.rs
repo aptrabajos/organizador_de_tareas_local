@@ -1,5 +1,5 @@
 use crate::db::Database;
-use crate::models::{CreateProjectDTO, Project, UpdateProjectDTO};
+use crate::models::project::{CreateProjectDTO, CreateLinkDTO, Project, ProjectLink, UpdateProjectDTO, UpdateLinkDTO};
 use std::process::Command;
 use std::path::PathBuf;
 use tauri::State;
@@ -426,3 +426,46 @@ pub async fn sync_project(
         destination_path
     ))
 }
+
+// Comandos para manejar enlaces de proyectos
+#[tauri::command]
+pub async fn create_project_link(
+    db: State<'_, Database>,
+    link: CreateLinkDTO,
+) -> Result<ProjectLink, String> {
+    println!("🔗 [LINK] Creando enlace: {} - {}", link.title, link.url);
+    db.create_link(link)
+        .map_err(|e| format!("Error creating link: {}", e))
+}
+
+#[tauri::command]
+pub async fn get_project_links(
+    db: State<'_, Database>,
+    project_id: i64,
+) -> Result<Vec<ProjectLink>, String> {
+    println!("🔗 [LINK] Obteniendo enlaces para proyecto ID: {}", project_id);
+    db.get_project_links(project_id)
+        .map_err(|e| format!("Error getting links: {}", e))
+}
+
+#[tauri::command]
+pub async fn update_project_link(
+    db: State<'_, Database>,
+    id: i64,
+    link: UpdateLinkDTO,
+) -> Result<ProjectLink, String> {
+    println!("🔗 [LINK] Actualizando enlace ID: {}", id);
+    db.update_link(id, link)
+        .map_err(|e| format!("Error updating link: {}", e))
+}
+
+#[tauri::command]
+pub async fn delete_project_link(
+    db: State<'_, Database>,
+    id: i64,
+) -> Result<(), String> {
+    println!("🔗 [LINK] Eliminando enlace ID: {}", id);
+    db.delete_link(id)
+        .map_err(|e| format!("Error deleting link: {}", e))
+}
+
