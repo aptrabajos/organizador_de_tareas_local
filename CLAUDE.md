@@ -84,15 +84,18 @@ pnpm run tauri:dev
 ### Production Build & Installation
 
 **Compilar para producción:**
+
 ```bash
 pnpm run tauri:build
 ```
 
 Esto genera:
+
 - Binario: `src-tauri/target/release/gestor-proyectos` (~16MB)
 - Paquete DEB: `src-tauri/target/release/bundle/deb/Gestor de Proyectos_0.1.0_amd64.deb` (~5.5MB)
 
 **Instalación en Manjaro/Arch:**
+
 ```bash
 # Copiar binario al PATH del usuario
 mkdir -p ~/.local/bin
@@ -120,6 +123,7 @@ update-desktop-database ~/.local/share/applications
 ```
 
 **Ejecutar la aplicación:**
+
 ```bash
 # Desde terminal
 gestor-proyectos
@@ -210,3 +214,21 @@ When adding new dependencies:
 - Tests: 38 tests pasando en 5 archivos
 - Código completamente tipado sin uso de `any`
 - Aplicación probada y funcionando correctamente
+
+### 2025-10-12 - Build de Producción e Instalación
+
+**Compilación:**
+- Build exitoso con Tauri 2.1.0
+- Binario optimizado: 16MB (release mode)
+- Paquete DEB generado: 5.5MB
+
+**Instalación en Manjaro:**
+- Binario instalado en `~/.local/bin/gestor-proyectos`
+- Entrada .desktop creada en menú de aplicaciones
+- Aplicación disponible desde terminal y menú gráfico
+- PATH configurado correctamente
+
+**Ubicaciones:**
+- Binario: `~/.local/bin/gestor-proyectos`
+- Desktop Entry: `~/.local/share/applications/gestor-proyectos.desktop`
+- Documentación de instalación agregada a CLAUDE.md
