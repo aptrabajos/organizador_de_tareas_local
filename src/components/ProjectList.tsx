@@ -5,6 +5,7 @@ import {
   openUrl,
   createProjectBackup,
   syncProjectToBackup,
+  trackProjectOpen,
 } from '../services/api';
 import { open } from '@tauri-apps/plugin-dialog';
 import { invoke } from '@tauri-apps/api/core';
