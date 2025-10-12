@@ -149,7 +149,7 @@ const ProjectList: Component<ProjectListProps> = (props) => {
               <Show when={project.notes}>
                 <div class="mt-3 rounded bg-gray-50 p-2 text-xs text-gray-700 dark:bg-gray-700 dark:text-gray-300">
                   <p class="font-semibold">📝 Notas:</p>
-                  <p class="mt-1 whitespace-pre-wrap">{project.notes}</p>
+                  <p class="mt-1 break-words whitespace-pre-wrap">{project.notes}</p>
                 </div>
               </Show>
 
