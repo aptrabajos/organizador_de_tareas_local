@@ -19,26 +19,25 @@ export interface ProjectFormData {
 }
 
 const ProjectForm: Component<ProjectFormProps> = (props) => {
-  const initialProject = props.project;
-  const [name, setName] = createSignal(initialProject?.name || '');
+  const [name, setName] = createSignal(props.project?.name || '');
   const [description, setDescription] = createSignal(
-    initialProject?.description || ''
+    props.project?.description || ''
   );
   const [localPath, setLocalPath] = createSignal(
-    initialProject?.local_path || ''
+    props.project?.local_path || ''
   );
   const [documentationUrl, setDocumentationUrl] = createSignal(
-    initialProject?.documentation_url || ''
+    props.project?.documentation_url || ''
   );
   const [aiDocumentationUrl, setAiDocumentationUrl] = createSignal(
-    initialProject?.ai_documentation_url || ''
+    props.project?.ai_documentation_url || ''
   );
   const [driveLink, setDriveLink] = createSignal(
-    initialProject?.drive_link || ''
+    props.project?.drive_link || ''
   );
-  const [notes, setNotes] = createSignal(initialProject?.notes || '');
+  const [notes, setNotes] = createSignal(props.project?.notes || '');
   const [imageData, setImageData] = createSignal(
-    initialProject?.image_data || ''
+    props.project?.image_data || ''
   );
   const [imageError, setImageError] = createSignal('');
 
