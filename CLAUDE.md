@@ -235,3 +235,99 @@ When adding new dependencies:
 - Binario: `~/.local/bin/gestor-proyectos`
 - Desktop Entry: `~/.local/share/applications/gestor-proyectos.desktop`
 - Documentación de instalación agregada a CLAUDE.md
+
+### 2025-10-12 - Sistema de Analytics y Estadísticas
+
+**Implementación Completa del Sistema de Analytics:**
+
+**Backend (Rust + SQLite):**
+
+- Nuevos campos en tabla `projects`:
+  - `last_opened_at` (DATETIME) - Timestamp de última apertura
+  - `opened_count` (INTEGER) - Contador de veces que se abrió el proyecto
+  - `total_time_seconds` (INTEGER) - Tiempo total trabajado en segundos
+
+- Nueva tabla `project_activity`:
+  - Registra todas las actividades (opened, edited, backup, etc.)
+  - Campos: id, project_id, activity_type, description, duration_seconds, created_at
+  - Relación con tabla projects mediante FOREIGN KEY con CASCADE DELETE
+
+**Comandos Tauri Agregados:**
+
+1. `track_project_open(project_id: i64)` - Registra apertura de proyecto
+   - Actualiza `last_opened_at` y `opened_count`
+   - Crea registro en tabla `project_activity`
+
+2. `add_project_time(project_id: i64, seconds: i64)` - Agrega tiempo trabajado
+   - Incrementa `total_time_seconds`
+
+3. `get_project_stats() -> ProjectStats` - Obtiene estadísticas globales
+   - Total de proyectos
+   - Proyectos activos hoy
+   - Tiempo total trabajado (en horas)
+   - Proyecto más activo
+   - Timeline de últimas 20 actividades
+
+4. `get_project_activities(project_id: i64, limit: i64)` - Obtiene timeline por proyecto
+
+**Frontend (SolidJS + TypeScript):**
+
+- Nuevo componente `Analytics.tsx`:
+  - Dashboard con 4 tarjetas de estadísticas
+  - Timeline de actividad reciente con íconos dinámicos
+  - Botón de actualización manual
+  - Formateo de fechas y duraciones
+  - Estados de carga y error
+  - Soporte para tema oscuro
+
+- Integración en `App.tsx`:
+  - Botón "📊 Estadísticas" en header
+  - Alternado entre vista de proyectos y analytics
+  - Estado reactivo con SolidJS
+
+- Tracking automático en `ProjectList.tsx`:
+  - Función `handleOpenTerminal` que registra apertura antes de abrir terminal
+  - Logs de confirmación: "📊 Tracking registrado para proyecto: [nombre]"
+  - Manejo de errores sin bloquear funcionalidad
+
+**API Layer (services/api.ts):**
+
+- 4 nuevas funciones async que llaman a comandos Tauri
+- Tipado completo con interfaces TypeScript
+- Manejo de promesas con async/await
+
+**Tipos TypeScript (types/project.ts):**
+
+- `ProjectActivity` interface
+- `ProjectStats` interface
+- Campos opcionales agregados a `Project` interface
+
+**Archivos Modificados:**
+
+- `src-tauri/src/db/mod.rs` - 4 métodos nuevos, migrations con ALTER TABLE
+- `src-tauri/src/models/project.rs` - 3 structs nuevos
+- `src-tauri/src/commands/mod.rs` - 4 comandos Tauri
+- `src-tauri/src/main.rs` - Registro de nuevos comandos
+- `src/components/Analytics.tsx` - Componente nuevo (171 líneas)
+- `src/components/ProjectList.tsx` - Tracking automático
+- `src/services/api.ts` - 4 funciones API
+- `src/types/project.ts` - Interfaces de analytics
+- `src/App.tsx` - Integración del botón y vista
+
+**Características Implementadas:**
+
+✅ Tracking automático al abrir proyectos con botón "🚀 Trabajar"
+✅ Dashboard de estadísticas en tiempo real
+✅ Timeline de actividad con íconos contextuales
+✅ Migración de BD sin afectar datos existentes (ALTER TABLE con graceful failure)
+✅ UI responsive con Tailwind CSS
+✅ Soporte completo para dark mode
+✅ Manejo de errores robusto
+✅ 0 errores de ESLint, 1 warning esperado en Rust (dead_code en CreateActivityDTO)
+
+**Próximas Funcionalidades Pendientes:**
+
+- Markdown con preview para notas
+- Checklist dentro de notas
+- Adjuntar archivos pequeños a proyectos
+- Distribución por tags en analytics
