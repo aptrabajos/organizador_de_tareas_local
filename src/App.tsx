@@ -50,7 +50,7 @@ const App: Component = () => {
     if (confirmed) {
       try {
         await store.deleteProject(project.id);
-      } catch (_err) {
+      } catch {
         alert('Error al eliminar el proyecto');
       }
     }
