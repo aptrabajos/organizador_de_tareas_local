@@ -246,6 +246,78 @@ const ProjectForm: Component<ProjectFormProps> = (props) => {
         />
       </div>
 
+      <div>
+        <label
+          for="notes"
+          class="block text-sm font-medium text-gray-700 dark:text-gray-300"
+        >
+          Notas
+        </label>
+        <textarea
+          id="notes"
+          value={notes()}
+          onInput={(e) => setNotes(e.currentTarget.value)}
+          rows={4}
+          class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400 dark:focus:ring-blue-800"
+          placeholder="Notas adicionales sobre el proyecto..."
+        />
+      </div>
+
+      <div>
+        <label
+          for="image"
+          class="block text-sm font-medium text-gray-700 dark:text-gray-300"
+        >
+          Imagen del Proyecto
+        </label>
+        <div class="mt-1 space-y-2">
+          <Show when={imageData()}>
+            <div class="relative inline-block">
+              <img
+                src={imageData()}
+                alt="Preview"
+                class="h-32 w-32 rounded-lg border-2 border-gray-300 object-cover dark:border-gray-600"
+              />
+              <button
+                type="button"
+                onClick={removeImage}
+                class="absolute -right-2 -top-2 rounded-full bg-red-500 p-1 text-white hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500"
+                aria-label="Eliminar imagen"
+              >
+                <svg
+                  class="h-4 w-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+          </Show>
+          <input
+            id="image"
+            type="file"
+            accept="image/*"
+            onChange={handleImageChange}
+            class="block w-full text-sm text-gray-500 file:mr-4 file:rounded-lg file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-blue-700 hover:file:bg-blue-100 dark:text-gray-400 dark:file:bg-blue-900 dark:file:text-blue-300 dark:hover:file:bg-blue-800"
+          />
+          <Show when={imageError()}>
+            <p class="text-sm text-red-600 dark:text-red-400">
+              {imageError()}
+            </p>
+          </Show>
+          <p class="text-xs text-gray-500 dark:text-gray-400">
+            Máximo 500KB, se redimensionará a 200x200px
+          </p>
+        </div>
+      </div>
+
       <div class="flex gap-3 pt-4">
         <button
           type="submit"
