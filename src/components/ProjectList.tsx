@@ -203,7 +203,7 @@ const ProjectList: Component<ProjectListProps> = (props) => {
 
               <div class="mt-4 flex flex-wrap gap-2">
                 <button
-                  onClick={() => props.onOpenTerminal(project)}
+                  onClick={() => handleOpenTerminal(project)}
                   class="flex-1 rounded bg-purple-600 px-3 py-2 text-sm font-medium text-white hover:bg-purple-700"
                 >
                   🚀 Trabajar
