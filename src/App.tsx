@@ -59,7 +59,7 @@ const App: Component = () => {
   const handleOpenTerminal = async (project: Project) => {
     try {
       await store.openTerminal(project.local_path);
-    } catch (_err) {
+    } catch {
       alert('Error al abrir terminal');
     }
   };
