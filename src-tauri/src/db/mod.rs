@@ -145,7 +145,8 @@ impl Database {
 
         let mut stmt = conn.prepare(
             "SELECT id, name, description, local_path, documentation_url, ai_documentation_url, drive_link, notes, image_data,
-                    created_at, updated_at FROM projects ORDER BY updated_at DESC"
+                    created_at, updated_at, last_opened_at, opened_count, total_time_seconds
+             FROM projects ORDER BY updated_at DESC"
         )?;
 
         let mut projects = Vec::new();
@@ -162,12 +163,15 @@ impl Database {
                 row.get::<_, Option<String>>(8)?,  // image_data
                 row.get::<_, String>(9)?,  // created_at
                 row.get::<_, String>(10)?,  // updated_at
+                row.get::<_, Option<String>>(11)?,  // last_opened_at
+                row.get::<_, Option<i64>>(12)?,  // opened_count
+                row.get::<_, Option<i64>>(13)?,  // total_time_seconds
             ))
         })?
         .collect::<Result<Vec<_>>>()?;
 
         // Para cada proyecto, obtener sus enlaces
-        for (id, name, description, local_path, documentation_url, ai_documentation_url, drive_link, notes, image_data, created_at, updated_at) in project_rows {
+        for (id, name, description, local_path, documentation_url, ai_documentation_url, drive_link, notes, image_data, created_at, updated_at, last_opened_at, opened_count, total_time_seconds) in project_rows {
             let links = self.get_project_links_internal(id, &conn).unwrap_or_else(|_| Vec::new());
 
             projects.push(Project {
@@ -183,6 +187,9 @@ impl Database {
                 links: Some(links),
                 created_at,
                 updated_at,
+                last_opened_at,
+                opened_count,
+                total_time_seconds,
             });
         }
 
