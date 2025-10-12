@@ -469,3 +469,45 @@ pub async fn delete_project_link(
         .map_err(|e| format!("Error deleting link: {}", e))
 }
 
+// Comandos para Analytics y Tracking
+#[tauri::command]
+pub async fn track_project_open(
+    db: State<'_, Database>,
+    project_id: i64,
+) -> Result<(), String> {
+    println!("📊 [ANALYTICS] Registrando apertura del proyecto ID: {}", project_id);
+    db.track_project_open(project_id)
+        .map_err(|e| format!("Error tracking project open: {}", e))
+}
+
+#[tauri::command]
+pub async fn add_project_time(
+    db: State<'_, Database>,
+    project_id: i64,
+    seconds: i64,
+) -> Result<(), String> {
+    println!("⏱️ [ANALYTICS] Agregando {} segundos al proyecto ID: {}", seconds, project_id);
+    db.add_project_time(project_id, seconds)
+        .map_err(|e| format!("Error adding project time: {}", e))
+}
+
+#[tauri::command]
+pub async fn get_project_stats(
+    db: State<'_, Database>,
+) -> Result<crate::models::project::ProjectStats, String> {
+    println!("📈 [ANALYTICS] Obteniendo estadísticas globales");
+    db.get_project_stats()
+        .map_err(|e| format!("Error getting project stats: {}", e))
+}
+
+#[tauri::command]
+pub async fn get_project_activities(
+    db: State<'_, Database>,
+    project_id: i64,
+    limit: i64,
+) -> Result<Vec<crate::models::project::ProjectActivity>, String> {
+    println!("📋 [ANALYTICS] Obteniendo actividades del proyecto ID: {}", project_id);
+    db.get_project_activities(project_id, limit)
+        .map_err(|e| format!("Error getting project activities: {}", e))
+}
+
