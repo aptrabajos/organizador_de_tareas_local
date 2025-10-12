@@ -1,7 +1,14 @@
 export interface ProjectLink {
   id: number;
   project_id: number;
-  type: 'repository' | 'documentation' | 'staging' | 'production' | 'design' | 'api' | 'other';
+  type:
+    | 'repository'
+    | 'documentation'
+    | 'staging'
+    | 'production'
+    | 'design'
+    | 'api'
+    | 'other';
   title: string;
   url: string;
   created_at: string;
@@ -29,6 +36,8 @@ export interface CreateProjectDTO {
   documentation_url?: string;
   ai_documentation_url?: string;
   drive_link?: string;
+  notes?: string;
+  image_data?: string;
 }
 
 export interface UpdateProjectDTO {
@@ -38,4 +47,6 @@ export interface UpdateProjectDTO {
   documentation_url?: string;
   ai_documentation_url?: string;
   drive_link?: string;
+  notes?: string;
+  image_data?: string;
 }
