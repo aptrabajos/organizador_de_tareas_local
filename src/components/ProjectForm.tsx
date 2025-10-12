@@ -20,8 +20,8 @@ export interface ProjectFormData {
 
 const ProjectForm: Component<ProjectFormProps> = (props) => {
   // Capturar valores iniciales una sola vez (props.project no cambia después de montar)
-  // eslint-disable-next-line solid/reactivity
   const initialValues = (() => {
+    // eslint-disable-next-line solid/reactivity
     const p = props.project;
     return {
       name: p?.name || '',
