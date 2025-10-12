@@ -86,6 +86,7 @@ const ProjectLinks: Component<ProjectLinksProps> = (props) => {
   };
 
   onMount(() => {
+    setNewLink((prev) => ({ ...prev, project_id: props.projectId }));
     loadLinks();
   });
 
