@@ -1,11 +1,11 @@
 import { Component, createSignal, Show } from 'solid-js';
 import type { Project } from '../types/project';
-import ProjectForm from './ProjectForm';
+import ProjectForm, { type ProjectFormData } from './ProjectForm';
 import ProjectLinks from './ProjectLinks';
 
 interface ProjectFormTabsProps {
   project?: Project;
-  onSubmit: (data: any) => void;
+  onSubmit: (data: ProjectFormData) => void;
   onCancel: () => void;
 }
 
