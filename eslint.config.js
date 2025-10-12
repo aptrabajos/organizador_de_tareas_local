@@ -31,6 +31,11 @@ export default [
         Element: 'readonly',
         InputEvent: 'readonly',
         SubmitEvent: 'readonly',
+        Event: 'readonly',
+        FileReader: 'readonly',
+        Image: 'readonly',
+        localStorage: 'readonly',
+        writeTextFile: 'readonly',
       },
     },
     rules: {
