@@ -259,6 +259,14 @@ impl Database {
             query_parts.push("drive_link = ?");
             params.push(Box::new(drive_link));
         }
+        if let Some(notes) = updates.notes {
+            query_parts.push("notes = ?");
+            params.push(Box::new(notes));
+        }
+        if let Some(image_data) = updates.image_data {
+            query_parts.push("image_data = ?");
+            params.push(Box::new(image_data));
+        }
 
         query_parts.push("updated_at = CURRENT_TIMESTAMP");
         params.push(Box::new(id));
