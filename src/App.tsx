@@ -15,6 +15,7 @@ const App: Component = () => {
   const store = createProjectStore();
   const [searchQuery, setSearchQuery] = createSignal('');
   const [showForm, setShowForm] = createSignal(false);
+  const [showAnalytics, setShowAnalytics] = createSignal(false);
   const [editingProject, setEditingProject] = createSignal<Project | null>(
     null
   );
