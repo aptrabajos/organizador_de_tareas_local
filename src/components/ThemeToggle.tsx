@@ -6,13 +6,15 @@ export default function ThemeToggle() {
   return (
     <button
       onClick={toggleTheme}
-      class="fixed top-20 right-4 z-50 rounded-full bg-white dark:bg-gray-800 p-3 shadow-lg hover:shadow-xl transition-all duration-200 border border-gray-200 dark:border-gray-700"
+      class="fixed right-4 top-20 z-50 rounded-full border border-gray-200 bg-white p-3 shadow-lg transition-all duration-200 hover:shadow-xl dark:border-gray-700 dark:bg-gray-800"
       aria-label="Cambiar tema"
-      title={theme() === 'light' ? 'Cambiar a tema oscuro' : 'Cambiar a tema claro'}
+      title={
+        theme() === 'light' ? 'Cambiar a tema oscuro' : 'Cambiar a tema claro'
+      }
     >
       {theme() === 'light' ? (
         <svg
-          class="w-6 h-6 text-gray-700"
+          class="h-6 w-6 text-gray-700"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -26,7 +28,7 @@ export default function ThemeToggle() {
         </svg>
       ) : (
         <svg
-          class="w-6 h-6 text-yellow-400"
+          class="h-6 w-6 text-yellow-400"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -42,4 +44,3 @@ export default function ThemeToggle() {
     </button>
   );
 }
-

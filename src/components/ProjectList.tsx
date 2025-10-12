@@ -1,7 +1,12 @@
 import { Component, For, Show } from 'solid-js';
 import toast from 'solid-toast';
 import type { Project } from '../types/project';
-import { openUrl, createProjectBackup, syncProject, syncProjectToBackup } from '../services/api';
+import {
+  openUrl,
+  createProjectBackup,
+  syncProject,
+  syncProjectToBackup,
+} from '../services/api';
 import { open } from '@tauri-apps/plugin-dialog';
 import { invoke } from '@tauri-apps/api/core';
 
@@ -52,17 +57,17 @@ const ProjectList: Component<ProjectListProps> = (props) => {
       // Crear carpeta del proyecto en /mnt/sda1 y guardar backup ahí
       const projectFolder = `/mnt/sda1/${project.name}`;
       const toastId = toast.loading(`Creando backup en ${projectFolder}...`);
-      
+
       try {
         const backupData = await createProjectBackup(project.id);
         const fullPath = `${projectFolder}/${backupData.filename}`;
-        
+
         // Usar el comando personalizado de Tauri (crea la carpeta automáticamente)
         await invoke('write_file_to_path', {
           filePath: fullPath,
           content: backupData.content,
         });
-        
+
         toast.success(`✅ Backup creado en:\n${fullPath}`, {
           id: toastId,
           duration: 5000,
@@ -80,10 +85,15 @@ const ProjectList: Component<ProjectListProps> = (props) => {
   const handleSync = async (project: Project) => {
     try {
       // Sincronizar directamente al backup en /mnt/sda1 con rsync
-      const toastId = toast.loading(`Sincronizando ${project.name} con rsync...`);
-      
+      const toastId = toast.loading(
+        `Sincronizando ${project.name} con rsync...`
+      );
+
       try {
-        const result = await syncProjectToBackup(project.local_path, project.name);
+        const result = await syncProjectToBackup(
+          project.local_path,
+          project.name
+        );
         toast.success(`✅ ${result}`, {
           id: toastId,
           duration: 5000,
@@ -111,11 +121,13 @@ const ProjectList: Component<ProjectListProps> = (props) => {
       <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         <For each={props.projects}>
           {(project) => (
-            <div class="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 shadow-sm transition-shadow hover:shadow-md">
+            <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md dark:border-gray-700 dark:bg-gray-800">
               <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
                 {project.name}
               </h3>
-              <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">{project.description}</p>
+              <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">
+                {project.description}
+              </p>
 
               <div class="mt-3 space-y-1 text-xs text-gray-500 dark:text-gray-400">
                 <p class="truncate" title={project.local_path}>

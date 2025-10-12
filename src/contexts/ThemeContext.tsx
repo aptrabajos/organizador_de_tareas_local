@@ -1,4 +1,10 @@
-import { createContext, useContext, createSignal, ParentComponent, onMount } from 'solid-js';
+import {
+  createContext,
+  useContext,
+  createSignal,
+  ParentComponent,
+  onMount,
+} from 'solid-js';
 
 export type Theme = 'light' | 'dark';
 
@@ -18,7 +24,10 @@ export const ThemeProvider: ParentComponent = (props) => {
       return saved;
     }
     // Detectar preferencia del sistema
-    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+    if (
+      window.matchMedia &&
+      window.matchMedia('(prefers-color-scheme: dark)').matches
+    ) {
       return 'dark';
     }
     return 'light';
@@ -72,4 +81,3 @@ export const useTheme = () => {
   }
   return context;
 };
-

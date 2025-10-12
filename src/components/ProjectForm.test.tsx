@@ -61,9 +61,11 @@ describe('ProjectForm', () => {
         name: 'New Project',
         description: 'New Description',
         local_path: '/home/user/new',
-        documentation_url: '',
-        ai_documentation_url: '',
-        drive_link: '',
+        documentation_url: undefined,
+        ai_documentation_url: undefined,
+        drive_link: undefined,
+        notes: undefined,
+        image_data: undefined,
       });
     });
   });

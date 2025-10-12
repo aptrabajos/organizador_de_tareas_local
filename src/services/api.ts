@@ -72,26 +72,47 @@ export async function syncProjectToBackup(
 // Funciones para manejar enlaces de proyectos
 export interface CreateLinkDTO {
   project_id: number;
-  link_type: 'repository' | 'documentation' | 'staging' | 'production' | 'design' | 'api' | 'other';
+  link_type:
+    | 'repository'
+    | 'documentation'
+    | 'staging'
+    | 'production'
+    | 'design'
+    | 'api'
+    | 'other';
   title: string;
   url: string;
 }
 
 export interface UpdateLinkDTO {
-  link_type?: 'repository' | 'documentation' | 'staging' | 'production' | 'design' | 'api' | 'other';
+  link_type?:
+    | 'repository'
+    | 'documentation'
+    | 'staging'
+    | 'production'
+    | 'design'
+    | 'api'
+    | 'other';
   title?: string;
   url?: string;
 }
 
-export async function createProjectLink(link: CreateLinkDTO): Promise<ProjectLink> {
+export async function createProjectLink(
+  link: CreateLinkDTO
+): Promise<ProjectLink> {
   return await invoke('create_project_link', { link });
 }
 
-export async function getProjectLinks(projectId: number): Promise<ProjectLink[]> {
+export async function getProjectLinks(
+  projectId: number
+): Promise<ProjectLink[]> {
   return await invoke('get_project_links', { projectId });
 }
 
-export async function updateProjectLink(id: number, link: UpdateLinkDTO): Promise<ProjectLink> {
+export async function updateProjectLink(
+  id: number,
+  link: UpdateLinkDTO
+): Promise<ProjectLink> {
   return await invoke('update_project_link', { id, link });
 }
 

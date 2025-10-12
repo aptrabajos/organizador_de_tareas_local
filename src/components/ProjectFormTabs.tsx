@@ -10,7 +10,9 @@ interface ProjectFormTabsProps {
 }
 
 const ProjectFormTabs: Component<ProjectFormTabsProps> = (props) => {
-  const [activeTab, setActiveTab] = createSignal<'details' | 'links'>('details');
+  const [activeTab, setActiveTab] = createSignal<'details' | 'links'>(
+    'details'
+  );
 
   return (
     <div class="space-y-4">
@@ -19,10 +21,10 @@ const ProjectFormTabs: Component<ProjectFormTabsProps> = (props) => {
         <nav class="-mb-px flex space-x-8">
           <button
             onClick={() => setActiveTab('details')}
-            class={`py-2 px-1 border-b-2 font-medium text-sm ${
+            class={`border-b-2 px-1 py-2 text-sm font-medium ${
               activeTab() === 'details'
                 ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
+                : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:border-gray-600 dark:hover:text-gray-300'
             }`}
           >
             📝 Detalles
@@ -30,10 +32,10 @@ const ProjectFormTabs: Component<ProjectFormTabsProps> = (props) => {
           <Show when={props.project?.id}>
             <button
               onClick={() => setActiveTab('links')}
-              class={`py-2 px-1 border-b-2 font-medium text-sm ${
+              class={`border-b-2 px-1 py-2 text-sm font-medium ${
                 activeTab() === 'links'
                   ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                  : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
+                  : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:border-gray-600 dark:hover:text-gray-300'
               }`}
             >
               🔗 Enlaces
