@@ -81,6 +81,52 @@ lsof -ti:1420 | xargs kill -9 2>/dev/null
 pnpm run tauri:dev
 ```
 
+### Production Build & Installation
+
+**Compilar para producción:**
+```bash
+pnpm run tauri:build
+```
+
+Esto genera:
+- Binario: `src-tauri/target/release/gestor-proyectos` (~16MB)
+- Paquete DEB: `src-tauri/target/release/bundle/deb/Gestor de Proyectos_0.1.0_amd64.deb` (~5.5MB)
+
+**Instalación en Manjaro/Arch:**
+```bash
+# Copiar binario al PATH del usuario
+mkdir -p ~/.local/bin
+cp src-tauri/target/release/gestor-proyectos ~/.local/bin/
+chmod +x ~/.local/bin/gestor-proyectos
+
+# Crear entrada en el menú de aplicaciones
+cat > ~/.local/share/applications/gestor-proyectos.desktop << 'EOF'
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Gestor de Proyectos
+Comment=Gestor visual de proyectos locales para desarrollo
+Exec=/home/manjarodesktop/.local/bin/gestor-proyectos
+Icon=folder-development
+Terminal=false
+Categories=Development;Utility;
+Keywords=projects;gestor;desarrollo;
+StartupNotify=true
+EOF
+
+# Hacer ejecutable y actualizar base de datos
+chmod +x ~/.local/share/applications/gestor-proyectos.desktop
+update-desktop-database ~/.local/share/applications
+```
+
+**Ejecutar la aplicación:**
+```bash
+# Desde terminal
+gestor-proyectos
+
+# O buscar "Gestor de Proyectos" en el menú de aplicaciones
+```
+
 ---
 
 ## MCP Server Configuration
