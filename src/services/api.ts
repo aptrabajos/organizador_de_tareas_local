@@ -121,3 +121,26 @@ export async function updateProjectLink(
 export async function deleteProjectLink(id: number): Promise<void> {
   await invoke('delete_project_link', { id });
 }
+
+// Funciones para Analytics y Tracking
+export async function trackProjectOpen(projectId: number): Promise<void> {
+  await invoke('track_project_open', { projectId });
+}
+
+export async function addProjectTime(
+  projectId: number,
+  seconds: number
+): Promise<void> {
+  await invoke('add_project_time', { projectId, seconds });
+}
+
+export async function getProjectStats(): Promise<ProjectStats> {
+  return await invoke('get_project_stats');
+}
+
+export async function getProjectActivities(
+  projectId: number,
+  limit: number = 20
+): Promise<ProjectActivity[]> {
+  return await invoke('get_project_activities', { projectId, limit });
+}
