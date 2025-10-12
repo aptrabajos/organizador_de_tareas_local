@@ -2,6 +2,8 @@ import { invoke } from '@tauri-apps/api/core';
 import type {
   Project,
   ProjectLink,
+  ProjectActivity,
+  ProjectStats,
   CreateProjectDTO,
   UpdateProjectDTO,
 } from '../types/project';
