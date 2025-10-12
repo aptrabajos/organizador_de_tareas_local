@@ -130,36 +130,44 @@ const App: Component = () => {
 
         {/* Main Content */}
         <main class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-          {/* Search Bar */}
-          <div class="mb-6">
-            <SearchBar onSearch={handleSearch} value={searchQuery()} />
-          </div>
-
-          {/* Error Message */}
-          <Show when={store.error()}>
-            <div class="mb-4 rounded-lg bg-red-50 p-4 text-red-800 dark:bg-red-900/20 dark:text-red-200">
-              <p class="font-medium">Error:</p>
-              <p>{store.error()}</p>
-            </div>
+          {/* Analytics View */}
+          <Show when={showAnalytics()}>
+            <Analytics />
           </Show>
 
-          {/* Loading State */}
-          <Show when={store.isLoading()}>
-            <div class="py-12 text-center">
-              <p class="text-gray-600 dark:text-gray-400">
-                Cargando proyectos...
-              </p>
+          {/* Projects View */}
+          <Show when={!showAnalytics()}>
+            {/* Search Bar */}
+            <div class="mb-6">
+              <SearchBar onSearch={handleSearch} value={searchQuery()} />
             </div>
-          </Show>
 
-          {/* Project List */}
-          <Show when={!store.isLoading()}>
-            <ProjectList
-              projects={store.projects()}
-              onEdit={handleEdit}
-              onDelete={handleDelete}
-              onOpenTerminal={handleOpenTerminal}
-            />
+            {/* Error Message */}
+            <Show when={store.error()}>
+              <div class="mb-4 rounded-lg bg-red-50 p-4 text-red-800 dark:bg-red-900/20 dark:text-red-200">
+                <p class="font-medium">Error:</p>
+                <p>{store.error()}</p>
+              </div>
+            </Show>
+
+            {/* Loading State */}
+            <Show when={store.isLoading()}>
+              <div class="py-12 text-center">
+                <p class="text-gray-600 dark:text-gray-400">
+                  Cargando proyectos...
+                </p>
+              </div>
+            </Show>
+
+            {/* Project List */}
+            <Show when={!store.isLoading()}>
+              <ProjectList
+                projects={store.projects()}
+                onEdit={handleEdit}
+                onDelete={handleDelete}
+                onOpenTerminal={handleOpenTerminal}
+              />
+            </Show>
           </Show>
         </main>
 
