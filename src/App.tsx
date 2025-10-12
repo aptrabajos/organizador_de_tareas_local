@@ -110,12 +110,20 @@ const App: Component = () => {
               <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
                 Gestor de Proyectos
               </h1>
-              <button
-                onClick={handleNewProject}
-                class="rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:bg-blue-500 dark:hover:bg-blue-600"
-              >
-                + Nuevo Proyecto
-              </button>
+              <div class="flex gap-2">
+                <button
+                  onClick={() => setShowAnalytics(!showAnalytics())}
+                  class="rounded-lg bg-purple-600 px-4 py-2 text-white hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 dark:bg-purple-500 dark:hover:bg-purple-600"
+                >
+                  📊 {showAnalytics() ? 'Proyectos' : 'Estadísticas'}
+                </button>
+                <button
+                  onClick={handleNewProject}
+                  class="rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:bg-blue-500 dark:hover:bg-blue-600"
+                >
+                  + Nuevo Proyecto
+                </button>
+              </div>
             </div>
           </div>
         </header>
