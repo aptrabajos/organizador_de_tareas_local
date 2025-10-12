@@ -1,4 +1,4 @@
-import { Component, createSignal } from 'solid-js';
+import { Component, createSignal, Show } from 'solid-js';
 import type { Project } from '../types/project';
 
 interface ProjectFormProps {
@@ -14,6 +14,8 @@ export interface ProjectFormData {
   documentation_url: string;
   ai_documentation_url: string;
   drive_link: string;
+  notes: string;
+  image_data: string;
 }
 
 const ProjectForm: Component<ProjectFormProps> = (props) => {
@@ -34,6 +36,75 @@ const ProjectForm: Component<ProjectFormProps> = (props) => {
   const [driveLink, setDriveLink] = createSignal(
     initialProject?.drive_link || ''
   );
+  const [notes, setNotes] = createSignal(initialProject?.notes || '');
+  const [imageData, setImageData] = createSignal(initialProject?.image_data || '');
+  const [imageError, setImageError] = createSignal('');
+
+  const handleImageChange = async (e: Event) => {
+    const input = e.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+
+    if (!file) return;
+
+    // Validar tipo
+    if (!file.type.startsWith('image/')) {
+      setImageError('Por favor selecciona una imagen válida');
+      return;
+    }
+
+    // Validar tamaño (máx 500KB)
+    if (file.size > 500 * 1024) {
+      setImageError('La imagen debe ser menor a 500KB');
+      return;
+    }
+
+    setImageError('');
+
+    // Leer y comprimir imagen
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        // Crear canvas para redimensionar
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+
+        if (!ctx) return;
+
+        // Calcular dimensiones (máx 200x200, mantener aspecto)
+        let width = img.width;
+        let height = img.height;
+        const maxSize = 200;
+
+        if (width > height) {
+          if (width > maxSize) {
+            height = (height * maxSize) / width;
+            width = maxSize;
+          }
+        } else {
+          if (height > maxSize) {
+            width = (width * maxSize) / height;
+            height = maxSize;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // Convertir a base64 con compresión
+        const base64 = canvas.toDataURL('image/jpeg', 0.7);
+        setImageData(base64);
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const removeImage = () => {
+    setImageData('');
+    setImageError('');
+  };
 
   const handleSubmit = (e: SubmitEvent) => {
     e.preventDefault();
