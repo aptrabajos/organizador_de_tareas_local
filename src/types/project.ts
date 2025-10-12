@@ -27,6 +27,27 @@ export interface Project {
   links?: ProjectLink[];
   created_at: string;
   updated_at: string;
+  // Analytics fields
+  last_opened_at?: string;
+  opened_count?: number;
+  total_time_seconds?: number;
+}
+
+export interface ProjectActivity {
+  id: number;
+  project_id: number;
+  activity_type: string;
+  description?: string;
+  duration_seconds?: number;
+  created_at: string;
+}
+
+export interface ProjectStats {
+  total_projects: number;
+  active_today: number;
+  total_time_hours: number;
+  most_active_project?: string;
+  recent_activities: ProjectActivity[];
 }
 
 export interface CreateProjectDTO {
