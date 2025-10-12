@@ -43,6 +43,36 @@ impl Database {
             [],
         );
 
+        // Agregar campos de tracking para analytics
+        let _ = conn.execute(
+            "ALTER TABLE projects ADD COLUMN last_opened_at DATETIME",
+            [],
+        );
+
+        let _ = conn.execute(
+            "ALTER TABLE projects ADD COLUMN opened_count INTEGER DEFAULT 0",
+            [],
+        );
+
+        let _ = conn.execute(
+            "ALTER TABLE projects ADD COLUMN total_time_seconds INTEGER DEFAULT 0",
+            [],
+        );
+
+        // Crear tabla de actividad para timeline
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS project_activity (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL,
+                activity_type TEXT NOT NULL,
+                description TEXT,
+                duration_seconds INTEGER,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE
+            )",
+            [],
+        )?;
+
         // Crear tabla de enlaces de proyectos
         conn.execute(
             "CREATE TABLE IF NOT EXISTS project_links (
