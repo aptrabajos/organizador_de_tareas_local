@@ -128,13 +128,15 @@ const ProjectForm: Component<ProjectFormProps> = (props) => {
       return;
     }
 
-    const formData = {
+    const formData: ProjectFormData = {
       name: name().trim(),
       description: description().trim(),
       local_path: localPath().trim(),
-      documentation_url: documentationUrl().trim(),
-      ai_documentation_url: aiDocumentationUrl().trim(),
-      drive_link: driveLink().trim(),
+      documentation_url: documentationUrl().trim() || undefined,
+      ai_documentation_url: aiDocumentationUrl().trim() || undefined,
+      drive_link: driveLink().trim() || undefined,
+      notes: notes().trim() || undefined,
+      image_data: imageData() || undefined,
     };
 
     console.log('✅ [FRONTEND] Enviando datos:', formData);
@@ -308,9 +310,7 @@ const ProjectForm: Component<ProjectFormProps> = (props) => {
             class="block w-full text-sm text-gray-500 file:mr-4 file:rounded-lg file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-blue-700 hover:file:bg-blue-100 dark:text-gray-400 dark:file:bg-blue-900 dark:file:text-blue-300 dark:hover:file:bg-blue-800"
           />
           <Show when={imageError()}>
-            <p class="text-sm text-red-600 dark:text-red-400">
-              {imageError()}
-            </p>
+            <p class="text-sm text-red-600 dark:text-red-400">{imageError()}</p>
           </Show>
           <p class="text-xs text-gray-500 dark:text-gray-400">
             Máximo 500KB, se redimensionará a 200x200px
