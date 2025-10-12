@@ -175,7 +175,8 @@ const ProjectLinks: Component<ProjectLinksProps> = (props) => {
                 onChange={(e) =>
                   setNewLink({
                     ...newLink(),
-                    link_type: e.currentTarget.value as CreateLinkDTO['link_type'],
+                    link_type: e.currentTarget
+                      .value as CreateLinkDTO['link_type'],
                   })
                 }
                 class="w-full rounded border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
