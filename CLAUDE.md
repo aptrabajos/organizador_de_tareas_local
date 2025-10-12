@@ -218,17 +218,20 @@ When adding new dependencies:
 ### 2025-10-12 - Build de Producción e Instalación
 
 **Compilación:**
+
 - Build exitoso con Tauri 2.1.0
 - Binario optimizado: 16MB (release mode)
 - Paquete DEB generado: 5.5MB
 
 **Instalación en Manjaro:**
+
 - Binario instalado en `~/.local/bin/gestor-proyectos`
 - Entrada .desktop creada en menú de aplicaciones
 - Aplicación disponible desde terminal y menú gráfico
 - PATH configurado correctamente
 
 **Ubicaciones:**
+
 - Binario: `~/.local/bin/gestor-proyectos`
 - Desktop Entry: `~/.local/share/applications/gestor-proyectos.desktop`
 - Documentación de instalación agregada a CLAUDE.md
