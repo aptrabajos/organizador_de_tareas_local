@@ -41,6 +41,10 @@ fn main() {
             commands::get_project_links,
             commands::update_project_link,
             commands::delete_project_link,
+            commands::track_project_open,
+            commands::add_project_time,
+            commands::get_project_stats,
+            commands::get_project_activities,
         ])
         .run(tauri::generate_context!())
         .expect("Error al ejecutar la aplicación Tauri");
