@@ -42,7 +42,12 @@ const App: Component = () => {
   };
 
   const handleDelete = async (project: Project) => {
-    if (confirm(`¿Eliminar proyecto "${project.name}"?`)) {
+    const confirmed = await confirm(`¿Eliminar proyecto "${project.name}"?`, {
+      title: 'Confirmar eliminación',
+      kind: 'warning',
+    });
+
+    if (confirmed) {
       try {
         await store.deleteProject(project.id);
       } catch (_err) {
