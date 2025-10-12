@@ -176,8 +176,10 @@ describe('ProjectForm', () => {
         description: 'Description',
         local_path: '/path',
         documentation_url: 'https://docs.com',
-        ai_documentation_url: '',
+        ai_documentation_url: undefined,
         drive_link: 'https://drive.com',
+        notes: undefined,
+        image_data: undefined,
       });
     });
   });
