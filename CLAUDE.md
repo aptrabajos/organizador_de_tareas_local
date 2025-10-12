@@ -138,3 +138,25 @@ When adding new dependencies:
 2. Verify compatibility with existing tooling
 3. Update this CLAUDE.md if it becomes a core dependency
 4. Run tests after installation to ensure no conflicts
+
+---
+
+## Changelog
+
+### 2025-10-12 - Mejoras de Calidad de Código
+
+**Correcciones de ESLint y TypeScript:**
+- Eliminadas variables no usadas en catch blocks (`_err` en App.tsx)
+- Reemplazado uso de `any` por tipos específicos (`ProjectFormData` en ProjectFormTabs.tsx)
+- Corregido uso de `any` por tipos indexados (`CreateLinkDTO['link_type']` en ProjectLinks.tsx)
+
+**Mejoras de Reactividad en SolidJS:**
+- Corregido acceso a props reactivos fuera de contexto en ProjectForm.tsx
+- Implementada captura de valores iniciales con IIFE para evitar warnings de reactividad
+- Movido acceso a `props.projectId` a contexto reactivo (onMount) en ProjectLinks.tsx
+
+**Resultados:**
+- ESLint: 0 errores, 0 warnings (antes: 6 warnings)
+- Tests: 38 tests pasando en 5 archivos
+- Código completamente tipado sin uso de `any`
+- Aplicación probada y funcionando correctamente
