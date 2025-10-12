@@ -174,16 +174,16 @@ impl Database {
         println!("🔒 [DB] Conexión obtenida exitosamente");
 
         let result = conn.query_row(
-            "SELECT id, name, description, local_path, documentation_url, ai_documentation_url, drive_link,
+            "SELECT id, name, description, local_path, documentation_url, ai_documentation_url, drive_link, notes, image_data,
                     created_at, updated_at FROM projects WHERE id = ?1",
             params![id],
             |row| {
                 println!("📊 [DB] Leyendo fila de base de datos...");
                 let project_id = row.get::<_, i64>(0)?;
-                
+
                 // Obtener enlaces del proyecto
                 let links = self.get_project_links_internal(project_id, &conn).unwrap_or_else(|_| Vec::new());
-                
+
                 let project = Project {
                     id: project_id,
                     name: row.get(1)?,
@@ -192,9 +192,11 @@ impl Database {
                     documentation_url: row.get(4)?,
                     ai_documentation_url: row.get(5)?,
                     drive_link: row.get(6)?,
+                    notes: row.get(7)?,
+                    image_data: row.get(8)?,
                     links: Some(links),
-                    created_at: row.get(7)?,
-                    updated_at: row.get(8)?,
+                    created_at: row.get(9)?,
+                    updated_at: row.get(10)?,
                 };
                 println!("✅ [DB] Proyecto leído de BD: '{}'", project.name);
                 Ok(project)
