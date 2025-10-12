@@ -15,6 +15,8 @@ export interface Project {
   documentation_url?: string;
   ai_documentation_url?: string;
   drive_link?: string;
+  notes?: string;
+  image_data?: string;
   links?: ProjectLink[];
   created_at: string;
   updated_at: string;
