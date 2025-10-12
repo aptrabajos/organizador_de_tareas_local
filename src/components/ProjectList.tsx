@@ -19,6 +19,21 @@ interface ProjectListProps {
 }
 
 const ProjectList: Component<ProjectListProps> = (props) => {
+  const handleOpenTerminal = async (project: Project) => {
+    try {
+      // Registrar apertura del proyecto para analytics
+      await trackProjectOpen(project.id);
+      console.log(`📊 Tracking registrado para proyecto: ${project.name}`);
+
+      // Abrir terminal
+      await props.onOpenTerminal(project);
+    } catch (error) {
+      console.error('Error al abrir proyecto:', error);
+      // Aunque falle el tracking, abrimos el terminal igual
+      await props.onOpenTerminal(project);
+    }
+  };
+
   const handleBackup = async (project: Project) => {
     try {
       // Pedir al usuario que seleccione la carpeta destino
