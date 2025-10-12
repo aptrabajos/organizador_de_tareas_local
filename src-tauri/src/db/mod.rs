@@ -319,7 +319,7 @@ impl Database {
         let search_pattern = format!("%{}%", query);
 
         let mut stmt = conn.prepare(
-            "SELECT id, name, description, local_path, documentation_url, ai_documentation_url, drive_link,
+            "SELECT id, name, description, local_path, documentation_url, ai_documentation_url, drive_link, notes, image_data,
                     created_at, updated_at FROM projects
              WHERE name LIKE ?1 OR description LIKE ?1 OR local_path LIKE ?1
              ORDER BY updated_at DESC"
@@ -335,16 +335,18 @@ impl Database {
                 row.get::<_, Option<String>>(4)?,  // documentation_url
                 row.get::<_, Option<String>>(5)?,  // ai_documentation_url
                 row.get::<_, Option<String>>(6)?,  // drive_link
-                row.get::<_, String>(7)?,  // created_at
-                row.get::<_, String>(8)?,  // updated_at
+                row.get::<_, Option<String>>(7)?,  // notes
+                row.get::<_, Option<String>>(8)?,  // image_data
+                row.get::<_, String>(9)?,  // created_at
+                row.get::<_, String>(10)?,  // updated_at
             ))
         })?
         .collect::<Result<Vec<_>>>()?;
 
         // Para cada proyecto, obtener sus enlaces
-        for (id, name, description, local_path, documentation_url, ai_documentation_url, drive_link, created_at, updated_at) in project_rows {
+        for (id, name, description, local_path, documentation_url, ai_documentation_url, drive_link, notes, image_data, created_at, updated_at) in project_rows {
             let links = self.get_project_links_internal(id, &conn).unwrap_or_else(|_| Vec::new());
-            
+
             projects.push(Project {
                 id,
                 name,
@@ -353,6 +355,8 @@ impl Database {
                 documentation_url,
                 ai_documentation_url,
                 drive_link,
+                notes,
+                image_data,
                 links: Some(links),
                 created_at,
                 updated_at,
