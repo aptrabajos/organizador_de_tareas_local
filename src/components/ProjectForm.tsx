@@ -19,26 +19,33 @@ export interface ProjectFormData {
 }
 
 const ProjectForm: Component<ProjectFormProps> = (props) => {
-  const [name, setName] = createSignal(props.project?.name || '');
-  const [description, setDescription] = createSignal(
-    props.project?.description || ''
-  );
-  const [localPath, setLocalPath] = createSignal(
-    props.project?.local_path || ''
-  );
+  // Capturar valores iniciales una sola vez (props.project no cambia después de montar)
+  const initialValues = (() => {
+    const p = props.project;
+    return {
+      name: p?.name || '',
+      description: p?.description || '',
+      localPath: p?.local_path || '',
+      documentationUrl: p?.documentation_url || '',
+      aiDocumentationUrl: p?.ai_documentation_url || '',
+      driveLink: p?.drive_link || '',
+      notes: p?.notes || '',
+      imageData: p?.image_data || '',
+    };
+  })();
+
+  const [name, setName] = createSignal(initialValues.name);
+  const [description, setDescription] = createSignal(initialValues.description);
+  const [localPath, setLocalPath] = createSignal(initialValues.localPath);
   const [documentationUrl, setDocumentationUrl] = createSignal(
-    props.project?.documentation_url || ''
+    initialValues.documentationUrl
   );
   const [aiDocumentationUrl, setAiDocumentationUrl] = createSignal(
-    props.project?.ai_documentation_url || ''
+    initialValues.aiDocumentationUrl
   );
-  const [driveLink, setDriveLink] = createSignal(
-    props.project?.drive_link || ''
-  );
-  const [notes, setNotes] = createSignal(props.project?.notes || '');
-  const [imageData, setImageData] = createSignal(
-    props.project?.image_data || ''
-  );
+  const [driveLink, setDriveLink] = createSignal(initialValues.driveLink);
+  const [notes, setNotes] = createSignal(initialValues.notes);
+  const [imageData, setImageData] = createSignal(initialValues.imageData);
   const [imageError, setImageError] = createSignal('');
 
   const handleImageChange = async (e: Event) => {
