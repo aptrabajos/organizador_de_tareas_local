@@ -4,11 +4,11 @@ import type { Project } from '../types/project';
 import {
   openUrl,
   createProjectBackup,
-  syncProject,
   syncProjectToBackup,
 } from '../services/api';
 import { open } from '@tauri-apps/plugin-dialog';
 import { invoke } from '@tauri-apps/api/core';
+import { writeTextFile } from '@tauri-apps/plugin-fs';
 
 interface ProjectListProps {
   projects: Project[];
