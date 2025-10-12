@@ -67,7 +67,7 @@ const ProjectLinks: Component<ProjectLinksProps> = (props) => {
   const [showAddForm, setShowAddForm] = createSignal(false);
   const [isLoading, setIsLoading] = createSignal(false);
   const [newLink, setNewLink] = createSignal<Partial<CreateLinkDTO>>({
-    project_id: props.projectId,
+    project_id: 0, // Se actualizará en onMount
     link_type: 'repository',
     title: '',
     url: '',
