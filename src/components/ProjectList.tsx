@@ -122,18 +122,36 @@ const ProjectList: Component<ProjectListProps> = (props) => {
         <For each={props.projects}>
           {(project) => (
             <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md dark:border-gray-700 dark:bg-gray-800">
-              <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
-                {project.name}
-              </h3>
-              <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">
-                {project.description}
-              </p>
+              <div class="flex gap-3">
+                <Show when={project.image_data}>
+                  <img
+                    src={project.image_data}
+                    alt={project.name}
+                    class="h-16 w-16 flex-shrink-0 rounded-lg border-2 border-gray-300 object-cover dark:border-gray-600"
+                  />
+                </Show>
+                <div class="flex-1">
+                  <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+                    {project.name}
+                  </h3>
+                  <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">
+                    {project.description}
+                  </p>
+                </div>
+              </div>
 
               <div class="mt-3 space-y-1 text-xs text-gray-500 dark:text-gray-400">
                 <p class="truncate" title={project.local_path}>
                   📁 {project.local_path}
                 </p>
               </div>
+
+              <Show when={project.notes}>
+                <div class="mt-3 rounded bg-gray-50 p-2 text-xs text-gray-700 dark:bg-gray-700 dark:text-gray-300">
+                  <p class="font-semibold">📝 Notas:</p>
+                  <p class="mt-1 whitespace-pre-wrap">{project.notes}</p>
+                </div>
+              </Show>
 
               <div class="mt-3 flex flex-wrap gap-2">
                 <Show when={project.documentation_url}>
