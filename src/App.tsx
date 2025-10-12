@@ -8,6 +8,7 @@ import { type ProjectFormData } from './components/ProjectForm';
 import ThemeToggle from './components/ThemeToggle';
 import { ThemeProvider } from './contexts/ThemeContext';
 import type { Project } from './types/project';
+import { confirm } from '@tauri-apps/plugin-dialog';
 
 const App: Component = () => {
   const store = createProjectStore();
