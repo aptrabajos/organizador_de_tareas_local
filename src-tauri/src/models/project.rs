@@ -24,6 +24,37 @@ pub struct Project {
     pub links: Option<Vec<ProjectLink>>,
     pub created_at: String,
     pub updated_at: String,
+    // Analytics fields
+    pub last_opened_at: Option<String>,
+    pub opened_count: Option<i64>,
+    pub total_time_seconds: Option<i64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProjectActivity {
+    pub id: i64,
+    pub project_id: i64,
+    pub activity_type: String,
+    pub description: Option<String>,
+    pub duration_seconds: Option<i64>,
+    pub created_at: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CreateActivityDTO {
+    pub project_id: i64,
+    pub activity_type: String,
+    pub description: Option<String>,
+    pub duration_seconds: Option<i64>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ProjectStats {
+    pub total_projects: i64,
+    pub active_today: i64,
+    pub total_time_hours: f64,
+    pub most_active_project: Option<String>,
+    pub recent_activities: Vec<ProjectActivity>,
 }
 
 #[derive(Debug, Deserialize)]
