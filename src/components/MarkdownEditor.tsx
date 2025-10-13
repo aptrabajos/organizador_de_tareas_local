@@ -1,5 +1,6 @@
 import { Component, createSignal, createEffect } from 'solid-js';
 import { marked } from 'marked';
+import DOMPurify from 'dompurify';
 
 interface MarkdownEditorProps {
   value: string;

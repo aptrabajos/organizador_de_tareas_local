@@ -49,6 +49,12 @@ export default [
     },
   },
   {
-    ignores: ['node_modules/**', 'dist/**', 'src-tauri/**', '.vite/**', 'tailwind.config.js'],
+    ignores: [
+      'node_modules/**',
+      'dist/**',
+      'src-tauri/**',
+      '.vite/**',
+      'tailwind.config.js',
+    ],
   },
 ];
