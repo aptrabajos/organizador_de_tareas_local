@@ -6,6 +6,8 @@ import type {
   ProjectStats,
   CreateProjectDTO,
   UpdateProjectDTO,
+  ProjectAttachment,
+  CreateAttachmentDTO,
 } from '../types/project';
 
 export async function createProject(
