@@ -29,7 +29,9 @@ const MarkdownEditor: Component<MarkdownEditorProps> = (props) => {
         '<input type="checkbox" class="mr-2 h-4 w-4 cursor-pointer" onclick="return false;"$1>'
       );
 
-      setRenderedHtml(html);
+      // Sanitizar HTML para prevenir XSS
+      const sanitized = DOMPurify.sanitize(html);
+      setRenderedHtml(sanitized);
     }
   });
 
