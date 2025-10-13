@@ -1,5 +1,7 @@
 import { Component, For, Show } from 'solid-js';
 import toast from 'solid-toast';
+import { marked } from 'marked';
+import DOMPurify from 'dompurify';
 import type { Project } from '../types/project';
 import {
   openUrl,
@@ -10,6 +12,12 @@ import {
 import { open } from '@tauri-apps/plugin-dialog';
 import { invoke } from '@tauri-apps/api/core';
 import { writeTextFile } from '@tauri-apps/plugin-fs';
+
+// Configurar marked para soportar GFM y checkboxes
+marked.use({
+  breaks: true,
+  gfm: true,
+});
 
 interface ProjectListProps {
   projects: Project[];
