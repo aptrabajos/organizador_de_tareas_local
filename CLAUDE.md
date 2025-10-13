@@ -327,7 +327,67 @@ When adding new dependencies:
 
 **Próximas Funcionalidades Pendientes:**
 
-- Markdown con preview para notas
-- Checklist dentro de notas
 - Adjuntar archivos pequeños a proyectos
 - Distribución por tags en analytics
+
+### 2025-10-13 - Markdown Editor con Preview y Checklists
+
+**Implementación Completa de Editor Rico para Notas:**
+
+**Frontend (SolidJS + TypeScript):**
+
+- Nuevo componente `MarkdownEditor.tsx`:
+  - Tabs "✏️ Editar" y "👁️ Vista Previa"
+  - Textarea con sintaxis monoespaciada para edición
+  - Preview en tiempo real del markdown renderizado
+  - Soporte completo para GitHub Flavored Markdown (GFM)
+  - Sanitización de HTML con DOMPurify (seguridad XSS)
+
+- Renderizado en ProjectList.tsx:
+  - Markdown renderizado en cards de proyectos
+  - Scroll automático para notas largas (max-height: 10rem)
+  - Estilos tipográficos con @tailwindcss/typography
+  - Checkboxes funcionales de solo lectura
+
+**Dependencias Agregadas:**
+
+- `marked@16.4.0` - Parser de Markdown a HTML
+- `dompurify@3.2.7` - Sanitización de HTML
+- `@tailwindcss/typography@0.5.19` - Estilos para contenido markdown
+
+**Sintaxis Markdown Soportada:**
+
+```markdown
+# Títulos (H1-H6)
+**Negrita** *Cursiva* `código inline`
+- [ ] Checklist sin marcar
+- [x] Checklist marcada
+- Listas sin orden
+1. Listas ordenadas
+[Links](https://example.com)
+> Citas en bloque
+\```
+Bloques de código
+\```
+```
+
+**Archivos Modificados:**
+
+- `src/components/MarkdownEditor.tsx` - Componente nuevo (104 líneas)
+- `src/components/ProjectForm.tsx` - Integración del editor en campo notas
+- `src/components/ProjectList.tsx` - Renderizado de markdown en cards
+- `tailwind.config.js` - Plugin de typography
+- `eslint.config.js` - Ignorar tailwind.config.js
+- `package.json` - 3 nuevas dependencias
+
+**Características Implementadas:**
+
+✅ Editor con tabs Edit/Preview
+✅ Sintaxis markdown completa (GFM)
+✅ Checklists funcionales con checkboxes
+✅ Sanitización de HTML contra XSS
+✅ Preview en tiempo real
+✅ Scroll automático para notas largas
+✅ Estilos tipográficos profesionales
+✅ Soporte dark mode completo
+✅ 0 errores de ESLint, 38 tests pasando
