@@ -89,3 +89,10 @@ export interface CreateAttachmentDTO {
   file_size: number;
   mime_type: string;
 }
+
+export interface GitCommit {
+  hash: string;
+  author: string;
+  date: string;
+  message: string;
+}
