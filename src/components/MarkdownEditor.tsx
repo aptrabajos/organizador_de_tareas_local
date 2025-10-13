@@ -71,12 +71,16 @@ const MarkdownEditor: Component<MarkdownEditorProps> = (props) => {
           <textarea
             value={props.value}
             onInput={handleTextareaChange}
-            placeholder={props.placeholder || 'Escribe en Markdown...\n\n# Título\n- [ ] Tarea pendiente\n- [x] Tarea completada\n**Negrita** *Cursiva* `código`'}
+            placeholder={
+              props.placeholder ||
+              'Escribe en Markdown...\n\n# Título\n- [ ] Tarea pendiente\n- [x] Tarea completada\n**Negrita** *Cursiva* `código`'
+            }
             class="w-full rounded-lg border border-gray-300 bg-white p-3 font-mono text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-500 dark:focus:border-blue-400 dark:focus:ring-blue-400"
             rows={12}
           />
           <div class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-            💡 Soporta Markdown: <strong>**negrita**</strong>, <em>*cursiva*</em>, <code>`código`</code>, listas, links, y más
+            💡 Soporta Markdown: <strong>**negrita**</strong>,{' '}
+            <em>*cursiva*</em>, <code>`código`</code>, listas, links, y más
           </div>
         </div>
       )}
