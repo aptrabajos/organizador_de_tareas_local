@@ -16,7 +16,8 @@ const AttachmentManager: Component<AttachmentManagerProps> = (props) => {
   const [isUploading, setIsUploading] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
   const [isDragging, setIsDragging] = createSignal(false);
-  const [previewImage, setPreviewImage] = createSignal<ProjectAttachment | null>(null);
+  const [previewImage, setPreviewImage] =
+    createSignal<ProjectAttachment | null>(null);
 
   // Cargar adjuntos al montar el componente
   onMount(async () => {
@@ -144,19 +145,42 @@ const AttachmentManager: Component<AttachmentManagerProps> = (props) => {
     if (mimeType.startsWith('video/')) return '🎥';
     if (mimeType.startsWith('audio/')) return '🎵';
     if (mimeType.includes('pdf')) return '📄';
-    if (mimeType.includes('zip') || mimeType.includes('rar'))
-      return '📦';
-    if (
-      mimeType.includes('word') ||
-      mimeType.includes('document')
-    )
-      return '📝';
-    if (
-      mimeType.includes('sheet') ||
-      mimeType.includes('excel')
-    )
-      return '📊';
+    if (mimeType.includes('zip') || mimeType.includes('rar')) return '📦';
+    if (mimeType.includes('word') || mimeType.includes('document')) return '📝';
+    if (mimeType.includes('sheet') || mimeType.includes('excel')) return '📊';
     return '📎';
+  };
+
+  // Drag & Drop handlers
+  const handleDragOver = (e: DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = async (e: DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    if (isUploading()) return;
+
+    const files = e.dataTransfer?.files;
+    if (!files || files.length === 0) return;
+
+    // Subir el primer archivo
+    await uploadFile(files[0]);
+  };
+
+  // Obtener URL de imagen para preview
+  const getImageDataUrl = (attachment: ProjectAttachment): string => {
+    return `data:${attachment.mime_type};base64,${attachment.file_data}`;
   };
 
   return (
@@ -166,7 +190,7 @@ const AttachmentManager: Component<AttachmentManagerProps> = (props) => {
           Archivos Adjuntos
         </h3>
         <label
-          class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors cursor-pointer disabled:opacity-50"
+          class="inline-flex cursor-pointer items-center rounded-lg bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
           classList={{ 'opacity-50 cursor-not-allowed': isUploading() }}
         >
           <span>{isUploading() ? 'Subiendo...' : 'Subir Archivo'}</span>
@@ -180,7 +204,7 @@ const AttachmentManager: Component<AttachmentManagerProps> = (props) => {
       </div>
 
       <Show when={error()}>
-        <div class="p-3 bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400 rounded-lg">
+        <div class="rounded-lg bg-red-100 p-3 text-red-700 dark:bg-red-900/20 dark:text-red-400">
           {error()}
         </div>
       </Show>
@@ -192,7 +216,7 @@ const AttachmentManager: Component<AttachmentManagerProps> = (props) => {
       <Show
         when={attachments().length > 0}
         fallback={
-          <div class="text-center py-8 text-gray-500 dark:text-gray-400">
+          <div class="py-8 text-center text-gray-500 dark:text-gray-400">
             No hay archivos adjuntos
           </div>
         }
@@ -200,13 +224,13 @@ const AttachmentManager: Component<AttachmentManagerProps> = (props) => {
         <div class="space-y-2">
           <For each={attachments()}>
             {(attachment) => (
-              <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
-                <div class="flex items-center space-x-3 flex-1 min-w-0">
+              <div class="flex items-center justify-between rounded-lg bg-gray-50 p-3 transition-colors hover:bg-gray-100 dark:bg-gray-800 dark:hover:bg-gray-700">
+                <div class="flex min-w-0 flex-1 items-center space-x-3">
                   <span class="text-2xl">
                     {getFileIcon(attachment.mime_type)}
                   </span>
-                  <div class="flex-1 min-w-0">
-                    <div class="font-medium text-gray-900 dark:text-gray-100 truncate">
+                  <div class="min-w-0 flex-1">
+                    <div class="truncate font-medium text-gray-900 dark:text-gray-100">
                       {attachment.filename}
                     </div>
                     <div class="text-sm text-gray-500 dark:text-gray-400">
@@ -215,14 +239,14 @@ const AttachmentManager: Component<AttachmentManagerProps> = (props) => {
                     </div>
                   </div>
                 </div>
-                <div class="flex items-center space-x-2 ml-4">
+                <div class="ml-4 flex items-center space-x-2">
                   <button
                     onClick={() => downloadAttachment(attachment)}
-                    class="p-2 text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20 rounded transition-colors"
+                    class="rounded p-2 text-blue-600 transition-colors hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20"
                     title="Descargar"
                   >
                     <svg
-                      class="w-5 h-5"
+                      class="h-5 w-5"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -239,11 +263,11 @@ const AttachmentManager: Component<AttachmentManagerProps> = (props) => {
                     onClick={() =>
                       handleDelete(attachment.id, attachment.filename)
                     }
-                    class="p-2 text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20 rounded transition-colors"
+                    class="rounded p-2 text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
                     title="Eliminar"
                   >
                     <svg
-                      class="w-5 h-5"
+                      class="h-5 w-5"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
