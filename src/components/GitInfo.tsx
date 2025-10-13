@@ -19,7 +19,7 @@ const GitInfo: Component<GitInfoProps> = (props) => {
       // Check if there are changes
       const status = await getGitStatus(props.projectPath);
       setHasChanges(status.trim().length > 0);
-    } catch (err) {
+    } catch {
       // Not a git repository or error
       setIsGitRepo(false);
     }
