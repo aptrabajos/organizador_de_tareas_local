@@ -679,4 +679,85 @@ impl Database {
 
         Ok(activities)
     }
+
+    // ==================== MÉTODOS PARA ARCHIVOS ADJUNTOS ====================
+
+    pub fn add_attachment(&self, attachment: CreateAttachmentDTO) -> Result<ProjectAttachment> {
+        const MAX_FILE_SIZE: i64 = 5 * 1024 * 1024; // 5MB en bytes
+
+        // Validar tamaño
+        if attachment.file_size > MAX_FILE_SIZE {
+            return Err(rusqlite::Error::InvalidParameterName(
+                "File size exceeds 5MB limit".to_string(),
+            ));
+        }
+
+        let conn = self.conn.lock().unwrap();
+
+        conn.execute(
+            "INSERT INTO project_attachments (project_id, filename, file_data, file_size, mime_type)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![
+                attachment.project_id,
+                attachment.filename,
+                attachment.file_data,
+                attachment.file_size,
+                attachment.mime_type
+            ],
+        )?;
+
+        let id = conn.last_insert_rowid();
+
+        let attachment = conn.query_row(
+            "SELECT id, project_id, filename, file_data, file_size, mime_type, created_at
+             FROM project_attachments WHERE id = ?1",
+            params![id],
+            |row| {
+                Ok(ProjectAttachment {
+                    id: row.get(0)?,
+                    project_id: row.get(1)?,
+                    filename: row.get(2)?,
+                    file_data: row.get(3)?,
+                    file_size: row.get(4)?,
+                    mime_type: row.get(5)?,
+                    created_at: row.get(6)?,
+                })
+            },
+        )?;
+
+        Ok(attachment)
+    }
+
+    pub fn get_attachments(&self, project_id: i64) -> Result<Vec<ProjectAttachment>> {
+        let conn = self.conn.lock().unwrap();
+
+        let mut stmt = conn.prepare(
+            "SELECT id, project_id, filename, file_data, file_size, mime_type, created_at
+             FROM project_attachments WHERE project_id = ?1 ORDER BY created_at DESC",
+        )?;
+
+        let attachments = stmt
+            .query_map(params![project_id], |row| {
+                Ok(ProjectAttachment {
+                    id: row.get(0)?,
+                    project_id: row.get(1)?,
+                    filename: row.get(2)?,
+                    file_data: row.get(3)?,
+                    file_size: row.get(4)?,
+                    mime_type: row.get(5)?,
+                    created_at: row.get(6)?,
+                })
+            })?
+            .collect::<Result<Vec<_>>>()?;
+
+        Ok(attachments)
+    }
+
+    pub fn delete_attachment(&self, id: i64) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+
+        conn.execute("DELETE FROM project_attachments WHERE id = ?1", params![id])?;
+
+        Ok(())
+    }
 }
