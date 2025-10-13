@@ -27,6 +27,20 @@ interface ProjectListProps {
 }
 
 const ProjectList: Component<ProjectListProps> = (props) => {
+  // Función helper para renderizar markdown de forma segura
+  const renderMarkdown = (markdown: string): string => {
+    let html = marked.parse(markdown) as string;
+
+    // Estilizar checkboxes
+    html = html.replace(
+      /<input type="checkbox"(.*?)>/g,
+      '<input type="checkbox" class="mr-1 h-3 w-3 cursor-pointer" onclick="return false;"$1>'
+    );
+
+    // Sanitizar HTML
+    return DOMPurify.sanitize(html);
+  };
+
   const handleOpenTerminal = async (project: Project) => {
     try {
       // Registrar apertura del proyecto para analytics
