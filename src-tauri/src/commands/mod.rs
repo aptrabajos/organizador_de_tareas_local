@@ -543,3 +543,82 @@ pub async fn delete_attachment(
         .map_err(|e| format!("Error deleting attachment: {}", e))
 }
 
+// Git Commands
+#[tauri::command]
+pub async fn get_git_branch(path: String) -> Result<String, String> {
+    let output = Command::new("git")
+        .args(&["-C", &path, "rev-parse", "--abbrev-ref", "HEAD"])
+        .output()
+        .map_err(|e| format!("Failed to execute git command: {}", e))?;
+
+    if output.status.success() {
+        let branch = String::from_utf8_lossy(&output.stdout)
+            .trim()
+            .to_string();
+        Ok(branch)
+    } else {
+        Err("Not a git repository".to_string())
+    }
+}
+
+#[tauri::command]
+pub async fn get_git_status(path: String) -> Result<String, String> {
+    let output = Command::new("git")
+        .args(&["-C", &path, "status", "--porcelain"])
+        .output()
+        .map_err(|e| format!("Failed to execute git command: {}", e))?;
+
+    if output.status.success() {
+        let status = String::from_utf8_lossy(&output.stdout).to_string();
+        Ok(status)
+    } else {
+        Err("Not a git repository".to_string())
+    }
+}
+
+#[derive(serde::Serialize)]
+pub struct GitCommit {
+    pub hash: String,
+    pub author: String,
+    pub date: String,
+    pub message: String,
+}
+
+#[tauri::command]
+pub async fn get_recent_commits(path: String, limit: usize) -> Result<Vec<GitCommit>, String> {
+    let limit_str = limit.to_string();
+    let output = Command::new("git")
+        .args(&[
+            "-C",
+            &path,
+            "log",
+            &format!("-{}", limit_str),
+            "--pretty=format:%H|%an|%ar|%s",
+        ])
+        .output()
+        .map_err(|e| format!("Failed to execute git command: {}", e))?;
+
+    if output.status.success() {
+        let commits_str = String::from_utf8_lossy(&output.stdout);
+        let commits: Vec<GitCommit> = commits_str
+            .lines()
+            .filter_map(|line| {
+                let parts: Vec<&str> = line.split('|').collect();
+                if parts.len() == 4 {
+                    Some(GitCommit {
+                        hash: parts[0][..7].to_string(), // Short hash
+                        author: parts[1].to_string(),
+                        date: parts[2].to_string(),
+                        message: parts[3].to_string(),
+                    })
+                } else {
+                    None
+                }
+            })
+            .collect();
+        Ok(commits)
+    } else {
+        Err("Not a git repository or no commits".to_string())
+    }
+}
+

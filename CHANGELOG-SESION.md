@@ -1,6 +1,6 @@
 # 📝 Changelog - Sesión de Mejoras
 
-**Fecha:** 2025-10-10  
+**Fecha:** 2025-10-10
 **Sesión:** Análisis, puesta en marcha y mejoras del proyecto
 
 ---
@@ -28,18 +28,19 @@ BUILD:    Vite (dev server + compilador)
 ### Documentación Creada
 
 - **ARQUITECTURA.md** (19 KB) - Explicación completa de cómo funciona todo
+
   - Rol de Vite (build tool, NO runtime)
   - Diferencia entre Tauri y Electron
   - Flujo de desarrollo vs producción
   - Comunicación frontend ↔ backend
-
 - **GUIA-DESARROLLO.md** (7.3 KB) - Guía práctica de desarrollo
+
   - Cómo iniciar la aplicación
   - Cómo ver logs
   - Solución de problemas comunes
   - Comandos útiles
-
 - **LOGS-CAPTURADOS.md** (9.4 KB) - Logs y debugging
+
   - Logs de inicio capturados
   - Estado del sistema verificado
   - Problemas resueltos
@@ -56,6 +57,7 @@ BUILD:    Vite (dev server + compilador)
 **Problema:** Puerto 1420 ocupado, múltiples instancias corriendo
 
 **Solución:**
+
 ```bash
 pkill -f "gestor-proyectos"
 lsof -ti:1420 | xargs kill -9
@@ -65,7 +67,8 @@ lsof -ti:1420 | xargs kill -9
 
 **Problema:** `tauri.conf.json` usaba `npm` en lugar de `pnpm`
 
-**Solución:** 
+**Solución:**
+
 ```json
 "beforeDevCommand": "pnpm run dev"  // Antes: npm run dev
 "beforeBuildCommand": "pnpm run build"  // Antes: npm run build
@@ -74,12 +77,13 @@ lsof -ti:1420 | xargs kill -9
 ### Scripts Helper Creados
 
 - **start-app.sh** (1.9 KB)
+
   - Verifica instancias previas
   - Libera puerto automáticamente
   - Verifica dependencias
   - Inicia aplicación limpiamente
-
 - **monitor-logs.sh** (1.9 KB)
+
   - Monitorea logs en tiempo real
   - Encuentra PID automáticamente
   - Muestra instrucciones claras
@@ -116,6 +120,7 @@ await writeTextFile(fullPath, backupData.content);
 ```
 
 **Mejoras:**
+
 - ✅ Selector de carpeta nativo
 - ✅ Sugiere carpeta del proyecto por defecto
 - ✅ Usuario puede elegir cualquier ubicación
@@ -149,13 +154,21 @@ const handleBackupToMnt = async (project: Project) => {
 ```
 
 **Interfaz actualizada:**
+
 - 💾 (azul) - "Crear backup - Elegir carpeta"
 - 💿 (índigo) - "Backup directo a /mnt/sda1"
 
 **Ventajas:**
+
 - ✅ Acceso directo al disco sin navegación
 - ✅ Solución para discos montados no visibles en selector
 - ✅ Flexibilidad: selector manual + acceso directo
+
+sudo systemctl suspend
+
+# Esperá unos segundos, reanuda y verificá
+
+timedatectl status
 
 ### Logs Mejorados (Backend)
 
@@ -174,6 +187,7 @@ println!("✅ [BACKUP] Datos de backup generados exitosamente");
 ```
 
 **Beneficios:**
+
 - 🎨 Emojis para fácil identificación
 - 📊 Información detallada del proceso
 - 🐛 Mejor debugging
@@ -232,6 +246,7 @@ Actualizado `tauri.conf.json` con scopes específicos:
 ### Error Corregido Durante el Proceso
 
 **Error inicial:**
+
 ```
 UnknownPermission { key: "fs", permission: "allow-read-recursive" }
 ```
@@ -398,28 +413,27 @@ Puerto:  1420 (interno)
 
 ## ✅ Checklist Final
 
-- [x] Aplicación funcionando
-- [x] Una única instancia corriendo
-- [x] Puerto 1420 libre para uso interno
-- [x] Logs capturándose correctamente
-- [x] Backup con selector de carpeta
-- [x] Acceso a `/mnt/**` configurado
-- [x] Scripts helper creados
-- [x] Documentación completa
-- [x] README actualizado
-- [x] Arquitectura documentada
+- [X] Aplicación funcionando
+- [X] Una única instancia corriendo
+- [X] Puerto 1420 libre para uso interno
+- [X] Logs capturándose correctamente
+- [X] Backup con selector de carpeta
+- [X] Acceso a `/mnt/**` configurado
+- [X] Scripts helper creados
+- [X] Documentación completa
+- [X] README actualizado
+- [X] Arquitectura documentada
 
 ---
 
 **Sesión completada exitosamente** 🎉
 
-**Total de archivos creados/modificados:** 10  
-**Documentación generada:** 52 KB  
-**Bugs resueltos:** 3  
-**Mejoras implementadas:** 2  
-**Scripts helper:** 2  
+**Total de archivos creados/modificados:** 10
+**Documentación generada:** 52 KB
+**Bugs resueltos:** 3
+**Mejoras implementadas:** 2
+**Scripts helper:** 2
 
 ---
 
 *Generado: 2025-10-10 22:30*
-
