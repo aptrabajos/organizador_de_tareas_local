@@ -70,6 +70,10 @@ const ProjectFormTabs: Component<ProjectFormTabsProps> = (props) => {
           projectName={props.project!.name}
         />
       </Show>
+
+      <Show when={activeTab() === 'attachments' && props.project?.id}>
+        <AttachmentManager projectId={props.project!.id} />
+      </Show>
     </div>
   );
 };
