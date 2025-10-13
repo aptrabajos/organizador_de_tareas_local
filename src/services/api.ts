@@ -146,3 +146,20 @@ export async function getProjectActivities(
 ): Promise<ProjectActivity[]> {
   return await invoke('get_project_activities', { projectId, limit });
 }
+
+// Funciones para manejar archivos adjuntos
+export async function addAttachment(
+  attachment: CreateAttachmentDTO
+): Promise<ProjectAttachment> {
+  return await invoke('add_attachment', { attachment });
+}
+
+export async function getAttachments(
+  projectId: number
+): Promise<ProjectAttachment[]> {
+  return await invoke('get_attachments', { projectId });
+}
+
+export async function deleteAttachment(id: number): Promise<void> {
+  await invoke('delete_attachment', { id });
+}
