@@ -187,9 +187,11 @@ const ProjectList: Component<ProjectListProps> = (props) => {
               <Show when={project.notes}>
                 <div class="mt-3 rounded bg-gray-50 p-2 text-xs text-gray-700 dark:bg-gray-700 dark:text-gray-300">
                   <p class="font-semibold">📝 Notas:</p>
-                  <p class="mt-1 whitespace-pre-wrap break-words">
-                    {project.notes}
-                  </p>
+                  <div
+                    class="prose prose-xs mt-1 max-w-none break-words dark:prose-invert"
+                    // eslint-disable-next-line solid/no-innerhtml
+                    innerHTML={renderMarkdown(project.notes!)}
+                  />
                 </div>
               </Show>
 
