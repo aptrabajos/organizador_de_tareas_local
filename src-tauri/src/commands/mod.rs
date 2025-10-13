@@ -511,3 +511,35 @@ pub async fn get_project_activities(
         .map_err(|e| format!("Error getting project activities: {}", e))
 }
 
+// ==================== COMANDOS PARA ARCHIVOS ADJUNTOS ====================
+
+#[tauri::command]
+pub async fn add_attachment(
+    db: State<'_, Database>,
+    attachment: crate::models::project::CreateAttachmentDTO,
+) -> Result<crate::models::project::ProjectAttachment, String> {
+    println!("📎 [ATTACHMENT] Agregando archivo: {} ({} bytes)", attachment.filename, attachment.file_size);
+    db.add_attachment(attachment)
+        .map_err(|e| format!("Error adding attachment: {}", e))
+}
+
+#[tauri::command]
+pub async fn get_attachments(
+    db: State<'_, Database>,
+    project_id: i64,
+) -> Result<Vec<crate::models::project::ProjectAttachment>, String> {
+    println!("📎 [ATTACHMENT] Obteniendo archivos del proyecto ID: {}", project_id);
+    db.get_attachments(project_id)
+        .map_err(|e| format!("Error getting attachments: {}", e))
+}
+
+#[tauri::command]
+pub async fn delete_attachment(
+    db: State<'_, Database>,
+    id: i64,
+) -> Result<(), String> {
+    println!("🗑️ [ATTACHMENT] Eliminando archivo ID: {}", id);
+    db.delete_attachment(id)
+        .map_err(|e| format!("Error deleting attachment: {}", e))
+}
+
