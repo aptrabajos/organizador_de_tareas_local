@@ -3,6 +3,7 @@ import toast from 'solid-toast';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import type { Project } from '../types/project';
+import GitInfo from './GitInfo';
 import {
   openUrl,
   createProjectBackup,
