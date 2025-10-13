@@ -221,15 +221,18 @@ const AttachmentManager: Component<AttachmentManagerProps> = (props) => {
         }}
       >
         <div class="text-gray-500 dark:text-gray-400">
-          <Show when={isDragging()} fallback={
-            <>
-              <div class="text-4xl mb-2">📎</div>
-              <div class="font-medium">Arrastra archivos aquí</div>
-              <div class="text-sm mt-1">o usa el botón "Subir Archivo"</div>
-              <div class="text-xs mt-2">Tamaño máximo: 5MB</div>
-            </>
-          }>
-            <div class="text-4xl mb-2">⬇️</div>
+          <Show
+            when={isDragging()}
+            fallback={
+              <>
+                <div class="mb-2 text-4xl">📎</div>
+                <div class="font-medium">Arrastra archivos aquí</div>
+                <div class="mt-1 text-sm">o usa el botón "Subir Archivo"</div>
+                <div class="mt-2 text-xs">Tamaño máximo: 5MB</div>
+              </>
+            }
+          >
+            <div class="mb-2 text-4xl">⬇️</div>
             <div class="font-medium text-blue-600 dark:text-blue-400">
               Suelta el archivo aquí
             </div>
@@ -264,6 +267,33 @@ const AttachmentManager: Component<AttachmentManagerProps> = (props) => {
                   </div>
                 </div>
                 <div class="ml-4 flex items-center space-x-2">
+                  <Show when={attachment.mime_type.startsWith('image/')}>
+                    <button
+                      onClick={() => setPreviewImage(attachment)}
+                      class="rounded p-2 text-purple-600 transition-colors hover:bg-purple-50 dark:text-purple-400 dark:hover:bg-purple-900/20"
+                      title="Ver imagen"
+                    >
+                      <svg
+                        class="h-5 w-5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                        />
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                        />
+                      </svg>
+                    </button>
+                  </Show>
                   <button
                     onClick={() => downloadAttachment(attachment)}
                     class="rounded p-2 text-blue-600 transition-colors hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20"
