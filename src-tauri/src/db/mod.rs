@@ -87,6 +87,21 @@ impl Database {
             [],
         )?;
 
+        // Crear tabla de archivos adjuntos
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS project_attachments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL,
+                filename TEXT NOT NULL,
+                file_data TEXT NOT NULL,
+                file_size INTEGER NOT NULL,
+                mime_type TEXT NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE
+            )",
+            [],
+        )?;
+
         Ok(Database {
             conn: Mutex::new(conn),
         })

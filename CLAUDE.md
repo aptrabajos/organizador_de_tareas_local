@@ -357,19 +357,22 @@ When adding new dependencies:
 
 **Sintaxis Markdown Soportada:**
 
-```markdown
+````markdown
 # Títulos (H1-H6)
-**Negrita** *Cursiva* `código inline`
+
+**Negrita** _Cursiva_ `código inline`
+
 - [ ] Checklist sin marcar
 - [x] Checklist marcada
 - Listas sin orden
+
 1. Listas ordenadas
-[Links](https://example.com)
-> Citas en bloque
-\```
-Bloques de código
-\```
-```
+   [Links](https://example.com)
+   > Citas en bloque
+   > \```
+   > Bloques de código
+   > \```
+````
 
 **Archivos Modificados:**
 
