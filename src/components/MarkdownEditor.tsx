@@ -20,7 +20,14 @@ const MarkdownEditor: Component<MarkdownEditorProps> = (props) => {
   // Renderizar markdown cuando cambia el valor o la tab
   createEffect(() => {
     if (activeTab() === 'preview') {
-      const html = marked.parse(props.value || props.placeholder || '') as string;
+      let html = marked.parse(props.value || props.placeholder || '') as string;
+
+      // Hacer que los checkboxes sean visibles con mejor estilo
+      html = html.replace(
+        /<input type="checkbox"(.*?)>/g,
+        '<input type="checkbox" class="mr-2 h-4 w-4 cursor-pointer" onclick="return false;"$1>'
+      );
+
       setRenderedHtml(html);
     }
   });
