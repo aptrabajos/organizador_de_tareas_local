@@ -259,17 +259,20 @@ const ProjectForm: Component<ProjectFormProps> = (props) => {
       <div>
         <label
           for="notes"
-          class="block text-sm font-medium text-gray-700 dark:text-gray-300"
+          class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
         >
-          Notas
+          Notas (Markdown)
         </label>
-        <textarea
-          id="notes"
+        <MarkdownEditor
           value={notes()}
-          onInput={(e) => setNotes(e.currentTarget.value)}
-          rows={4}
-          class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400 dark:focus:ring-blue-800"
-          placeholder="Notas adicionales sobre el proyecto..."
+          onChange={setNotes}
+          placeholder="Notas adicionales sobre el proyecto...
+
+# Ejemplo de Markdown
+- [ ] Tarea pendiente
+- [x] Tarea completada
+
+**Texto en negrita** y *texto en cursiva*"
         />
       </div>
 
