@@ -11,9 +11,9 @@ interface ProjectFormTabsProps {
 }
 
 const ProjectFormTabs: Component<ProjectFormTabsProps> = (props) => {
-  const [activeTab, setActiveTab] = createSignal<'details' | 'links'>(
-    'details'
-  );
+  const [activeTab, setActiveTab] = createSignal<
+    'details' | 'links' | 'attachments'
+  >('details');
 
   return (
     <div class="space-y-4">
