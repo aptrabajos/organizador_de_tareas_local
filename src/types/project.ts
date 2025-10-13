@@ -71,3 +71,21 @@ export interface UpdateProjectDTO {
   notes?: string;
   image_data?: string;
 }
+
+export interface ProjectAttachment {
+  id: number;
+  project_id: number;
+  filename: string;
+  file_data: string;
+  file_size: number;
+  mime_type: string;
+  created_at: string;
+}
+
+export interface CreateAttachmentDTO {
+  project_id: number;
+  filename: string;
+  file_data: string;
+  file_size: number;
+  mime_type: string;
+}
