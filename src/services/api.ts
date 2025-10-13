@@ -8,6 +8,7 @@ import type {
   UpdateProjectDTO,
   ProjectAttachment,
   CreateAttachmentDTO,
+  GitCommit,
 } from '../types/project';
 
 export async function createProject(
