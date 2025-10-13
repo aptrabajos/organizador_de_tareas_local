@@ -95,3 +95,23 @@ pub struct UpdateProjectDTO {
     pub notes: Option<String>,
     pub image_data: Option<String>,
 }
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ProjectAttachment {
+    pub id: i64,
+    pub project_id: i64,
+    pub filename: String,
+    pub file_data: String,
+    pub file_size: i64,
+    pub mime_type: String,
+    pub created_at: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CreateAttachmentDTO {
+    pub project_id: i64,
+    pub filename: String,
+    pub file_data: String,
+    pub file_size: i64,
+    pub mime_type: String,
+}
