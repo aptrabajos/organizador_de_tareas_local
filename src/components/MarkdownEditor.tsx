@@ -92,6 +92,7 @@ const MarkdownEditor: Component<MarkdownEditorProps> = (props) => {
       {activeTab() === 'preview' && (
         <div
           class="prose prose-sm max-w-none rounded-lg border border-gray-300 bg-gray-50 p-4 dark:prose-invert dark:border-gray-600 dark:bg-gray-800"
+          // eslint-disable-next-line solid/no-innerhtml
           innerHTML={renderedHtml()}
         />
       )}
