@@ -1,213 +1,125 @@
-# Guía de Compilación e Instalación
+# Instalación - Gestor de Proyectos
 
-## 📦 Compilación de la Aplicación
+## 🚀 Aplicación compilada y lista para usar en Manjaro Linux
 
-### **Requisitos Previos**
-- Node.js y pnpm instalados
-- Rust y Cargo instalados
-- Dependencias del sistema (GTK, webkit2gtk)
+### Archivos generados
 
-### **Compilar en Modo Desarrollo**
-```bash
-pnpm tauri dev
-```
-
-### **Compilar para Producción**
-```bash
-pnpm tauri build
-```
-
-**Resultado:**
-- ✅ Ejecutable optimizado: `src-tauri/target/release/gestor-proyectos`
-- ✅ Paquete DEB: `src-tauri/target/release/bundle/deb/`
-- ✅ Tamaño: ~16 MB
-- ✅ Rendimiento: Optimizado para producción
+1. **Binario ejecutable**: `src-tauri/target/release/gestor-proyectos` (17MB)
+2. **Paquete .deb**: `src-tauri/target/release/bundle/deb/Gestor de Proyectos_0.1.0_amd64.deb` (5.6MB)
 
 ---
 
-## 🚀 Instalación en Manjaro/Arch Linux
-
-### **Opción 1: Instalación Local (Recomendado)**
+## 📦 Opción 1: Instalar usando el paquete .deb
 
 ```bash
-# 1. Compilar la aplicación
-pnpm tauri build
+# Instalar el paquete .deb (recomendado)
+sudo pacman -U "src-tauri/target/release/bundle/deb/Gestor de Proyectos_0.1.0_amd64.deb"
 
-# 2. Ejecutar el instalador
-./install.sh
-```
-
-**¿Qué hace el instalador?**
-- ✅ Copia el ejecutable a `~/.local/bin/gestor-proyectos`
-- ✅ Crea entrada en el menú de aplicaciones
-- ✅ Instala el ícono de la aplicación
-- ✅ Configura el archivo `.desktop`
-
-**Cómo usar:**
-- Busca "Gestor de Proyectos" en tu menú de aplicaciones
-- O ejecuta `gestor-proyectos` desde la terminal
-
----
-
-### **Opción 2: Paquete DEB (Debian/Ubuntu)**
-
-```bash
-# Instalar el paquete DEB generado
-sudo dpkg -i src-tauri/target/release/bundle/deb/Gestor_de_Proyectos_0.1.0_amd64.deb
-
-# Si hay dependencias faltantes
-sudo apt-get install -f
+# O usar debtap para convertir a paquete de Arch
+debtap -u
+debtap "src-tauri/target/release/bundle/deb/Gestor de Proyectos_0.1.0_amd64.deb"
+sudo pacman -U gestor-de-proyectos-0.1.0-1-x86_64.pkg.tar.zst
 ```
 
 ---
 
-### **Opción 3: Ejecutable Portable**
+## 🔧 Opción 2: Ejecutar el binario directamente
 
 ```bash
-# Simplemente ejecutar el binario directamente
+# Hacer ejecutable (si no lo está)
+chmod +x src-tauri/target/release/gestor-proyectos
+
+# Ejecutar desde la terminal
 ./src-tauri/target/release/gestor-proyectos
+
+# O copiar a ~/.local/bin para ejecutar desde cualquier lugar
+cp src-tauri/target/release/gestor-proyectos ~/.local/bin/
+gestor-proyectos
 ```
 
 ---
 
-## 🗑️ Desinstalación
+## 🎯 Opción 3: Crear un lanzador de aplicación
 
-### **Si instalaste con install.sh:**
-```bash
-./uninstall.sh
+Crear archivo en `~/.local/share/applications/gestor-proyectos.desktop`:
+
+```desktop
+[Desktop Entry]
+Name=Gestor de Proyectos
+Comment=Aplicación para gestionar proyectos locales
+Exec=/home/TU_USUARIO/.local/bin/gestor-proyectos
+Icon=folder-projects
+Terminal=false
+Type=Application
+Categories=Development;Utility;
 ```
 
-### **Si instalaste el paquete DEB:**
-```bash
-sudo dpkg -r gestor-de-proyectos
-```
+Reemplaza `TU_USUARIO` con tu nombre de usuario.
 
-### **Eliminar datos de la aplicación:**
+---
+
+## ✨ Características incluidas en esta versión
+
+### Funcionalidades principales:
+- ✅ Gestión de proyectos con base de datos SQLite
+- ✅ Editor Markdown con preview en tiempo real
+- ✅ Checklists interactivas en notas
+- ✅ **NUEVO: Sistema de archivos adjuntos (hasta 5MB)**
+- ✅ Enlaces a recursos externos (repos, docs, staging, etc.)
+- ✅ Analytics con tracking de tiempo
+- ✅ Búsqueda de proyectos
+- ✅ Backups y sincronización
+- ✅ Integración con terminal
+
+### Sistema de archivos adjuntos:
+- Subir archivos de hasta 5MB
+- Almacenamiento en base de datos SQLite
+- Descarga con un click
+- Iconos según tipo de archivo
+- Eliminación con confirmación
+- Limpieza automática al borrar proyectos
+
+---
+
+## 🔄 Recompilar desde código fuente
+
+Si necesitas recompilar:
+
 ```bash
-rm -rf ~/.local/share/gestor-proyectos/
+# Desarrollo
+pnpm run tauri:dev
+
+# Producción
+pnpm run tauri:build
 ```
 
 ---
 
-## 📁 Estructura de Archivos Instalados
+## 📊 Base de datos
 
+La base de datos SQLite se crea automáticamente en:
+`~/.local/share/com.gestor.proyectos/gestor_proyectos.db`
+
+---
+
+## 🐛 Solución de problemas
+
+### Puerto 1420 ocupado
+```bash
+lsof -ti:1420 | xargs kill -9
 ```
-~/.local/
-├── bin/
-│   └── gestor-proyectos                    # Ejecutable
-├── share/
-│   ├── applications/
-│   │   └── gestor-proyectos.desktop        # Entrada del menú
-│   ├── icons/hicolor/256x256/apps/
-│   │   └── gestor-proyectos.png            # Ícono de la app
-│   └── gestor-proyectos/
-│       └── proyectos.db                    # Base de datos (creada al usar la app)
+
+### Limpiar procesos anteriores
+```bash
+pkill -f "gestor-proyectos"
+```
+
+### Ver logs en desarrollo
+```bash
+pnpm run tauri:dev 2>&1 | tee /tmp/gestor-app.log
 ```
 
 ---
 
-## 🔧 Solución de Problemas
-
-### **La aplicación no aparece en el menú**
-```bash
-# Actualizar caché de aplicaciones
-update-desktop-database ~/.local/share/applications
-```
-
-### **Error: comando no encontrado**
-Agrega `~/.local/bin` a tu PATH:
-```bash
-# En ~/.bashrc o ~/.zshrc
-export PATH="$HOME/.local/bin:$PATH"
-```
-
-### **Error de permisos al ejecutar**
-```bash
-chmod +x ~/.local/bin/gestor-proyectos
-```
-
-### **Recompilar después de cambios**
-```bash
-# 1. Limpiar builds anteriores
-rm -rf src-tauri/target/release
-
-# 2. Recompilar
-pnpm tauri build
-
-# 3. Reinstalar
-./install.sh
-```
-
----
-
-## 📦 Distribución de la Aplicación
-
-### **Compartir con otros usuarios**
-
-**1. Compartir el ejecutable:**
-```bash
-# Copiar solo el ejecutable (16 MB)
-cp src-tauri/target/release/gestor-proyectos ~/compartir/
-```
-
-**2. Compartir el paquete DEB:**
-```bash
-# Copiar el .deb (para usuarios de Debian/Ubuntu)
-cp src-tauri/target/release/bundle/deb/Gestor_de_Proyectos_0.1.0_amd64.deb ~/compartir/
-```
-
-**3. Compartir el proyecto completo:**
-```bash
-# Clonar desde GitHub
-git clone git@github.com:aptrabajos/organizador_de_tareas_local.git
-cd organizador_de_tareas_local
-pnpm install
-pnpm tauri build
-./install.sh
-```
-
----
-
-## 🎯 Mejores Prácticas
-
-### **Desarrollo:**
-- Usar `pnpm tauri dev` para desarrollo con hot reload
-- Usar `./start-app.sh` para inicio limpio sin conflictos de puerto
-
-### **Producción:**
-- Compilar con `pnpm tauri build` para optimización máxima
-- Instalar con `./install.sh` para integración completa con el sistema
-- Crear backup de `proyectos.db` regularmente
-
-### **Actualización:**
-```bash
-# 1. Actualizar código
-git pull origin main
-
-# 2. Actualizar dependencias
-pnpm install
-
-# 3. Recompilar e instalar
-pnpm tauri build && ./install.sh
-```
-
----
-
-## 📊 Información Técnica
-
-- **Framework UI:** SolidJS + Tailwind CSS
-- **Backend:** Rust + Tauri 2.x
-- **Base de datos:** SQLite (rusqlite)
-- **Bundle size:** ~16 MB
-- **Plataforma:** Linux (GTK3/WebKit2)
-- **Arquitectura:** x86_64
-
----
-
-## 🚀 ¡Listo!
-
-Ahora tu aplicación está instalada y disponible en tu sistema Manjaro.
-Busca "Gestor de Proyectos" en tu menú de aplicaciones o ejecuta `gestor-proyectos` desde la terminal.
-
-**¡Disfruta tu gestor de proyectos!** 🎉
-
+**Versión**: 0.1.0  
+**Build**: 2025-10-12
