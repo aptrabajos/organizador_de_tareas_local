@@ -164,3 +164,19 @@ export async function getAttachments(
 export async function deleteAttachment(id: number): Promise<void> {
   await invoke('delete_attachment', { id });
 }
+
+// Funciones para obtener información de Git
+export async function getGitBranch(path: string): Promise<string> {
+  return await invoke('get_git_branch', { path });
+}
+
+export async function getGitStatus(path: string): Promise<string> {
+  return await invoke('get_git_status', { path });
+}
+
+export async function getRecentCommits(
+  path: string,
+  limit: number = 5
+): Promise<GitCommit[]> {
+  return await invoke('get_recent_commits', { path, limit });
+}
