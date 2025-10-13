@@ -1,3 +1,4 @@
+/* eslint-disable no-undef */
 import { Component, createSignal, For, Show, onMount } from 'solid-js';
 import {
   addAttachment,
