@@ -209,8 +209,32 @@ const AttachmentManager: Component<AttachmentManagerProps> = (props) => {
         </div>
       </Show>
 
-      <div class="text-sm text-gray-600 dark:text-gray-400">
-        Tamaño máximo: 5MB
+      {/* Zona de Drag & Drop */}
+      <div
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        class="rounded-lg border-2 border-dashed p-8 text-center transition-all"
+        classList={{
+          'border-blue-500 bg-blue-50 dark:bg-blue-900/10': isDragging(),
+          'border-gray-300 dark:border-gray-600': !isDragging(),
+        }}
+      >
+        <div class="text-gray-500 dark:text-gray-400">
+          <Show when={isDragging()} fallback={
+            <>
+              <div class="text-4xl mb-2">📎</div>
+              <div class="font-medium">Arrastra archivos aquí</div>
+              <div class="text-sm mt-1">o usa el botón "Subir Archivo"</div>
+              <div class="text-xs mt-2">Tamaño máximo: 5MB</div>
+            </>
+          }>
+            <div class="text-4xl mb-2">⬇️</div>
+            <div class="font-medium text-blue-600 dark:text-blue-400">
+              Suelta el archivo aquí
+            </div>
+          </Show>
+        </div>
       </div>
 
       <Show
