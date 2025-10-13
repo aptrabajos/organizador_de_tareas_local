@@ -48,6 +48,9 @@ fn main() {
             commands::add_attachment,
             commands::get_attachments,
             commands::delete_attachment,
+            commands::get_git_branch,
+            commands::get_git_status,
+            commands::get_recent_commits,
         ])
         .run(tauri::generate_context!())
         .expect("Error al ejecutar la aplicación Tauri");
