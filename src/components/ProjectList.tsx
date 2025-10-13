@@ -179,10 +179,11 @@ const ProjectList: Component<ProjectListProps> = (props) => {
                 </div>
               </div>
 
-              <div class="mt-3 space-y-1 text-xs text-gray-500 dark:text-gray-400">
+              <div class="mt-3 space-y-2 text-xs text-gray-500 dark:text-gray-400">
                 <p class="truncate" title={project.local_path}>
                   📁 {project.local_path}
                 </p>
+                <GitInfo projectPath={project.local_path} />
               </div>
 
               <Show when={project.notes}>
