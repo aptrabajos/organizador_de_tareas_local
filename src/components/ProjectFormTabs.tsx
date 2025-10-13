@@ -2,6 +2,7 @@ import { Component, createSignal, Show } from 'solid-js';
 import type { Project } from '../types/project';
 import ProjectForm, { type ProjectFormData } from './ProjectForm';
 import ProjectLinks from './ProjectLinks';
+import AttachmentManager from './AttachmentManager';
 
 interface ProjectFormTabsProps {
   project?: Project;
