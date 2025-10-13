@@ -15,6 +15,8 @@ const AttachmentManager: Component<AttachmentManagerProps> = (props) => {
   const [attachments, setAttachments] = createSignal<ProjectAttachment[]>([]);
   const [isUploading, setIsUploading] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
+  const [isDragging, setIsDragging] = createSignal(false);
+  const [previewImage, setPreviewImage] = createSignal<ProjectAttachment | null>(null);
 
   // Cargar adjuntos al montar el componente
   onMount(async () => {
