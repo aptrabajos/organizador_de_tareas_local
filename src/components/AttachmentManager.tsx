@@ -340,6 +340,53 @@ const AttachmentManager: Component<AttachmentManagerProps> = (props) => {
           </For>
         </div>
       </Show>
+
+      {/* Modal de preview de imagen */}
+      <Show when={previewImage()}>
+        <div
+          class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75 p-4"
+          onClick={() => setPreviewImage(null)}
+        >
+          <div
+            class="relative max-h-full max-w-4xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setPreviewImage(null)}
+              class="absolute -right-4 -top-4 rounded-full bg-white p-2 shadow-lg hover:bg-gray-100 dark:bg-gray-800 dark:hover:bg-gray-700"
+              title="Cerrar"
+            >
+              <svg
+                class="h-6 w-6 text-gray-600 dark:text-gray-300"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+            <img
+              src={getImageDataUrl(previewImage()!)}
+              alt={previewImage()!.filename}
+              class="max-h-[90vh] rounded-lg shadow-2xl"
+            />
+            <div class="mt-4 rounded-lg bg-white p-4 dark:bg-gray-800">
+              <div class="font-medium text-gray-900 dark:text-gray-100">
+                {previewImage()!.filename}
+              </div>
+              <div class="text-sm text-gray-500 dark:text-gray-400">
+                {formatFileSize(previewImage()!.file_size)} •{' '}
+                {new Date(previewImage()!.created_at).toLocaleDateString()}
+              </div>
+            </div>
+          </div>
+        </div>
+      </Show>
     </div>
   );
 };
