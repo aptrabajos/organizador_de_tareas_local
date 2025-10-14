@@ -18,8 +18,7 @@
         "minWidth": 800,
         "minHeight": 600,
         "resizable": true,
-        "fullscreen": false,
-        "fileDropEnabled": true
+        "fullscreen": false
       }
     ],
     "security": {
@@ -37,28 +36,28 @@
             {
               "identifier": "fs:default",
               "allow": [
-                {"path": "$HOME/**"},
-                {"path": "/mnt/**"},
-                {"path": "/tmp/**"},
-                {"path": "/home/**"}
+                { "path": "$HOME/**" },
+                { "path": "/mnt/**" },
+                { "path": "/tmp/**" },
+                { "path": "/home/**" }
               ]
             },
             {
               "identifier": "fs:allow-read",
               "allow": [
-                {"path": "$HOME/**"},
-                {"path": "/mnt/**"},
-                {"path": "/tmp/**"},
-                {"path": "/home/**"}
+                { "path": "$HOME/**" },
+                { "path": "/mnt/**" },
+                { "path": "/tmp/**" },
+                { "path": "/home/**" }
               ]
             },
             {
               "identifier": "fs:allow-write",
               "allow": [
-                {"path": "$HOME/**"},
-                {"path": "/mnt/**"},
-                {"path": "/tmp/**"},
-                {"path": "/home/**"}
+                { "path": "$HOME/**" },
+                { "path": "/mnt/**" },
+                { "path": "/tmp/**" },
+                { "path": "/home/**" }
               ]
             },
             "fs:allow-exists"
