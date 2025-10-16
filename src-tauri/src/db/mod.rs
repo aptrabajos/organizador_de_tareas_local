@@ -2,7 +2,7 @@ use rusqlite::{params, Connection, Result};
 use std::path::PathBuf;
 use std::sync::Mutex;
 
-use crate::models::project::{CreateProjectDTO, CreateLinkDTO, Project, ProjectLink, UpdateProjectDTO, UpdateLinkDTO, ProjectAttachment, CreateAttachmentDTO};
+use crate::models::project::{CreateProjectDTO, CreateLinkDTO, Project, ProjectLink, UpdateProjectDTO, UpdateLinkDTO, ProjectAttachment, CreateAttachmentDTO, JournalEntry, CreateJournalEntryDTO, UpdateJournalEntryDTO};
 
 pub struct Database {
     conn: Mutex<Connection>,
