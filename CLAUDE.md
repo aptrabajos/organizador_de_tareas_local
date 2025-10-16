@@ -472,10 +472,11 @@ Tags: #bug #pendiente
 
 📅 14 Oct 2025 - 10:15
 Reunión con cliente - nuevos requerimientos:
+
 - [ ] Agregar filtros por fecha
 - [ ] Export a PDF
 - [x] Mejorar búsqueda
-Tags: #meeting #features
+      Tags: #meeting #features
 ```
 
 **API Layer (services/api.ts):**

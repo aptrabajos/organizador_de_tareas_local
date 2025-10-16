@@ -129,7 +129,10 @@ const Analytics: Component = () => {
           </h3>
 
           <Show
-            when={stats()?.recent_activities && stats()!.recent_activities.length > 0}
+            when={
+              stats()?.recent_activities &&
+              stats()!.recent_activities.length > 0
+            }
             fallback={
               <p class="text-center text-gray-500 dark:text-gray-400">
                 No hay actividad registrada
