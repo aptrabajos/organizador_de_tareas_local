@@ -125,19 +125,24 @@ export default function ProjectJournal(props: ProjectJournalProps) {
     try {
       return JSON.parse(tagsStr);
     } catch {
-      return tagsStr.split(',').map((t) => t.trim()).filter(Boolean);
+      return tagsStr
+        .split(',')
+        .map((t) => t.trim())
+        .filter(Boolean);
     }
   };
 
   return (
     <div class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-      <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+      <div class="flex max-h-[90vh] w-full max-w-4xl flex-col rounded-lg bg-white shadow-xl dark:bg-gray-800">
         {/* Header */}
-        <div class="flex items-center justify-between p-4 border-b dark:border-gray-700">
-          <h2 class="text-xl font-bold dark:text-white">📓 Diario del Proyecto</h2>
+        <div class="flex items-center justify-between border-b p-4 dark:border-gray-700">
+          <h2 class="text-xl font-bold dark:text-white">
+            📓 Diario del Proyecto
+          </h2>
           <button
             onClick={() => props.onClose()}
-            class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-2xl"
+            class="text-2xl text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
           >
             ×
           </button>
@@ -145,32 +150,32 @@ export default function ProjectJournal(props: ProjectJournalProps) {
 
         {/* Error Message */}
         <Show when={error()}>
-          <div class="m-4 p-3 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200 rounded">
+          <div class="m-4 rounded bg-red-100 p-3 text-red-700 dark:bg-red-900 dark:text-red-200">
             {error()}
           </div>
         </Show>
 
         {/* New Entry Form */}
-        <div class="p-4 border-b dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
+        <div class="border-b bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900">
           <textarea
             value={newContent()}
             onInput={(e) => setNewContent(e.currentTarget.value)}
             placeholder="Escribe una nota rápida... (soporta Markdown)"
-            class="w-full p-3 border dark:border-gray-600 rounded-lg dark:bg-gray-800 dark:text-white resize-none"
+            class="w-full resize-none rounded-lg border p-3 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
             rows={3}
           />
-          <div class="flex gap-2 mt-2">
+          <div class="mt-2 flex gap-2">
             <input
               type="text"
               value={newTags()}
               onInput={(e) => setNewTags(e.currentTarget.value)}
               placeholder="Tags: bug, tip, idea (separados por coma)"
-              class="flex-1 px-3 py-2 border dark:border-gray-600 rounded-lg dark:bg-gray-800 dark:text-white text-sm"
+              class="flex-1 rounded-lg border px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-white"
             />
             <button
               onClick={handleCreate}
               disabled={!newContent().trim()}
-              class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              class="rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
               💾 Guardar
             </button>
@@ -178,28 +183,28 @@ export default function ProjectJournal(props: ProjectJournalProps) {
         </div>
 
         {/* Entries List */}
-        <div class="flex-1 overflow-y-auto p-4 space-y-4">
+        <div class="flex-1 space-y-4 overflow-y-auto p-4">
           <Show when={loading()}>
-            <div class="text-center py-8 text-gray-500 dark:text-gray-400">
+            <div class="py-8 text-center text-gray-500 dark:text-gray-400">
               Cargando entradas...
             </div>
           </Show>
 
           <Show when={!loading() && entries().length === 0}>
-            <div class="text-center py-8 text-gray-500 dark:text-gray-400">
+            <div class="py-8 text-center text-gray-500 dark:text-gray-400">
               No hay entradas aún. ¡Crea la primera!
             </div>
           </Show>
 
           <For each={entries()}>
             {(entry) => (
-              <div class="border dark:border-gray-700 rounded-lg p-4 bg-white dark:bg-gray-800">
+              <div class="rounded-lg border bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
                 <Show
                   when={editingId() === entry.id}
                   fallback={
                     <>
                       {/* View Mode */}
-                      <div class="flex items-start justify-between mb-2">
+                      <div class="mb-2 flex items-start justify-between">
                         <div class="text-sm text-gray-500 dark:text-gray-400">
                           📅 {formatDate(entry.created_at)}
                           <Show when={entry.created_at !== entry.updated_at}>
@@ -210,13 +215,13 @@ export default function ProjectJournal(props: ProjectJournalProps) {
                         <div class="flex gap-2">
                           <button
                             onClick={() => handleStartEdit(entry)}
-                            class="text-blue-600 hover:text-blue-800 dark:text-blue-400 text-sm"
+                            class="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400"
                           >
                             ✏️
                           </button>
                           <button
                             onClick={() => handleDelete(entry.id)}
-                            class="text-red-600 hover:text-red-800 dark:text-red-400 text-sm"
+                            class="text-sm text-red-600 hover:text-red-800 dark:text-red-400"
                           >
                             🗑️
                           </button>
@@ -224,8 +229,9 @@ export default function ProjectJournal(props: ProjectJournalProps) {
                       </div>
 
                       {/* Rendered Markdown Content */}
+                      {/* eslint-disable-next-line solid/no-innerhtml */}
                       <div
-                        class="prose dark:prose-invert prose-sm max-w-none mb-3"
+                        class="prose prose-sm mb-3 max-w-none dark:prose-invert"
                         innerHTML={renderMarkdown(entry.content)}
                       />
 
@@ -234,7 +240,7 @@ export default function ProjectJournal(props: ProjectJournalProps) {
                         <div class="flex flex-wrap gap-2">
                           <For each={parseTags(entry.tags)}>
                             {(tag) => (
-                              <span class="px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 text-xs rounded">
+                              <span class="rounded bg-blue-100 px-2 py-1 text-xs text-blue-800 dark:bg-blue-900 dark:text-blue-200">
                                 #{tag}
                               </span>
                             )}
@@ -248,7 +254,7 @@ export default function ProjectJournal(props: ProjectJournalProps) {
                   <textarea
                     value={editContent()}
                     onInput={(e) => setEditContent(e.currentTarget.value)}
-                    class="w-full p-3 border dark:border-gray-600 rounded-lg dark:bg-gray-900 dark:text-white resize-none mb-2"
+                    class="mb-2 w-full resize-none rounded-lg border p-3 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
                     rows={4}
                   />
                   <input
@@ -256,18 +262,18 @@ export default function ProjectJournal(props: ProjectJournalProps) {
                     value={editTags()}
                     onInput={(e) => setEditTags(e.currentTarget.value)}
                     placeholder="Tags separados por coma"
-                    class="w-full px-3 py-2 border dark:border-gray-600 rounded-lg dark:bg-gray-900 dark:text-white text-sm mb-2"
+                    class="mb-2 w-full rounded-lg border px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white"
                   />
                   <div class="flex gap-2">
                     <button
                       onClick={handleSaveEdit}
-                      class="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-sm"
+                      class="rounded bg-green-600 px-3 py-1 text-sm text-white hover:bg-green-700"
                     >
                       ✓ Guardar
                     </button>
                     <button
                       onClick={handleCancelEdit}
-                      class="px-3 py-1 bg-gray-600 text-white rounded hover:bg-gray-700 text-sm"
+                      class="rounded bg-gray-600 px-3 py-1 text-sm text-white hover:bg-gray-700"
                     >
                       ✗ Cancelar
                     </button>
