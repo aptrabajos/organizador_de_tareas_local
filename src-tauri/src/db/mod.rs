@@ -102,6 +102,20 @@ impl Database {
             [],
         )?;
 
+        // Crear tabla de journal entries (diario de proyecto)
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS project_journal (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL,
+                content TEXT NOT NULL,
+                tags TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE
+            )",
+            [],
+        )?;
+
         Ok(Database {
             conn: Mutex::new(conn),
         })
