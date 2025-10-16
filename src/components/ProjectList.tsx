@@ -29,6 +29,9 @@ interface ProjectListProps {
 }
 
 const ProjectList: Component<ProjectListProps> = (props) => {
+  // Estado para controlar el journal modal
+  const [journalProjectId, setJournalProjectId] = createSignal<number | null>(null);
+
   // Función helper para renderizar markdown de forma segura
   const renderMarkdown = (markdown: string): string => {
     let html = marked.parse(markdown) as string;
