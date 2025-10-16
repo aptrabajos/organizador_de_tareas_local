@@ -96,3 +96,25 @@ export interface GitCommit {
   date: string;
   message: string;
 }
+
+// ==================== PROJECT JOURNAL ====================
+
+export interface JournalEntry {
+  id: number;
+  project_id: number;
+  content: string;
+  tags?: string; // JSON string array
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateJournalEntryDTO {
+  project_id: number;
+  content: string;
+  tags?: string;
+}
+
+export interface UpdateJournalEntryDTO {
+  content?: string;
+  tags?: string;
+}
