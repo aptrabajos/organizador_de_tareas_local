@@ -394,3 +394,118 @@ When adding new dependencies:
 ✅ Estilos tipográficos profesionales
 ✅ Soporte dark mode completo
 ✅ 0 errores de ESLint, 38 tests pasando
+
+### 2025-10-16 - Project Journal (Diario de Proyecto)
+
+**Implementación Completa del Sistema de Diario/Bitácora por Proyecto:**
+
+**Backend (Rust + SQLite):**
+
+- Nueva tabla `project_journal`:
+  - `id` (INTEGER PRIMARY KEY) - ID único de la entrada
+  - `project_id` (INTEGER) - Relación con proyectos
+  - `content` (TEXT) - Contenido en Markdown
+  - `tags` (TEXT) - Tags opcionales en formato JSON array
+  - `created_at` (DATETIME) - Timestamp de creación
+  - `updated_at` (DATETIME) - Timestamp de última actualización
+  - Relación con tabla projects mediante FOREIGN KEY con CASCADE DELETE
+
+**Comandos Tauri Agregados:**
+
+1. `create_journal_entry(entry: CreateJournalEntryDTO) -> JournalEntry`
+   - Crea una nueva entrada en el diario del proyecto
+   - Soporta contenido Markdown y tags opcionales
+
+2. `get_journal_entries(project_id: i64) -> Vec<JournalEntry>`
+   - Obtiene todas las entradas del diario ordenadas por fecha (más reciente primero)
+
+3. `update_journal_entry(id: i64, updates: UpdateJournalEntryDTO) -> JournalEntry`
+   - Actualiza contenido y/o tags de una entrada existente
+   - Actualiza automáticamente el timestamp `updated_at`
+
+4. `delete_journal_entry(id: i64)`
+   - Elimina una entrada del diario con confirmación
+
+**Frontend (SolidJS + TypeScript):**
+
+- Nuevo componente `ProjectJournal.tsx`:
+  - Modal full-screen con diseño responsivo
+  - Formulario rápido para crear nuevas entradas
+  - Lista cronológica de entradas (últimas primero)
+  - Edición inline con modo edit/view
+  - Renderizado de Markdown con preview
+  - Sistema de tags con visualización por colores
+  - Soporte completo para dark mode
+  - Estados de carga y manejo de errores
+
+- Integración en `ProjectList.tsx`:
+  - Botón "📓 Diario" junto a "🚀 Trabajar"
+  - Modal controlado con estado reactivo
+  - Color distintivo (amber-600) para fácil identificación
+
+**Características del Diario:**
+
+✅ **Entrada rápida**: Textarea simple con soporte Markdown
+✅ **Tags flexibles**: Sistema de etiquetado separado por comas (#bug, #tip, #idea)
+✅ **Vista cronológica**: Ordenamiento automático por fecha descendente
+✅ **Edición inline**: Click en ✏️ para editar cualquier entrada
+✅ **Markdown rendering**: Preview en tiempo real con sintaxis GFM
+✅ **Timestamps**: Muestra fecha de creación y "(editado)" si fue modificado
+✅ **Sanitización**: HTML seguro con DOMPurify
+✅ **Responsivo**: Diseño adaptable a diferentes tamaños de pantalla
+✅ **Dark mode**: Soporte completo para tema oscuro
+
+**Casos de Uso:**
+
+```markdown
+# Ejemplos de entradas típicas:
+
+📅 16 Oct 2025 - 14:30
+Implementé el cache con WeakMap para evitar memory leaks.
+Mejora de performance del 40%.
+Tags: #performance #tip
+
+📅 15 Oct 2025 - 18:45
+Bug encontrado en el loader de imágenes.
+TODO: Revisar mañana el hook useEffect.
+Tags: #bug #pendiente
+
+📅 14 Oct 2025 - 10:15
+Reunión con cliente - nuevos requerimientos:
+- [ ] Agregar filtros por fecha
+- [ ] Export a PDF
+- [x] Mejorar búsqueda
+Tags: #meeting #features
+```
+
+**API Layer (services/api.ts):**
+
+- 4 nuevas funciones async que llaman a comandos Tauri
+- Tipado completo con interfaces TypeScript
+- Manejo de promesas con async/await
+
+**Tipos TypeScript (types/project.ts):**
+
+- `JournalEntry` interface
+- `CreateJournalEntryDTO` interface
+- `UpdateJournalEntryDTO` interface
+
+**Archivos Modificados:**
+
+- `src-tauri/src/db/mod.rs` - 4 métodos CRUD para journal, creación de tabla
+- `src-tauri/src/models/project.rs` - 3 structs nuevos para journal
+- `src-tauri/src/commands/mod.rs` - 4 comandos Tauri para journal
+- `src-tauri/src/main.rs` - Registro de nuevos comandos
+- `src/components/ProjectJournal.tsx` - Componente nuevo (285 líneas)
+- `src/components/ProjectList.tsx` - Integración del botón y modal
+- `src/services/api.ts` - 4 funciones API para journal
+- `src/types/project.ts` - Interfaces de journal
+
+**Resultados:**
+
+✅ 0 errores de ESLint
+✅ 1 warning en Rust (preexistente: dead_code en CreateActivityDTO)
+✅ Compilación exitosa en 12.7 segundos
+✅ Hot Module Reload funcionando correctamente
+✅ UI completamente funcional con dark mode
+✅ Migración de BD automática sin pérdida de datos
