@@ -228,10 +228,10 @@ export default function ProjectJournal(props: ProjectJournalProps) {
                         </div>
                       </div>
 
-                      {/* Rendered Markdown Content */}
-                      {/* eslint-disable-next-line solid/no-innerhtml */}
+                      {/* Rendered Markdown Content - sanitized with DOMPurify */}
                       <div
                         class="prose prose-sm mb-3 max-w-none dark:prose-invert"
+                        // eslint-disable-next-line solid/no-innerhtml
                         innerHTML={renderMarkdown(entry.content)}
                       />
 
