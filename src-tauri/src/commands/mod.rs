@@ -543,6 +543,49 @@ pub async fn delete_attachment(
         .map_err(|e| format!("Error deleting attachment: {}", e))
 }
 
+// ==================== COMANDOS PARA PROJECT JOURNAL ====================
+
+#[tauri::command]
+pub async fn create_journal_entry(
+    db: State<'_, Database>,
+    entry: crate::models::project::CreateJournalEntryDTO,
+) -> Result<crate::models::project::JournalEntry, String> {
+    println!("📓 [JOURNAL] Creando entrada de diario para proyecto ID: {}", entry.project_id);
+    db.create_journal_entry(entry)
+        .map_err(|e| format!("Error creating journal entry: {}", e))
+}
+
+#[tauri::command]
+pub async fn get_journal_entries(
+    db: State<'_, Database>,
+    project_id: i64,
+) -> Result<Vec<crate::models::project::JournalEntry>, String> {
+    println!("📓 [JOURNAL] Obteniendo entradas de diario para proyecto ID: {}", project_id);
+    db.get_journal_entries(project_id)
+        .map_err(|e| format!("Error getting journal entries: {}", e))
+}
+
+#[tauri::command]
+pub async fn update_journal_entry(
+    db: State<'_, Database>,
+    id: i64,
+    updates: crate::models::project::UpdateJournalEntryDTO,
+) -> Result<crate::models::project::JournalEntry, String> {
+    println!("📓 [JOURNAL] Actualizando entrada de diario ID: {}", id);
+    db.update_journal_entry(id, updates)
+        .map_err(|e| format!("Error updating journal entry: {}", e))
+}
+
+#[tauri::command]
+pub async fn delete_journal_entry(
+    db: State<'_, Database>,
+    id: i64,
+) -> Result<(), String> {
+    println!("📓 [JOURNAL] Eliminando entrada de diario ID: {}", id);
+    db.delete_journal_entry(id)
+        .map_err(|e| format!("Error deleting journal entry: {}", e))
+}
+
 // Git Commands
 #[tauri::command]
 pub async fn get_git_branch(path: String) -> Result<String, String> {
