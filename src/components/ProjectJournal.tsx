@@ -129,10 +129,6 @@ export default function ProjectJournal(props: ProjectJournalProps) {
     }
   };
 
-  const formatTagsForInput = (tags: string[]): string => {
-    return tags.join(', ');
-  };
-
   return (
     <div class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
       <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
@@ -140,7 +136,7 @@ export default function ProjectJournal(props: ProjectJournalProps) {
         <div class="flex items-center justify-between p-4 border-b dark:border-gray-700">
           <h2 class="text-xl font-bold dark:text-white">📓 Diario del Proyecto</h2>
           <button
-            onClick={props.onClose}
+            onClick={() => props.onClose()}
             class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-2xl"
           >
             ×
