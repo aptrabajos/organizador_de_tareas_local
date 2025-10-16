@@ -183,3 +183,28 @@ export async function getRecentCommits(
 ): Promise<GitCommit[]> {
   return await invoke('get_recent_commits', { path, limit });
 }
+
+// ==================== FUNCIONES PARA PROJECT JOURNAL ====================
+
+export async function createJournalEntry(
+  entry: CreateJournalEntryDTO
+): Promise<JournalEntry> {
+  return await invoke('create_journal_entry', { entry });
+}
+
+export async function getJournalEntries(
+  projectId: number
+): Promise<JournalEntry[]> {
+  return await invoke('get_journal_entries', { projectId });
+}
+
+export async function updateJournalEntry(
+  id: number,
+  updates: UpdateJournalEntryDTO
+): Promise<JournalEntry> {
+  return await invoke('update_journal_entry', { id, updates });
+}
+
+export async function deleteJournalEntry(id: number): Promise<void> {
+  await invoke('delete_journal_entry', { id });
+}
