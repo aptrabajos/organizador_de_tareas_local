@@ -291,6 +291,14 @@ const ProjectList: Component<ProjectListProps> = (props) => {
           )}
         </For>
       </div>
+
+      {/* Journal Modal */}
+      <Show when={journalProjectId() !== null}>
+        <ProjectJournal
+          projectId={journalProjectId()!}
+          onClose={() => setJournalProjectId(null)}
+        />
+      </Show>
     </Show>
   );
 };
