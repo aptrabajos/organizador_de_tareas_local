@@ -1,9 +1,10 @@
-import { Component, For, Show } from 'solid-js';
+import { Component, For, Show, createSignal } from 'solid-js';
 import toast from 'solid-toast';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import type { Project } from '../types/project';
 import GitInfo from './GitInfo';
+import ProjectJournal from './ProjectJournal';
 import {
   openUrl,
   createProjectBackup,
