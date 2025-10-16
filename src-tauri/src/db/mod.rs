@@ -774,4 +774,121 @@ impl Database {
 
         Ok(())
     }
+
+    // ==================== MÉTODOS PARA PROJECT JOURNAL ====================
+
+    pub fn create_journal_entry(&self, entry: CreateJournalEntryDTO) -> Result<JournalEntry> {
+        let conn = self.conn.lock().unwrap();
+
+        conn.execute(
+            "INSERT INTO project_journal (project_id, content, tags)
+             VALUES (?1, ?2, ?3)",
+            params![entry.project_id, entry.content, entry.tags],
+        )?;
+
+        let id = conn.last_insert_rowid();
+
+        let journal_entry = conn.query_row(
+            "SELECT id, project_id, content, tags, created_at, updated_at
+             FROM project_journal WHERE id = ?1",
+            params![id],
+            |row| {
+                Ok(JournalEntry {
+                    id: row.get(0)?,
+                    project_id: row.get(1)?,
+                    content: row.get(2)?,
+                    tags: row.get(3)?,
+                    created_at: row.get(4)?,
+                    updated_at: row.get(5)?,
+                })
+            },
+        )?;
+
+        Ok(journal_entry)
+    }
+
+    pub fn get_journal_entries(&self, project_id: i64) -> Result<Vec<JournalEntry>> {
+        let conn = self.conn.lock().unwrap();
+
+        let mut stmt = conn.prepare(
+            "SELECT id, project_id, content, tags, created_at, updated_at
+             FROM project_journal
+             WHERE project_id = ?1
+             ORDER BY created_at DESC",
+        )?;
+
+        let entries = stmt
+            .query_map(params![project_id], |row| {
+                Ok(JournalEntry {
+                    id: row.get(0)?,
+                    project_id: row.get(1)?,
+                    content: row.get(2)?,
+                    tags: row.get(3)?,
+                    created_at: row.get(4)?,
+                    updated_at: row.get(5)?,
+                })
+            })?
+            .collect::<Result<Vec<_>>>()?;
+
+        Ok(entries)
+    }
+
+    pub fn update_journal_entry(&self, id: i64, updates: UpdateJournalEntryDTO) -> Result<JournalEntry> {
+        let conn = self.conn.lock().unwrap();
+
+        let mut set_clauses = Vec::new();
+        let mut params: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
+
+        if let Some(content) = updates.content {
+            set_clauses.push("content = ?");
+            params.push(Box::new(content));
+        }
+
+        if let Some(tags) = updates.tags {
+            set_clauses.push("tags = ?");
+            params.push(Box::new(tags));
+        }
+
+        if set_clauses.is_empty() {
+            return Err(rusqlite::Error::InvalidParameterCount(0, 1));
+        }
+
+        set_clauses.push("updated_at = CURRENT_TIMESTAMP");
+        params.push(Box::new(id));
+
+        let query = format!(
+            "UPDATE project_journal SET {} WHERE id = ?",
+            set_clauses.join(", ")
+        );
+
+        let params_ref: Vec<&dyn rusqlite::ToSql> = params.iter().map(|p| p.as_ref()).collect();
+        conn.execute(&query, params_ref.as_slice())?;
+
+        // Obtener la entrada actualizada
+        let entry = conn.query_row(
+            "SELECT id, project_id, content, tags, created_at, updated_at
+             FROM project_journal WHERE id = ?1",
+            params![id],
+            |row| {
+                Ok(JournalEntry {
+                    id: row.get(0)?,
+                    project_id: row.get(1)?,
+                    content: row.get(2)?,
+                    tags: row.get(3)?,
+                    created_at: row.get(4)?,
+                    updated_at: row.get(5)?,
+                })
+            },
+        )?;
+
+        Ok(entry)
+    }
+
+    pub fn delete_journal_entry(&self, id: i64) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+
+        conn.execute("DELETE FROM project_journal WHERE id = ?1", params![id])?;
+
+        Ok(())
+    }
 }
