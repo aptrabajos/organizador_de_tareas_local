@@ -115,3 +115,28 @@ pub struct CreateAttachmentDTO {
     pub file_size: i64,
     pub mime_type: String,
 }
+
+// ==================== PROJECT JOURNAL ====================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct JournalEntry {
+    pub id: i64,
+    pub project_id: i64,
+    pub content: String,
+    pub tags: Option<String>, // JSON array: ["bug", "tip"]
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CreateJournalEntryDTO {
+    pub project_id: i64,
+    pub content: String,
+    pub tags: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UpdateJournalEntryDTO {
+    pub content: Option<String>,
+    pub tags: Option<String>,
+}
