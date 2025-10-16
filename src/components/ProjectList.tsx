@@ -30,7 +30,9 @@ interface ProjectListProps {
 
 const ProjectList: Component<ProjectListProps> = (props) => {
   // Estado para controlar el journal modal
-  const [journalProjectId, setJournalProjectId] = createSignal<number | null>(null);
+  const [journalProjectId, setJournalProjectId] = createSignal<number | null>(
+    null
+  );
 
   // Función helper para renderizar markdown de forma segura
   const renderMarkdown = (markdown: string): string => {
@@ -237,6 +239,14 @@ const ProjectList: Component<ProjectListProps> = (props) => {
                   class="flex-1 rounded bg-purple-600 px-3 py-2 text-sm font-medium text-white hover:bg-purple-700"
                 >
                   🚀 Trabajar
+                </button>
+                <button
+                  onClick={() => setJournalProjectId(project.id)}
+                  class="rounded bg-amber-600 px-3 py-2 text-sm font-medium text-white hover:bg-amber-700"
+                  aria-label="Diario"
+                  title="Diario del proyecto"
+                >
+                  📓
                 </button>
                 <button
                   onClick={() => handleBackup(project)}
