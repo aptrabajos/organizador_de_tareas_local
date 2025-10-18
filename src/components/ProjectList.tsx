@@ -350,6 +350,14 @@ const ProjectList: Component<ProjectListProps> = (props) => {
           </div>
         </div>
       </Show>
+
+      {/* Project Context Modal */}
+      <Show when={contextProjectId() !== null}>
+        <ProjectContext
+          projectId={contextProjectId()!}
+          onClose={() => setContextProjectId(null)}
+        />
+      </Show>
     </Show>
   );
 };
