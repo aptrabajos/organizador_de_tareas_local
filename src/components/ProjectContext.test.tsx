@@ -97,15 +97,13 @@ describe('ProjectContext', () => {
       render(() => <ProjectContext projectId={1} onClose={mockOnClose} />);
 
       await waitFor(() => {
-        expect(screen.getByText('Proyecto Test')).toBeInTheDocument();
+        expect(screen.getByText('Proyecto Test')).toBeTruthy();
       });
 
-      expect(
-        screen.getByText('Descripción del proyecto de prueba')
-      ).toBeInTheDocument();
-      expect(screen.getByText(/react/)).toBeInTheDocument();
-      expect(screen.getByText(/typescript/)).toBeInTheDocument();
-      expect(screen.getByText(/activo/i)).toBeInTheDocument();
+      expect(screen.getByText('Descripción del proyecto de prueba')).toBeTruthy();
+      expect(screen.getByText(/react/)).toBeTruthy();
+      expect(screen.getByText(/typescript/)).toBeTruthy();
+      expect(screen.getByText(/activo/i)).toBeTruthy();
     });
 
     it('should render recent journal entries section', async () => {
