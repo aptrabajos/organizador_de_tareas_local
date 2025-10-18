@@ -145,3 +145,27 @@ pub struct UpdateJournalEntryDTO {
     pub content: Option<String>,
     pub tags: Option<String>,
 }
+
+// ==================== PROJECT TODOS ====================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProjectTodo {
+    pub id: i64,
+    pub project_id: i64,
+    pub content: String,
+    pub is_completed: bool,
+    pub created_at: String,
+    pub completed_at: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CreateTodoDTO {
+    pub project_id: i64,
+    pub content: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UpdateTodoDTO {
+    pub content: Option<String>,
+    pub is_completed: Option<bool>,
+}
