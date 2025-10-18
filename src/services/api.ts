@@ -218,7 +218,9 @@ export async function createTodo(todo: CreateTodoDTO): Promise<ProjectTodo> {
   return await invoke('create_todo', { todo });
 }
 
-export async function getProjectTodos(projectId: number): Promise<ProjectTodo[]> {
+export async function getProjectTodos(
+  projectId: number
+): Promise<ProjectTodo[]> {
   return await invoke('get_project_todos', { projectId });
 }
 

@@ -154,4 +154,183 @@ describe('API Service', () => {
       });
     });
   });
+
+  // ==================== TODOS API TESTS ====================
+
+  describe('TODOs API', () => {
+    describe('createTodo', () => {
+      it('should create a TODO', async () => {
+        const mockTodo = {
+          project_id: 1,
+          content: 'Implementar feature X',
+        };
+
+        const mockResponse = {
+          id: 1,
+          ...mockTodo,
+          is_completed: false,
+          created_at: '2024-01-01T00:00:00Z',
+          completed_at: null,
+        };
+
+        vi.mocked(invoke).mockResolvedValue(mockResponse);
+
+        const result = await api.createTodo(mockTodo);
+
+        expect(invoke).toHaveBeenCalledWith('create_todo', { todo: mockTodo });
+        expect(result).toEqual(mockResponse);
+        expect(result.is_completed).toBe(false);
+      });
+    });
+
+    describe('getProjectTodos', () => {
+      it('should get all TODOs for a project', async () => {
+        const mockTodos = [
+          {
+            id: 1,
+            project_id: 1,
+            content: 'TODO 1',
+            is_completed: false,
+            created_at: '2024-01-01T00:00:00Z',
+            completed_at: null,
+          },
+          {
+            id: 2,
+            project_id: 1,
+            content: 'TODO 2',
+            is_completed: true,
+            created_at: '2024-01-02T00:00:00Z',
+            completed_at: '2024-01-03T00:00:00Z',
+          },
+        ];
+
+        vi.mocked(invoke).mockResolvedValue(mockTodos);
+
+        const result = await api.getProjectTodos(1);
+
+        expect(invoke).toHaveBeenCalledWith('get_project_todos', {
+          projectId: 1,
+        });
+        expect(result).toHaveLength(2);
+        expect(result[0].is_completed).toBe(false);
+        expect(result[1].is_completed).toBe(true);
+      });
+    });
+
+    describe('updateTodo', () => {
+      it('should update TODO content', async () => {
+        const updates = { content: 'Updated content' };
+        const mockResponse = {
+          id: 1,
+          project_id: 1,
+          content: 'Updated content',
+          is_completed: false,
+          created_at: '2024-01-01T00:00:00Z',
+          completed_at: null,
+        };
+
+        vi.mocked(invoke).mockResolvedValue(mockResponse);
+
+        const result = await api.updateTodo(1, updates);
+
+        expect(invoke).toHaveBeenCalledWith('update_todo', {
+          id: 1,
+          updates,
+        });
+        expect(result.content).toBe('Updated content');
+      });
+
+      it('should toggle TODO completion', async () => {
+        const updates = { is_completed: true };
+        const mockResponse = {
+          id: 1,
+          project_id: 1,
+          content: 'Some TODO',
+          is_completed: true,
+          created_at: '2024-01-01T00:00:00Z',
+          completed_at: '2024-01-05T00:00:00Z',
+        };
+
+        vi.mocked(invoke).mockResolvedValue(mockResponse);
+
+        const result = await api.updateTodo(1, updates);
+
+        expect(result.is_completed).toBe(true);
+        expect(result.completed_at).toBeTruthy();
+      });
+    });
+
+    describe('deleteTodo', () => {
+      it('should delete a TODO', async () => {
+        vi.mocked(invoke).mockResolvedValue(undefined);
+
+        await api.deleteTodo(1);
+
+        expect(invoke).toHaveBeenCalledWith('delete_todo', { id: 1 });
+      });
+    });
+  });
+
+  // ==================== STATUS & PIN API TESTS ====================
+
+  describe('Status & Pin API', () => {
+    describe('updateProjectStatus', () => {
+      it('should update project status to "pausado"', async () => {
+        vi.mocked(invoke).mockResolvedValue(undefined);
+
+        await api.updateProjectStatus(1, 'pausado');
+
+        expect(invoke).toHaveBeenCalledWith('update_project_status', {
+          projectId: 1,
+          status: 'pausado',
+        });
+      });
+
+      it('should update project status to "completado"', async () => {
+        vi.mocked(invoke).mockResolvedValue(undefined);
+
+        await api.updateProjectStatus(1, 'completado');
+
+        expect(invoke).toHaveBeenCalledWith('update_project_status', {
+          projectId: 1,
+          status: 'completado',
+        });
+      });
+    });
+
+    describe('togglePinProject', () => {
+      it('should pin a project and return true', async () => {
+        vi.mocked(invoke).mockResolvedValue(true);
+
+        const result = await api.togglePinProject(1);
+
+        expect(invoke).toHaveBeenCalledWith('toggle_pin_project', {
+          projectId: 1,
+        });
+        expect(result).toBe(true);
+      });
+
+      it('should unpin a project and return false', async () => {
+        vi.mocked(invoke).mockResolvedValue(false);
+
+        const result = await api.togglePinProject(1);
+
+        expect(result).toBe(false);
+      });
+    });
+
+    describe('reorderPinnedProjects', () => {
+      it('should reorder pinned projects', async () => {
+        const newOrder = [3, 1, 5, 2];
+
+        vi.mocked(invoke).mockResolvedValue(undefined);
+
+        await api.reorderPinnedProjects(newOrder);
+
+        expect(invoke).toHaveBeenCalledWith('reorder_pinned_projects', {
+          projectIds: newOrder,
+        });
+      });
+    });
+  });
 });
