@@ -253,6 +253,14 @@ const ProjectList: Component<ProjectListProps> = (props) => {
                   📓
                 </button>
                 <button
+                  onClick={() => setTodosProjectId(project.id)}
+                  class="rounded bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700"
+                  aria-label="TODOs"
+                  title="Lista de tareas"
+                >
+                  ✅
+                </button>
+                <button
                   onClick={() => handleBackup(project)}
                   class="rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
                   aria-label="Crear backup"
