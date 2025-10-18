@@ -395,6 +395,7 @@ const ProjectList: Component<ProjectListProps> = (props) => {
           )}
         </For>
       </div>
+      </Show>
 
       {/* Journal Modal */}
       <Show when={journalProjectId() !== null}>
