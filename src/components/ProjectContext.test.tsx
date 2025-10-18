@@ -123,12 +123,12 @@ describe('ProjectContext', () => {
       render(() => <ProjectContext projectId={1} onClose={mockOnClose} />);
 
       await waitFor(() => {
-        expect(screen.getByText(/tareas pendientes/i)).toBeInTheDocument();
+        expect(screen.getByText(/tareas pendientes/i)).toBeTruthy();
       });
 
-      expect(screen.getByText('TODO pendiente 1')).toBeInTheDocument();
+      expect(screen.getByText('TODO pendiente 1')).toBeTruthy();
       // No debe mostrar TODOs completados
-      expect(screen.queryByText('TODO completado')).not.toBeInTheDocument();
+      expect(screen.queryByText('TODO completado')).toBeFalsy();
     });
 
     it('should render project links section', async () => {
