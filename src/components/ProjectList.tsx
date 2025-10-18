@@ -96,6 +96,33 @@ const ProjectList: Component<ProjectListProps> = (props) => {
     }
   };
 
+  const handleTogglePin = async (project: Project) => {
+    try {
+      const newPinned = await togglePinProject(project.id);
+      const message = newPinned
+        ? `📌 ${project.name} marcado como favorito`
+        : `📌 ${project.name} desmarcado como favorito`;
+      toast.success(message);
+      // Recargar proyectos para reflejar el cambio
+      window.location.reload();
+    } catch (error) {
+      console.error('Error al cambiar pin:', error);
+      toast.error('Error al cambiar favorito');
+    }
+  };
+
+  const handleChangeStatus = async (project: Project, newStatus: string) => {
+    try {
+      await updateProjectStatus(project.id, newStatus);
+      toast.success(`Estado cambiado a: ${newStatus}`);
+      // Recargar proyectos para reflejar el cambio
+      window.location.reload();
+    } catch (error) {
+      console.error('Error al cambiar estado:', error);
+      toast.error('Error al cambiar estado');
+    }
+  };
+
   const handleBackup = async (project: Project) => {
     try {
       // Pedir al usuario que seleccione la carpeta destino
