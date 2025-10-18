@@ -311,6 +311,31 @@ const ProjectList: Component<ProjectListProps> = (props) => {
           onClose={() => setJournalProjectId(null)}
         />
       </Show>
+
+      {/* TODOs Modal */}
+      <Show when={todosProjectId() !== null}>
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div class="flex max-h-[90vh] w-full max-w-2xl flex-col rounded-lg bg-white shadow-xl dark:bg-gray-800">
+            {/* Header */}
+            <div class="flex items-center justify-between border-b p-4 dark:border-gray-700">
+              <h2 class="text-xl font-bold dark:text-white">
+                ✅ Lista de Tareas
+              </h2>
+              <button
+                onClick={() => setTodosProjectId(null)}
+                class="text-2xl text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Content */}
+            <div class="flex-1 overflow-y-auto p-4">
+              <TodoList projectId={todosProjectId()!} />
+            </div>
+          </div>
+        </div>
+      </Show>
     </Show>
   );
 };
