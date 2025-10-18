@@ -123,3 +123,24 @@ export interface UpdateJournalEntryDTO {
   content?: string;
   tags?: string;
 }
+
+// ==================== PROJECT TODOS ====================
+
+export interface ProjectTodo {
+  id: number;
+  project_id: number;
+  content: string;
+  is_completed: boolean;
+  created_at: string;
+  completed_at?: string;
+}
+
+export interface CreateTodoDTO {
+  project_id: number;
+  content: string;
+}
+
+export interface UpdateTodoDTO {
+  content?: string;
+  is_completed?: boolean;
+}
