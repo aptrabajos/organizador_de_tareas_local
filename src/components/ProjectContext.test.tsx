@@ -135,10 +135,10 @@ describe('ProjectContext', () => {
       render(() => <ProjectContext projectId={1} onClose={mockOnClose} />);
 
       await waitFor(() => {
-        expect(screen.getByText(/enlaces/i)).toBeInTheDocument();
+        expect(screen.getByText(/enlaces/i)).toBeTruthy();
       });
 
-      expect(screen.getByText('Repositorio principal')).toBeInTheDocument();
+      expect(screen.getByText('Repositorio principal')).toBeTruthy();
       const link = screen.getByRole('link', { name: /repositorio principal/i });
       expect(link).toHaveAttribute('href', 'https://github.com/user/repo');
     });
@@ -149,7 +149,7 @@ describe('ProjectContext', () => {
       render(() => <ProjectContext projectId={1} onClose={mockOnClose} />);
 
       await waitFor(() => {
-        expect(screen.getByText(/sin entradas de diario/i)).toBeInTheDocument();
+        expect(screen.getByText(/sin entradas de diario/i)).toBeTruthy();
       });
     });
 
@@ -161,7 +161,7 @@ describe('ProjectContext', () => {
       render(() => <ProjectContext projectId={1} onClose={mockOnClose} />);
 
       await waitFor(() => {
-        expect(screen.getByText(/sin tareas pendientes/i)).toBeInTheDocument();
+        expect(screen.getByText(/sin tareas pendientes/i)).toBeTruthy();
       });
     });
 
@@ -171,7 +171,7 @@ describe('ProjectContext', () => {
       render(() => <ProjectContext projectId={1} onClose={mockOnClose} />);
 
       await waitFor(() => {
-        expect(screen.getByText(/sin enlaces/i)).toBeInTheDocument();
+        expect(screen.getByText(/sin enlaces/i)).toBeTruthy();
       });
     });
   });
@@ -181,7 +181,7 @@ describe('ProjectContext', () => {
       render(() => <ProjectContext projectId={1} onClose={mockOnClose} />);
 
       await waitFor(() => {
-        expect(screen.getByText('Proyecto Test')).toBeInTheDocument();
+        expect(screen.getByText('Proyecto Test')).toBeTruthy();
       });
 
       const closeButton = screen.getByRole('button', { name: /cerrar/i });
@@ -194,7 +194,7 @@ describe('ProjectContext', () => {
       render(() => <ProjectContext projectId={1} onClose={mockOnClose} />);
 
       await waitFor(() => {
-        expect(screen.getByText('Proyecto Test')).toBeInTheDocument();
+        expect(screen.getByText('Proyecto Test')).toBeTruthy();
       });
 
       const backdrop = screen.getByTestId('modal-backdrop');
@@ -208,8 +208,8 @@ describe('ProjectContext', () => {
     it('should show loading state while fetching data', () => {
       render(() => <ProjectContext projectId={1} onClose={mockOnClose} />);
 
-      expect(screen.getByRole('status')).toBeInTheDocument();
-      expect(screen.getByText(/cargando/i)).toBeInTheDocument();
+      expect(screen.getByRole('status')).toBeTruthy();
+      expect(screen.getByText(/cargando/i)).toBeTruthy();
     });
 
     it('should show error message when API fails', async () => {
@@ -220,7 +220,7 @@ describe('ProjectContext', () => {
       render(() => <ProjectContext projectId={1} onClose={mockOnClose} />);
 
       await waitFor(() => {
-        expect(screen.getByText(/error al cargar/i)).toBeInTheDocument();
+        expect(screen.getByText(/error al cargar/i)).toBeTruthy();
       });
     });
   });
@@ -244,19 +244,19 @@ describe('ProjectContext', () => {
       render(() => <ProjectContext projectId={1} onClose={mockOnClose} />);
 
       await waitFor(() => {
-        expect(screen.getByText('Entrada 1')).toBeInTheDocument();
+        expect(screen.getByText('Entrada 1')).toBeTruthy();
       });
 
       // Debe mostrar solo las 5 más recientes
-      expect(screen.getByText('Entrada 5')).toBeInTheDocument();
-      expect(screen.queryByText('Entrada 6')).not.toBeInTheDocument();
+      expect(screen.getByText('Entrada 5')).toBeTruthy();
+      expect(screen.queryByText('Entrada 6')).toBeFalsy();
     });
 
     it('should display tags as individual badges', async () => {
       render(() => <ProjectContext projectId={1} onClose={mockOnClose} />);
 
       await waitFor(() => {
-        expect(screen.getByText('Proyecto Test')).toBeInTheDocument();
+        expect(screen.getByText('Proyecto Test')).toBeTruthy();
       });
 
       // Verificar que cada tag esté en su propio badge
@@ -264,9 +264,9 @@ describe('ProjectContext', () => {
       const tsBadge = screen.getByText('typescript');
       const testBadge = screen.getByText('testing');
 
-      expect(reactBadge).toBeInTheDocument();
-      expect(tsBadge).toBeInTheDocument();
-      expect(testBadge).toBeInTheDocument();
+      expect(reactBadge).toBeTruthy();
+      expect(tsBadge).toBeTruthy();
+      expect(testBadge).toBeTruthy();
     });
   });
 });
