@@ -447,9 +447,10 @@ impl Database {
 
         let mut stmt = conn.prepare(
             "SELECT id, name, description, local_path, documentation_url, ai_documentation_url, drive_link, notes, image_data,
-                    created_at, updated_at, last_opened_at, opened_count, total_time_seconds FROM projects
+                    created_at, updated_at, last_opened_at, opened_count, total_time_seconds,
+                    status, status_changed_at, is_pinned, pinned_order FROM projects
              WHERE name LIKE ?1 OR description LIKE ?1 OR local_path LIKE ?1 OR notes LIKE ?1
-             ORDER BY updated_at DESC"
+             ORDER BY is_pinned DESC, pinned_order ASC, updated_at DESC"
         )?;
 
         let mut projects = Vec::new();
@@ -469,12 +470,16 @@ impl Database {
                 row.get::<_, Option<String>>(11)?,  // last_opened_at
                 row.get::<_, Option<i64>>(12)?,  // opened_count
                 row.get::<_, Option<i64>>(13)?,  // total_time_seconds
+                row.get::<_, Option<String>>(14)?,  // status
+                row.get::<_, Option<String>>(15)?,  // status_changed_at
+                row.get::<_, Option<bool>>(16)?,  // is_pinned
+                row.get::<_, Option<i64>>(17)?,  // pinned_order
             ))
         })?
         .collect::<Result<Vec<_>>>()?;
 
         // Para cada proyecto, obtener sus enlaces
-        for (id, name, description, local_path, documentation_url, ai_documentation_url, drive_link, notes, image_data, created_at, updated_at, last_opened_at, opened_count, total_time_seconds) in project_rows {
+        for (id, name, description, local_path, documentation_url, ai_documentation_url, drive_link, notes, image_data, created_at, updated_at, last_opened_at, opened_count, total_time_seconds, status, status_changed_at, is_pinned, pinned_order) in project_rows {
             let links = self.get_project_links_internal(id, &conn).unwrap_or_else(|_| Vec::new());
 
             projects.push(Project {
