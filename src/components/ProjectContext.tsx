@@ -118,7 +118,7 @@ export default function ProjectContext(props: ProjectContextProps) {
                 <div class="mb-3">
                   <span class="text-sm text-gray-500 dark:text-gray-400">Ruta: </span>
                   <code class="rounded bg-gray-100 px-2 py-1 text-sm text-gray-800 dark:bg-gray-700 dark:text-gray-200">
-                    {project()?.path}
+                    {project()?.local_path}
                   </code>
                 </div>
                 <Show when={projectTags().length > 0}>
