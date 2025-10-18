@@ -141,7 +141,7 @@ describe('ProjectContext', () => {
       expect(screen.getByText('Repositorio principal')).toBeTruthy();
       const link = screen.getByRole('link', {
         name: /repositorio principal/i,
-      }) as HTMLAnchorElement;
+      });
       expect(link.getAttribute('href')).toBe('https://github.com/user/repo');
     });
 
