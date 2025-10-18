@@ -12,6 +12,9 @@ import type {
   JournalEntry,
   CreateJournalEntryDTO,
   UpdateJournalEntryDTO,
+  ProjectTodo,
+  CreateTodoDTO,
+  UpdateTodoDTO,
 } from '../types/project';
 
 export async function createProject(
