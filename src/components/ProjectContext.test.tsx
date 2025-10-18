@@ -100,7 +100,9 @@ describe('ProjectContext', () => {
         expect(screen.getByText('Proyecto Test')).toBeTruthy();
       });
 
-      expect(screen.getByText('Descripción del proyecto de prueba')).toBeTruthy();
+      expect(
+        screen.getByText('Descripción del proyecto de prueba')
+      ).toBeTruthy();
       expect(screen.getByText(/react/)).toBeTruthy();
       expect(screen.getByText(/typescript/)).toBeTruthy();
       expect(screen.getByText(/activo/i)).toBeTruthy();
@@ -110,11 +112,11 @@ describe('ProjectContext', () => {
       render(() => <ProjectContext projectId={1} onClose={mockOnClose} />);
 
       await waitFor(() => {
-        expect(screen.getByText(/diario reciente/i)).toBeInTheDocument();
+        expect(screen.getByText(/diario reciente/i)).toBeTruthy();
       });
 
-      expect(screen.getByText('Última entrada del diario')).toBeInTheDocument();
-      expect(screen.getByText('Segunda entrada')).toBeInTheDocument();
+      expect(screen.getByText('Última entrada del diario')).toBeTruthy();
+      expect(screen.getByText('Segunda entrada')).toBeTruthy();
     });
 
     it('should render pending TODOs section', async () => {
