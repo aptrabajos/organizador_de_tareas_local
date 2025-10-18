@@ -1,7 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@solidjs/testing-library';
 import ProjectContext from './ProjectContext';
-import type { Project, JournalEntry, ProjectTodo, ProjectLink } from '../types/project';
+import type {
+  Project,
+  JournalEntry,
+  ProjectTodo,
+  ProjectLink,
+} from '../types/project';
 
 // Mock de las APIs
 vi.mock('../services/api', () => ({
@@ -80,7 +85,9 @@ describe('ProjectContext', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     (getProject as ReturnType<typeof vi.fn>).mockResolvedValue(mockProject);
-    (getJournalEntries as ReturnType<typeof vi.fn>).mockResolvedValue(mockJournalEntries);
+    (getJournalEntries as ReturnType<typeof vi.fn>).mockResolvedValue(
+      mockJournalEntries
+    );
     (getProjectTodos as ReturnType<typeof vi.fn>).mockResolvedValue(mockTodos);
     (getProjectLinks as ReturnType<typeof vi.fn>).mockResolvedValue(mockLinks);
   });
@@ -93,7 +100,9 @@ describe('ProjectContext', () => {
         expect(screen.getByText('Proyecto Test')).toBeInTheDocument();
       });
 
-      expect(screen.getByText('Descripción del proyecto de prueba')).toBeInTheDocument();
+      expect(
+        screen.getByText('Descripción del proyecto de prueba')
+      ).toBeInTheDocument();
       expect(screen.getByText(/react/)).toBeInTheDocument();
       expect(screen.getByText(/typescript/)).toBeInTheDocument();
       expect(screen.getByText(/activo/i)).toBeInTheDocument();
@@ -204,7 +213,9 @@ describe('ProjectContext', () => {
     });
 
     it('should show error message when API fails', async () => {
-      (getProject as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('API Error'));
+      (getProject as ReturnType<typeof vi.fn>).mockRejectedValue(
+        new Error('API Error')
+      );
 
       render(() => <ProjectContext projectId={1} onClose={mockOnClose} />);
 
@@ -216,14 +227,19 @@ describe('ProjectContext', () => {
 
   describe('Data Formatting', () => {
     it('should limit journal entries to maximum 5 recent', async () => {
-      const manyEntries: JournalEntry[] = Array.from({ length: 10 }, (_, i) => ({
-        id: i + 1,
-        project_id: 1,
-        content: `Entrada ${i + 1}`,
-        created_at: new Date(2025, 0, 15 - i).toISOString(),
-      }));
+      const manyEntries: JournalEntry[] = Array.from(
+        { length: 10 },
+        (_, i) => ({
+          id: i + 1,
+          project_id: 1,
+          content: `Entrada ${i + 1}`,
+          created_at: new Date(2025, 0, 15 - i).toISOString(),
+        })
+      );
 
-      (getJournalEntries as ReturnType<typeof vi.fn>).mockResolvedValue(manyEntries);
+      (getJournalEntries as ReturnType<typeof vi.fn>).mockResolvedValue(
+        manyEntries
+      );
 
       render(() => <ProjectContext projectId={1} onClose={mockOnClose} />);
 
