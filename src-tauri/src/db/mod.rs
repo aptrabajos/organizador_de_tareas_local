@@ -498,6 +498,10 @@ impl Database {
                 last_opened_at,
                 opened_count,
                 total_time_seconds,
+                status,
+                status_changed_at,
+                is_pinned,
+                pinned_order,
             });
         }
 
