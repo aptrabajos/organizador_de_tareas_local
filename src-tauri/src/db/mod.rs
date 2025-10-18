@@ -294,7 +294,8 @@ impl Database {
 
         let result = conn.query_row(
             "SELECT id, name, description, local_path, documentation_url, ai_documentation_url, drive_link, notes, image_data,
-                    created_at, updated_at, last_opened_at, opened_count, total_time_seconds FROM projects WHERE id = ?1",
+                    created_at, updated_at, last_opened_at, opened_count, total_time_seconds,
+                    status, status_changed_at, is_pinned, pinned_order FROM projects WHERE id = ?1",
             params![id],
             |row| {
                 println!("📊 [DB] Leyendo fila de base de datos...");
@@ -319,6 +320,10 @@ impl Database {
                     last_opened_at: row.get(11)?,
                     opened_count: row.get(12)?,
                     total_time_seconds: row.get(13)?,
+                    status: row.get(14)?,
+                    status_changed_at: row.get(15)?,
+                    is_pinned: row.get(16)?,
+                    pinned_order: row.get(17)?,
                 };
                 println!("✅ [DB] Proyecto leído de BD: '{}'", project.name);
                 Ok(project)
