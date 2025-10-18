@@ -211,3 +211,43 @@ export async function updateJournalEntry(
 export async function deleteJournalEntry(id: number): Promise<void> {
   await invoke('delete_journal_entry', { id });
 }
+
+// ==================== FUNCIONES PARA PROJECT TODOS ====================
+
+export async function createTodo(todo: CreateTodoDTO): Promise<ProjectTodo> {
+  return await invoke('create_todo', { todo });
+}
+
+export async function getProjectTodos(projectId: number): Promise<ProjectTodo[]> {
+  return await invoke('get_project_todos', { projectId });
+}
+
+export async function updateTodo(
+  id: number,
+  updates: UpdateTodoDTO
+): Promise<ProjectTodo> {
+  return await invoke('update_todo', { id, updates });
+}
+
+export async function deleteTodo(id: number): Promise<void> {
+  await invoke('delete_todo', { id });
+}
+
+// ==================== FUNCIONES PARA ESTADOS Y FAVORITOS ====================
+
+export async function updateProjectStatus(
+  projectId: number,
+  status: string
+): Promise<void> {
+  await invoke('update_project_status', { projectId, status });
+}
+
+export async function togglePinProject(projectId: number): Promise<boolean> {
+  return await invoke('toggle_pin_project', { projectId });
+}
+
+export async function reorderPinnedProjects(
+  projectIds: number[]
+): Promise<void> {
+  await invoke('reorder_pinned_projects', { projectIds });
+}
