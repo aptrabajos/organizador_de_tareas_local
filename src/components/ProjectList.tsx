@@ -5,6 +5,7 @@ import DOMPurify from 'dompurify';
 import type { Project } from '../types/project';
 import GitInfo from './GitInfo';
 import ProjectJournal from './ProjectJournal';
+import TodoList from './TodoList';
 import {
   openUrl,
   createProjectBackup,
