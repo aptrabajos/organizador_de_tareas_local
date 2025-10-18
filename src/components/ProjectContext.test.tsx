@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@solidjs/testing-library';
-import '@testing-library/jest-dom';
 import ProjectContext from './ProjectContext';
 import type { Project, JournalEntry, ProjectTodo, ProjectLink } from '../types/project';
 
