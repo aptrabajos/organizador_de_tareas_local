@@ -6,6 +6,7 @@ import type { Project } from '../types/project';
 import GitInfo from './GitInfo';
 import ProjectJournal from './ProjectJournal';
 import TodoList from './TodoList';
+import ProjectContext from './ProjectContext';
 import {
   openUrl,
   createProjectBackup,
