@@ -39,6 +39,11 @@ const ProjectList: Component<ProjectListProps> = (props) => {
   // Estado para controlar el modal de TODOs
   const [todosProjectId, setTodosProjectId] = createSignal<number | null>(null);
 
+  // Estado para controlar el modal de contexto del proyecto
+  const [contextProjectId, setContextProjectId] = createSignal<number | null>(
+    null
+  );
+
   // Función helper para renderizar markdown de forma segura
   const renderMarkdown = (markdown: string): string => {
     let html = marked.parse(markdown) as string;
