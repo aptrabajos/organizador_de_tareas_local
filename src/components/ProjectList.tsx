@@ -286,6 +286,40 @@ const ProjectList: Component<ProjectListProps> = (props) => {
           <For each={filteredProjects()}>
             {(project) => (
               <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md dark:border-gray-700 dark:bg-gray-800">
+                {/* Header con botón de pin */}
+                <div class="mb-2 flex items-start justify-between gap-2">
+                  <div class="flex flex-1 items-center gap-2">
+                    <Show when={project.status}>
+                      <select
+                        value={project.status || 'activo'}
+                        onChange={(e) =>
+                          handleChangeStatus(project, e.currentTarget.value)
+                        }
+                        class="rounded border border-gray-300 px-2 py-0.5 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <option value="activo">🟢 Activo</option>
+                        <option value="pausado">🟡 Pausado</option>
+                        <option value="completado">✅ Completado</option>
+                        <option value="archivado">📦 Archivado</option>
+                      </select>
+                    </Show>
+                  </div>
+                  <button
+                    onClick={() => handleTogglePin(project)}
+                    class="rounded p-1 hover:bg-gray-100 dark:hover:bg-gray-700"
+                    title={
+                      project.is_pinned
+                        ? 'Desmarcar como favorito'
+                        : 'Marcar como favorito'
+                    }
+                  >
+                    <span class="text-lg">
+                      {project.is_pinned ? '📌' : '📍'}
+                    </span>
+                  </button>
+                </div>
+
                 <div class="flex gap-3">
                   <Show when={project.image_data}>
                     <img
