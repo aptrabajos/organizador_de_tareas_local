@@ -955,4 +955,196 @@ impl Database {
 
         Ok(())
     }
+
+    // ==================== MÉTODOS PARA PROJECT TODOS ====================
+
+    pub fn create_todo(&self, todo: CreateTodoDTO) -> Result<ProjectTodo> {
+        let conn = self.conn.lock().unwrap();
+
+        conn.execute(
+            "INSERT INTO project_todos (project_id, content)
+             VALUES (?1, ?2)",
+            params![todo.project_id, todo.content],
+        )?;
+
+        let id = conn.last_insert_rowid();
+
+        let todo = conn.query_row(
+            "SELECT id, project_id, content, is_completed, created_at, completed_at
+             FROM project_todos WHERE id = ?1",
+            params![id],
+            |row| {
+                Ok(ProjectTodo {
+                    id: row.get(0)?,
+                    project_id: row.get(1)?,
+                    content: row.get(2)?,
+                    is_completed: row.get(3)?,
+                    created_at: row.get(4)?,
+                    completed_at: row.get(5)?,
+                })
+            },
+        )?;
+
+        Ok(todo)
+    }
+
+    pub fn get_project_todos(&self, project_id: i64) -> Result<Vec<ProjectTodo>> {
+        let conn = self.conn.lock().unwrap();
+
+        let mut stmt = conn.prepare(
+            "SELECT id, project_id, content, is_completed, created_at, completed_at
+             FROM project_todos
+             WHERE project_id = ?1
+             ORDER BY is_completed ASC, created_at DESC",
+        )?;
+
+        let todos = stmt
+            .query_map(params![project_id], |row| {
+                Ok(ProjectTodo {
+                    id: row.get(0)?,
+                    project_id: row.get(1)?,
+                    content: row.get(2)?,
+                    is_completed: row.get(3)?,
+                    created_at: row.get(4)?,
+                    completed_at: row.get(5)?,
+                })
+            })?
+            .collect::<Result<Vec<_>>>()?;
+
+        Ok(todos)
+    }
+
+    pub fn update_todo(&self, id: i64, updates: UpdateTodoDTO) -> Result<ProjectTodo> {
+        let conn = self.conn.lock().unwrap();
+
+        let mut set_clauses = Vec::new();
+        let mut params: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
+
+        if let Some(content) = updates.content {
+            set_clauses.push("content = ?");
+            params.push(Box::new(content));
+        }
+
+        if let Some(is_completed) = updates.is_completed {
+            set_clauses.push("is_completed = ?");
+            params.push(Box::new(is_completed));
+
+            // Si se completó, actualizar completed_at
+            if is_completed {
+                set_clauses.push("completed_at = CURRENT_TIMESTAMP");
+            } else {
+                set_clauses.push("completed_at = NULL");
+            }
+        }
+
+        if set_clauses.is_empty() {
+            return Err(rusqlite::Error::InvalidParameterCount(0, 1));
+        }
+
+        params.push(Box::new(id));
+
+        let query = format!(
+            "UPDATE project_todos SET {} WHERE id = ?",
+            set_clauses.join(", ")
+        );
+
+        let params_ref: Vec<&dyn rusqlite::ToSql> = params.iter().map(|p| p.as_ref()).collect();
+        conn.execute(&query, params_ref.as_slice())?;
+
+        // Obtener el TODO actualizado
+        let todo = conn.query_row(
+            "SELECT id, project_id, content, is_completed, created_at, completed_at
+             FROM project_todos WHERE id = ?1",
+            params![id],
+            |row| {
+                Ok(ProjectTodo {
+                    id: row.get(0)?,
+                    project_id: row.get(1)?,
+                    content: row.get(2)?,
+                    is_completed: row.get(3)?,
+                    created_at: row.get(4)?,
+                    completed_at: row.get(5)?,
+                })
+            },
+        )?;
+
+        Ok(todo)
+    }
+
+    pub fn delete_todo(&self, id: i64) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+
+        conn.execute("DELETE FROM project_todos WHERE id = ?1", params![id])?;
+
+        Ok(())
+    }
+
+    // ==================== MÉTODOS PARA ESTADOS Y FAVORITOS ====================
+
+    pub fn update_project_status(&self, id: i64, status: String) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+
+        conn.execute(
+            "UPDATE projects
+             SET status = ?1, status_changed_at = CURRENT_TIMESTAMP
+             WHERE id = ?2",
+            params![status, id],
+        )?;
+
+        Ok(())
+    }
+
+    pub fn toggle_pin_project(&self, id: i64) -> Result<bool> {
+        let conn = self.conn.lock().unwrap();
+
+        // Obtener estado actual
+        let is_pinned: bool = conn.query_row(
+            "SELECT COALESCE(is_pinned, 0) FROM projects WHERE id = ?1",
+            params![id],
+            |row| row.get(0),
+        )?;
+
+        let new_pinned = !is_pinned;
+
+        // Si se está fijando, asignar un orden
+        if new_pinned {
+            // Obtener el máximo orden actual
+            let max_order: i64 = conn.query_row(
+                "SELECT COALESCE(MAX(pinned_order), 0) FROM projects WHERE is_pinned = 1",
+                [],
+                |row| row.get(0),
+            ).unwrap_or(0);
+
+            conn.execute(
+                "UPDATE projects
+                 SET is_pinned = ?1, pinned_order = ?2
+                 WHERE id = ?3",
+                params![new_pinned, max_order + 1, id],
+            )?;
+        } else {
+            conn.execute(
+                "UPDATE projects
+                 SET is_pinned = ?1, pinned_order = 0
+                 WHERE id = ?2",
+                params![new_pinned, id],
+            )?;
+        }
+
+        Ok(new_pinned)
+    }
+
+    pub fn reorder_pinned_projects(&self, project_ids: Vec<i64>) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+
+        for (index, project_id) in project_ids.iter().enumerate() {
+            conn.execute(
+                "UPDATE projects
+                 SET pinned_order = ?1
+                 WHERE id = ?2",
+                params![index as i64 + 1, project_id],
+            )?;
+        }
+
+        Ok(())
+    }
 }
