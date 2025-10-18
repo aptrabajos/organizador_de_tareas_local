@@ -44,6 +44,27 @@ const ProjectList: Component<ProjectListProps> = (props) => {
     null
   );
 
+  // Estado para filtros
+  const [statusFilter, setStatusFilter] = createSignal<string>('all');
+  const [showPinnedOnly, setShowPinnedOnly] = createSignal(false);
+
+  // Función para filtrar proyectos
+  const filteredProjects = () => {
+    let filtered = [...props.projects];
+
+    // Filtrar por estado
+    if (statusFilter() !== 'all') {
+      filtered = filtered.filter((p) => p.status === statusFilter());
+    }
+
+    // Filtrar por pinned
+    if (showPinnedOnly()) {
+      filtered = filtered.filter((p) => p.is_pinned === true);
+    }
+
+    return filtered;
+  };
+
   // Función helper para renderizar markdown de forma segura
   const renderMarkdown = (markdown: string): string => {
     let html = marked.parse(markdown) as string;
