@@ -251,6 +251,14 @@ const ProjectList: Component<ProjectListProps> = (props) => {
                   🚀 Trabajar
                 </button>
                 <button
+                  onClick={() => setContextProjectId(project.id)}
+                  class="rounded bg-cyan-600 px-3 py-2 text-sm font-medium text-white hover:bg-cyan-700"
+                  aria-label="Contexto"
+                  title="Ver contexto del proyecto"
+                >
+                  📋
+                </button>
+                <button
                   onClick={() => setJournalProjectId(project.id)}
                   class="rounded bg-amber-600 px-3 py-2 text-sm font-medium text-white hover:bg-amber-700"
                   aria-label="Diario"
