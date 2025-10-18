@@ -28,6 +28,11 @@ pub struct Project {
     pub last_opened_at: Option<String>,
     pub opened_count: Option<i64>,
     pub total_time_seconds: Option<i64>,
+    // Quick Start & Context fields
+    pub status: Option<String>, // activo, pausado, completado, archivado
+    pub status_changed_at: Option<String>,
+    pub is_pinned: Option<bool>,
+    pub pinned_order: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
