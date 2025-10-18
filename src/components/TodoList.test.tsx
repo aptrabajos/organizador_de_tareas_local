@@ -131,6 +131,11 @@ describe('TodoList', () => {
 
       render(() => <TodoList projectId={1} />);
 
+      // Esperar a que termine de cargar
+      await waitFor(() => {
+        expect(screen.queryByRole('status')).toBeFalsy();
+      });
+
       const button = screen.getByRole('button', { name: /agregar/i });
 
       // Intentar crear sin escribir nada
