@@ -67,7 +67,7 @@ export default function ProjectContext(props: ProjectContextProps) {
     loadData();
   });
 
-  const handleBackdropClick = (e: MouseEvent) => {
+  const handleBackdropClick = (e: Event) => {
     if (e.target === e.currentTarget) {
       props.onClose();
     }
