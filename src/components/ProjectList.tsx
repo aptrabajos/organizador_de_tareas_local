@@ -194,8 +194,65 @@ const ProjectList: Component<ProjectListProps> = (props) => {
         </div>
       }
     >
-      <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        <For each={props.projects}>
+      {/* Barra de filtros */}
+      <div class="mb-6 flex flex-wrap items-center gap-3 rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+        <div class="flex items-center gap-2">
+          <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
+            Estado:
+          </span>
+          <select
+            value={statusFilter()}
+            onInput={(e) => setStatusFilter(e.currentTarget.value)}
+            class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+          >
+            <option value="all">Todos</option>
+            <option value="activo">Activo</option>
+            <option value="pausado">Pausado</option>
+            <option value="completado">Completado</option>
+            <option value="archivado">Archivado</option>
+          </select>
+        </div>
+
+        <label class="flex cursor-pointer items-center gap-2">
+          <input
+            type="checkbox"
+            checked={showPinnedOnly()}
+            onChange={(e) => setShowPinnedOnly(e.currentTarget.checked)}
+            class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+          />
+          <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
+            📌 Solo favoritos
+          </span>
+        </label>
+
+        <Show when={statusFilter() !== 'all' || showPinnedOnly()}>
+          <button
+            onClick={() => {
+              setStatusFilter('all');
+              setShowPinnedOnly(false);
+            }}
+            class="ml-auto rounded-md bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+          >
+            Limpiar filtros
+          </button>
+        </Show>
+
+        <div class="ml-auto text-sm text-gray-600 dark:text-gray-400">
+          {filteredProjects().length} de {props.projects.length} proyectos
+        </div>
+      </div>
+
+      <Show
+        when={filteredProjects().length > 0}
+        fallback={
+          <div class="py-12 text-center text-gray-500 dark:text-gray-400">
+            <p class="text-lg">No hay proyectos que coincidan con los filtros</p>
+            <p class="mt-2 text-sm">Intenta cambiar los filtros aplicados</p>
+          </div>
+        }
+      >
+        <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <For each={filteredProjects()}>
           {(project) => (
             <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md dark:border-gray-700 dark:bg-gray-800">
               <div class="flex gap-3">
