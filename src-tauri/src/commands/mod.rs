@@ -586,6 +586,82 @@ pub async fn delete_journal_entry(
         .map_err(|e| format!("Error deleting journal entry: {}", e))
 }
 
+// ==================== COMANDOS PARA PROJECT TODOS ====================
+
+#[tauri::command]
+pub async fn create_todo(
+    db: State<'_, Database>,
+    todo: crate::models::project::CreateTodoDTO,
+) -> Result<crate::models::project::ProjectTodo, String> {
+    println!("✅ [TODO] Creando TODO para proyecto ID: {}", todo.project_id);
+    db.create_todo(todo)
+        .map_err(|e| format!("Error creating todo: {}", e))
+}
+
+#[tauri::command]
+pub async fn get_project_todos(
+    db: State<'_, Database>,
+    project_id: i64,
+) -> Result<Vec<crate::models::project::ProjectTodo>, String> {
+    println!("✅ [TODO] Obteniendo TODOs para proyecto ID: {}", project_id);
+    db.get_project_todos(project_id)
+        .map_err(|e| format!("Error getting todos: {}", e))
+}
+
+#[tauri::command]
+pub async fn update_todo(
+    db: State<'_, Database>,
+    id: i64,
+    updates: crate::models::project::UpdateTodoDTO,
+) -> Result<crate::models::project::ProjectTodo, String> {
+    println!("✅ [TODO] Actualizando TODO ID: {}", id);
+    db.update_todo(id, updates)
+        .map_err(|e| format!("Error updating todo: {}", e))
+}
+
+#[tauri::command]
+pub async fn delete_todo(
+    db: State<'_, Database>,
+    id: i64,
+) -> Result<(), String> {
+    println!("✅ [TODO] Eliminando TODO ID: {}", id);
+    db.delete_todo(id)
+        .map_err(|e| format!("Error deleting todo: {}", e))
+}
+
+// ==================== COMANDOS PARA ESTADOS Y FAVORITOS ====================
+
+#[tauri::command]
+pub async fn update_project_status(
+    db: State<'_, Database>,
+    project_id: i64,
+    status: String,
+) -> Result<(), String> {
+    println!("🔄 [STATUS] Actualizando estado del proyecto ID: {} a '{}'", project_id, status);
+    db.update_project_status(project_id, status)
+        .map_err(|e| format!("Error updating project status: {}", e))
+}
+
+#[tauri::command]
+pub async fn toggle_pin_project(
+    db: State<'_, Database>,
+    project_id: i64,
+) -> Result<bool, String> {
+    println!("⭐ [PIN] Toggling favorito para proyecto ID: {}", project_id);
+    db.toggle_pin_project(project_id)
+        .map_err(|e| format!("Error toggling pin: {}", e))
+}
+
+#[tauri::command]
+pub async fn reorder_pinned_projects(
+    db: State<'_, Database>,
+    project_ids: Vec<i64>,
+) -> Result<(), String> {
+    println!("↕️ [PIN] Reordenando proyectos favoritos: {:?}", project_ids);
+    db.reorder_pinned_projects(project_ids)
+        .map_err(|e| format!("Error reordering pinned projects: {}", e))
+}
+
 // Git Commands
 #[tauri::command]
 pub async fn get_git_branch(path: String) -> Result<String, String> {
