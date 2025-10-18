@@ -116,6 +116,41 @@ impl Database {
             [],
         )?;
 
+        // Agregar campos de Quick Start & Context a projects
+        let _ = conn.execute(
+            "ALTER TABLE projects ADD COLUMN status TEXT DEFAULT 'activo'",
+            [],
+        );
+
+        let _ = conn.execute(
+            "ALTER TABLE projects ADD COLUMN status_changed_at DATETIME",
+            [],
+        );
+
+        let _ = conn.execute(
+            "ALTER TABLE projects ADD COLUMN is_pinned BOOLEAN DEFAULT 0",
+            [],
+        );
+
+        let _ = conn.execute(
+            "ALTER TABLE projects ADD COLUMN pinned_order INTEGER DEFAULT 0",
+            [],
+        );
+
+        // Crear tabla de TODOs por proyecto
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS project_todos (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL,
+                content TEXT NOT NULL,
+                is_completed BOOLEAN DEFAULT 0,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                completed_at DATETIME,
+                FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE
+            )",
+            [],
+        )?;
+
         Ok(Database {
             conn: Mutex::new(conn),
         })
