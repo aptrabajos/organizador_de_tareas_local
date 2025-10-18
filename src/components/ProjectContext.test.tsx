@@ -28,7 +28,7 @@ describe('ProjectContext', () => {
     id: 1,
     name: 'Proyecto Test',
     description: 'Descripción del proyecto de prueba',
-    path: '/home/user/proyecto-test',
+    local_path: '/home/user/proyecto-test',
     tags: 'react,typescript,testing',
     status: 'activo',
     is_pinned: false,

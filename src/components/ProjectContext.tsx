@@ -1,5 +1,10 @@
 import { createSignal, onMount, Show, For } from 'solid-js';
-import type { Project, JournalEntry, ProjectTodo, ProjectLink } from '../types/project';
+import type {
+  Project,
+  JournalEntry,
+  ProjectTodo,
+  ProjectLink,
+} from '../types/project';
 import {
   getProject,
   getJournalEntries,
@@ -116,7 +121,9 @@ export default function ProjectContext(props: ProjectContextProps) {
                   {project()?.description}
                 </p>
                 <div class="mb-3">
-                  <span class="text-sm text-gray-500 dark:text-gray-400">Ruta: </span>
+                  <span class="text-sm text-gray-500 dark:text-gray-400">
+                    Ruta:{' '}
+                  </span>
                   <code class="rounded bg-gray-100 px-2 py-1 text-sm text-gray-800 dark:bg-gray-700 dark:text-gray-200">
                     {project()?.local_path}
                   </code>
@@ -207,7 +214,9 @@ export default function ProjectContext(props: ProjectContextProps) {
                 <Show
                   when={links().length > 0}
                   fallback={
-                    <p class="text-sm text-gray-500 dark:text-gray-400">Sin enlaces</p>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">
+                      Sin enlaces
+                    </p>
                   }
                 >
                   <div class="space-y-2">
