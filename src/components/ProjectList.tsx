@@ -12,6 +12,8 @@ import {
   createProjectBackup,
   syncProjectToBackup,
   trackProjectOpen,
+  togglePinProject,
+  updateProjectStatus,
 } from '../services/api';
 import { open } from '@tauri-apps/plugin-dialog';
 import { invoke } from '@tauri-apps/api/core';
@@ -246,155 +248,157 @@ const ProjectList: Component<ProjectListProps> = (props) => {
         when={filteredProjects().length > 0}
         fallback={
           <div class="py-12 text-center text-gray-500 dark:text-gray-400">
-            <p class="text-lg">No hay proyectos que coincidan con los filtros</p>
+            <p class="text-lg">
+              No hay proyectos que coincidan con los filtros
+            </p>
             <p class="mt-2 text-sm">Intenta cambiar los filtros aplicados</p>
           </div>
         }
       >
         <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           <For each={filteredProjects()}>
-          {(project) => (
-            <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md dark:border-gray-700 dark:bg-gray-800">
-              <div class="flex gap-3">
-                <Show when={project.image_data}>
-                  <img
-                    src={project.image_data}
-                    alt={project.name}
-                    class="h-16 w-16 flex-shrink-0 rounded-lg border-2 border-gray-300 object-cover dark:border-gray-600"
-                  />
-                </Show>
-                <div class="flex-1">
-                  <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
-                    {project.name}
-                  </h3>
-                  <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">
-                    {project.description}
+            {(project) => (
+              <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md dark:border-gray-700 dark:bg-gray-800">
+                <div class="flex gap-3">
+                  <Show when={project.image_data}>
+                    <img
+                      src={project.image_data}
+                      alt={project.name}
+                      class="h-16 w-16 flex-shrink-0 rounded-lg border-2 border-gray-300 object-cover dark:border-gray-600"
+                    />
+                  </Show>
+                  <div class="flex-1">
+                    <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+                      {project.name}
+                    </h3>
+                    <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">
+                      {project.description}
+                    </p>
+                  </div>
+                </div>
+
+                <div class="mt-3 space-y-2 text-xs text-gray-500 dark:text-gray-400">
+                  <p class="truncate" title={project.local_path}>
+                    📁 {project.local_path}
                   </p>
+                  <GitInfo projectPath={project.local_path} />
+                </div>
+
+                <Show when={project.notes}>
+                  <div class="mt-3 rounded bg-gray-50 p-2 text-xs text-gray-700 dark:bg-gray-700 dark:text-gray-300">
+                    <p class="font-semibold">📝 Notas:</p>
+                    <div
+                      class="prose-xs prose mt-1 max-h-40 max-w-none overflow-y-auto break-words dark:prose-invert"
+                      // eslint-disable-next-line solid/no-innerhtml
+                      innerHTML={renderMarkdown(project.notes!)}
+                    />
+                  </div>
+                </Show>
+
+                <div class="mt-3 flex flex-wrap gap-2">
+                  <Show when={project.documentation_url}>
+                    <button
+                      onClick={() => openUrl(project.documentation_url!)}
+                      class="rounded bg-blue-100 px-2 py-1 text-xs text-blue-700 hover:bg-blue-200"
+                      type="button"
+                    >
+                      📖 Documentación
+                    </button>
+                  </Show>
+                  <Show when={project.ai_documentation_url}>
+                    <button
+                      onClick={() => openUrl(project.ai_documentation_url!)}
+                      class="rounded bg-purple-100 px-2 py-1 text-xs text-purple-700 hover:bg-purple-200"
+                      type="button"
+                    >
+                      🤖 Docs IA
+                    </button>
+                  </Show>
+                  <Show when={project.drive_link}>
+                    <button
+                      onClick={() => openUrl(project.drive_link!)}
+                      class="rounded bg-green-100 px-2 py-1 text-xs text-green-700 hover:bg-green-200"
+                      type="button"
+                    >
+                      📂 Drive
+                    </button>
+                  </Show>
+                </div>
+
+                <div class="mt-4 flex flex-wrap gap-2">
+                  <button
+                    onClick={() => handleOpenTerminal(project)}
+                    class="flex-1 rounded bg-purple-600 px-3 py-2 text-sm font-medium text-white hover:bg-purple-700"
+                  >
+                    🚀 Trabajar
+                  </button>
+                  <button
+                    onClick={() => setContextProjectId(project.id)}
+                    class="rounded bg-cyan-600 px-3 py-2 text-sm font-medium text-white hover:bg-cyan-700"
+                    aria-label="Contexto"
+                    title="Ver contexto del proyecto"
+                  >
+                    📋
+                  </button>
+                  <button
+                    onClick={() => setJournalProjectId(project.id)}
+                    class="rounded bg-amber-600 px-3 py-2 text-sm font-medium text-white hover:bg-amber-700"
+                    aria-label="Diario"
+                    title="Diario del proyecto"
+                  >
+                    📓
+                  </button>
+                  <button
+                    onClick={() => setTodosProjectId(project.id)}
+                    class="rounded bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700"
+                    aria-label="TODOs"
+                    title="Lista de tareas"
+                  >
+                    ✅
+                  </button>
+                  <button
+                    onClick={() => handleBackup(project)}
+                    class="rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                    aria-label="Crear backup"
+                    title="Crear backup - Elegir carpeta"
+                  >
+                    💾
+                  </button>
+                  <button
+                    onClick={() => handleBackupToMnt(project)}
+                    class="rounded bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+                    aria-label="Backup a disco"
+                    title="Backup directo a /mnt/sda1"
+                  >
+                    💿
+                  </button>
+                  <button
+                    onClick={() => handleSync(project)}
+                    class="rounded bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700"
+                    aria-label="Sincronizar"
+                    title="Sincronizar con rsync"
+                  >
+                    🔄
+                  </button>
+                  <button
+                    onClick={() => props.onEdit(project)}
+                    class="rounded border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                    aria-label="Editar"
+                  >
+                    ✏️
+                  </button>
+                  <button
+                    onClick={() => props.onDelete(project)}
+                    class="rounded border border-red-300 px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+                    aria-label="Eliminar"
+                  >
+                    🗑️
+                  </button>
                 </div>
               </div>
-
-              <div class="mt-3 space-y-2 text-xs text-gray-500 dark:text-gray-400">
-                <p class="truncate" title={project.local_path}>
-                  📁 {project.local_path}
-                </p>
-                <GitInfo projectPath={project.local_path} />
-              </div>
-
-              <Show when={project.notes}>
-                <div class="mt-3 rounded bg-gray-50 p-2 text-xs text-gray-700 dark:bg-gray-700 dark:text-gray-300">
-                  <p class="font-semibold">📝 Notas:</p>
-                  <div
-                    class="prose-xs prose mt-1 max-h-40 max-w-none overflow-y-auto break-words dark:prose-invert"
-                    // eslint-disable-next-line solid/no-innerhtml
-                    innerHTML={renderMarkdown(project.notes!)}
-                  />
-                </div>
-              </Show>
-
-              <div class="mt-3 flex flex-wrap gap-2">
-                <Show when={project.documentation_url}>
-                  <button
-                    onClick={() => openUrl(project.documentation_url!)}
-                    class="rounded bg-blue-100 px-2 py-1 text-xs text-blue-700 hover:bg-blue-200"
-                    type="button"
-                  >
-                    📖 Documentación
-                  </button>
-                </Show>
-                <Show when={project.ai_documentation_url}>
-                  <button
-                    onClick={() => openUrl(project.ai_documentation_url!)}
-                    class="rounded bg-purple-100 px-2 py-1 text-xs text-purple-700 hover:bg-purple-200"
-                    type="button"
-                  >
-                    🤖 Docs IA
-                  </button>
-                </Show>
-                <Show when={project.drive_link}>
-                  <button
-                    onClick={() => openUrl(project.drive_link!)}
-                    class="rounded bg-green-100 px-2 py-1 text-xs text-green-700 hover:bg-green-200"
-                    type="button"
-                  >
-                    📂 Drive
-                  </button>
-                </Show>
-              </div>
-
-              <div class="mt-4 flex flex-wrap gap-2">
-                <button
-                  onClick={() => handleOpenTerminal(project)}
-                  class="flex-1 rounded bg-purple-600 px-3 py-2 text-sm font-medium text-white hover:bg-purple-700"
-                >
-                  🚀 Trabajar
-                </button>
-                <button
-                  onClick={() => setContextProjectId(project.id)}
-                  class="rounded bg-cyan-600 px-3 py-2 text-sm font-medium text-white hover:bg-cyan-700"
-                  aria-label="Contexto"
-                  title="Ver contexto del proyecto"
-                >
-                  📋
-                </button>
-                <button
-                  onClick={() => setJournalProjectId(project.id)}
-                  class="rounded bg-amber-600 px-3 py-2 text-sm font-medium text-white hover:bg-amber-700"
-                  aria-label="Diario"
-                  title="Diario del proyecto"
-                >
-                  📓
-                </button>
-                <button
-                  onClick={() => setTodosProjectId(project.id)}
-                  class="rounded bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700"
-                  aria-label="TODOs"
-                  title="Lista de tareas"
-                >
-                  ✅
-                </button>
-                <button
-                  onClick={() => handleBackup(project)}
-                  class="rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
-                  aria-label="Crear backup"
-                  title="Crear backup - Elegir carpeta"
-                >
-                  💾
-                </button>
-                <button
-                  onClick={() => handleBackupToMnt(project)}
-                  class="rounded bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700"
-                  aria-label="Backup a disco"
-                  title="Backup directo a /mnt/sda1"
-                >
-                  💿
-                </button>
-                <button
-                  onClick={() => handleSync(project)}
-                  class="rounded bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700"
-                  aria-label="Sincronizar"
-                  title="Sincronizar con rsync"
-                >
-                  🔄
-                </button>
-                <button
-                  onClick={() => props.onEdit(project)}
-                  class="rounded border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                  aria-label="Editar"
-                >
-                  ✏️
-                </button>
-                <button
-                  onClick={() => props.onDelete(project)}
-                  class="rounded border border-red-300 px-3 py-2 text-sm text-red-600 hover:bg-red-50"
-                  aria-label="Eliminar"
-                >
-                  🗑️
-                </button>
-              </div>
-            </div>
-          )}
-        </For>
-      </div>
+            )}
+          </For>
+        </div>
       </Show>
 
       {/* Journal Modal */}
