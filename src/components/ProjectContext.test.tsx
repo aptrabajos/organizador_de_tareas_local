@@ -92,6 +92,7 @@ describe('ProjectContext', () => {
     );
     (getProjectTodos as ReturnType<typeof vi.fn>).mockResolvedValue(mockTodos);
     (getProjectLinks as ReturnType<typeof vi.fn>).mockResolvedValue(mockLinks);
+    (getAttachments as ReturnType<typeof vi.fn>).mockResolvedValue([]);
   });
 
   describe('Rendering', () => {
