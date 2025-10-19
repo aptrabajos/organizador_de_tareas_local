@@ -1169,12 +1169,14 @@ chmod +x ~/.local/bin/gestor-proyectos
 El usuario solicitó poder elegir la carpeta de destino para los backups. Se implementó:
 
 **Backend (Rust):**
+
 - Comando Tauri `select_backup_folder()` que abre diálogo nativo del sistema
 - Usa `tauri_plugin_dialog::DialogExt` (compatible con Tauri 2.x)
 - Método `.blocking_pick_folder()` para selección de carpetas
 - Retorna `Option<String>` con la ruta o `None` si se cancela
 
 **Frontend (SolidJS + TypeScript):**
+
 - Nueva sección en Settings → Tab Backups: "📁 Carpeta de Backups"
 - Input de solo lectura mostrando ruta actual (`backup.default_path`)
 - Botón "📁 Seleccionar" que invoca el diálogo del sistema
@@ -1209,12 +1211,14 @@ pub async fn select_backup_folder(app: tauri::AppHandle) -> Result<Option<String
 ```
 
 **Archivos modificados:**
+
 - `src-tauri/src/commands/mod.rs` - Comando `select_backup_folder`
 - `src-tauri/src/main.rs` - Registro del comando
 - `src/services/api.ts` - Función `selectBackupFolder()`
 - `src/components/Settings.tsx` - Sección de selección de carpeta
 
 **UX implementada:**
+
 1. Usuario abre Settings → Tab Backups
 2. Primera sección muestra input con ruta actual o "(No configurada)"
 3. Click en "📁 Seleccionar" → Se abre diálogo nativo del OS
