@@ -73,6 +73,7 @@ fn main() {
             commands::detect_programs,
             commands::open_file_manager,
             commands::open_text_editor,
+            commands::select_backup_folder,
         ])
         .run(tauri::generate_context!())
         .expect("Error al ejecutar la aplicación Tauri");
