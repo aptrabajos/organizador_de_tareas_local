@@ -24,6 +24,7 @@ export default function ProjectContext(props: ProjectContextProps) {
   const [journalEntries, setJournalEntries] = createSignal<JournalEntry[]>([]);
   const [todos, setTodos] = createSignal<ProjectTodo[]>([]);
   const [links, setLinks] = createSignal<ProjectLink[]>([]);
+  const [attachments, setAttachments] = createSignal<ProjectAttachment[]>([]);
   const [loading, setLoading] = createSignal(true);
   const [error, setError] = createSignal<string | null>(null);
 
