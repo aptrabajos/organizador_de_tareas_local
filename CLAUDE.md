@@ -841,7 +841,9 @@ Comandos migrados a usar platform abstraction:
 **Código clave:**
 
 ```tsx
-{/* Backup automático habilitado */}
+{
+  /* Backup automático habilitado */
+}
 <div class="flex items-center justify-between">
   <label class="relative inline-flex cursor-pointer items-center">
     <input
@@ -863,7 +865,7 @@ Comandos migrados a usar platform abstraction:
     />
     <div class="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:start-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-blue-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:border-gray-600 dark:bg-gray-700 dark:peer-focus:ring-blue-800 rtl:peer-checked:after:-translate-x-full" />
   </label>
-</div>
+</div>;
 ```
 
 #### Tab Interfaz (UI Settings)
@@ -925,7 +927,12 @@ Comandos migrados a usar platform abstraction:
         ...cfg,
         advanced: {
           ...cfg.advanced,
-          log_level: e.currentTarget.value as 'trace' | 'debug' | 'info' | 'warn' | 'error',
+          log_level: e.currentTarget.value as
+            | 'trace'
+            | 'debug'
+            | 'info'
+            | 'warn'
+            | 'error',
         },
       });
     }
@@ -1037,7 +1044,7 @@ onMount(async () => {
 // JSX:
 <Show when={showWelcome()}>
   <WelcomeScreen onClose={() => setShowWelcome(false)} />
-</Show>
+</Show>;
 ```
 
 #### Build para Windows - Documentación
@@ -1047,6 +1054,7 @@ onMount(async () => {
 Documentación completa para cross-compilation desde Linux a Windows:
 
 **Requisitos:**
+
 - Rust target: `x86_64-pc-windows-gnu`
 - Compilador MinGW: `mingw-w64-gcc`
 - Configuración en tauri.conf.json
@@ -1065,11 +1073,13 @@ cargo tauri build --target x86_64-pc-windows-gnu
 ```
 
 **Ubicaciones de artefactos Windows:**
+
 - Binario: `src-tauri/target/x86_64-pc-windows-gnu/release/gestor-proyectos.exe`
 - MSI Installer: `src-tauri/target/x86_64-pc-windows-gnu/release/bundle/msi/`
 - NSIS Setup: `src-tauri/target/x86_64-pc-windows-gnu/release/bundle/nsis/`
 
 **Troubleshooting incluido:**
+
 - Problemas de linker
 - Dependencias faltantes
 - Errores de WebView2
@@ -1085,7 +1095,7 @@ cargo tauri build --target x86_64-pc-windows-gnu
   "version": "0.2.1",
   "bundle": {
     "active": true,
-    "targets": "all",  // Cambiado de array a "all"
+    "targets": "all", // Cambiado de array a "all"
     "windows": {
       "certificateThumbprint": null,
       "digestAlgorithm": "sha256",
@@ -1105,16 +1115,19 @@ cargo tauri build --target x86_64-pc-windows-gnu
 4. **solid/reactivity**: Convertido step indicators a `<Index>` component
 
 **Resultado final:**
+
 - ✅ 0 errores de ESLint
 - ⚠️ 3 warnings aceptables (any type, props reactivity en onClick handlers)
 
 #### Archivos Modificados/Creados
 
 **Nuevos archivos:**
+
 - `src/components/WelcomeScreen.tsx` (152 líneas) - Wizard de onboarding
 - `BUILD_WINDOWS.md` (200+ líneas) - Documentación cross-compilation
 
 **Archivos modificados:**
+
 - `src/components/Settings.tsx` (200+ líneas agregadas) - 3 tabs implementados
 - `src/App.tsx` (modificado) - Integración WelcomeScreen con onMount
 - `src-tauri/tauri.conf.json` (modificado) - Version 0.2.1, targets: "all", windows config
@@ -1136,6 +1149,7 @@ pnpm run tauri:build
 - ⚠️ AppImage: Error en linuxdeploy (no crítico)
 
 **Warnings de compilación (esperados):**
+
 - `migrate_if_needed` - Método preparado para futuras migraciones
 - `CreateActivityDTO` fields - Struct preparado para tracking manual
 - `PlatformOperations` methods - Métodos preparados para backups/paths

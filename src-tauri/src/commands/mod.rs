@@ -738,3 +738,26 @@ pub async fn open_text_editor(
     platform.open_text_editor(&path, &config)
 }
 
+#[tauri::command]
+pub async fn select_backup_folder(app: tauri::AppHandle) -> Result<Option<String>, String> {
+    use tauri::api::dialog::blocking::FileDialogBuilder;
+
+    println!("📁 [DIALOG] Abriendo diálogo de selección de carpeta");
+
+    let result = FileDialogBuilder::new()
+        .set_title("Seleccionar carpeta de backups")
+        .pick_folder();
+
+    match result {
+        Some(path) => {
+            let path_str = path.to_string_lossy().to_string();
+            println!("✅ [DIALOG] Carpeta seleccionada: {}", path_str);
+            Ok(Some(path_str))
+        }
+        None => {
+            println!("⚠️ [DIALOG] Usuario canceló la selección");
+            Ok(None)
+        }
+    }
+}
+
