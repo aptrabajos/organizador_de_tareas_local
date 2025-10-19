@@ -91,16 +91,17 @@ impl PlatformOperations for LinuxPlatform {
             }
             ProgramMode::Default => {
                 // Usar x-terminal-emulator (enlace simbólico al terminal predeterminado)
-                Command::new("x-terminal-emulator")
+                if Command::new("x-terminal-emulator")
                     .arg("--working-directory")
                     .arg(path)
                     .spawn()
-                    .or_else(|_| {
-                        // Fallback si x-terminal-emulator no existe
-                        self.try_terminal_fallback(path).map(|_| ())
-                    })
-                    .map_err(|e| format!("Error al abrir terminal: {}", e))?;
-                Ok(())
+                    .is_ok()
+                {
+                    Ok(())
+                } else {
+                    // Fallback si x-terminal-emulator no existe
+                    self.try_terminal_fallback(path)
+                }
             }
             ProgramMode::Custom => {
                 let program = config
