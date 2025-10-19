@@ -20,12 +20,23 @@ const App: Component = () => {
   const [showForm, setShowForm] = createSignal(false);
   const [showAnalytics, setShowAnalytics] = createSignal(false);
   const [showSettings, setShowSettings] = createSignal(false);
+  const [showWelcome, setShowWelcome] = createSignal(false);
   const [editingProject, setEditingProject] = createSignal<Project | null>(
     null
   );
 
-  onMount(() => {
+  onMount(async () => {
     store.loadProjects();
+
+    // Verificar si mostrar welcome screen
+    try {
+      const config = await getConfig();
+      if (config.ui.show_welcome) {
+        setShowWelcome(true);
+      }
+    } catch (err) {
+      console.error('Error cargando config:', err);
+    }
   });
 
   const handleSearch = (query: string) => {
