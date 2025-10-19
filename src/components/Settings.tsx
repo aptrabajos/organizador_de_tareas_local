@@ -84,7 +84,7 @@ export default function Settings(props: { onClose: () => void }) {
       const cfg = await resetConfig();
       setConfig(cfg);
       setSuccessMessage('✅ Configuración reseteada');
-      setTimeout(() => setSuccessMessage(null), 3000);
+      window.setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err) {
       setError(`Error al resetear: ${err}`);
     } finally {
