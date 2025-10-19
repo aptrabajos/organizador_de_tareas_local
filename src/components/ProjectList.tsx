@@ -30,6 +30,7 @@ interface ProjectListProps {
   onEdit: (project: Project) => void;
   onDelete: (project: Project) => void;
   onOpenTerminal: (project: Project) => void;
+  onProjectsChanged?: () => void; // Callback para refrescar proyectos
 }
 
 const ProjectList: Component<ProjectListProps> = (props) => {
