@@ -1,0 +1,7 @@
+v0.2.1 - Build exitoso $(date)
+
+Artefactos generados:
+-rw-r--r-- 1 manjarodesktop manjarodesktop 5,8M oct 19 00:45 src-tauri/target/release/bundle/deb/Gestor de Proyectos_0.1.0_amd64.deb
+-rw-r--r-- 1 manjarodesktop manjarodesktop 5,8M oct 19 17:05 src-tauri/target/release/bundle/deb/Gestor de Proyectos_0.2.1_amd64.deb
+-rw-r--r-- 1 manjarodesktop manjarodesktop 5,8M oct 19 17:05 src-tauri/target/release/bundle/rpm/Gestor de Proyectos-0.2.1-1.x86_64.rpm
+-rwxr-xr-x 2 manjarodesktop manjarodesktop  17M oct 19 17:05 src-tauri/target/release/gestor-proyectos

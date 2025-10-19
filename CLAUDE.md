@@ -816,8 +816,356 @@ Comandos migrados a usar platform abstraction:
 
 #### Próximas Mejoras (v0.3.0)
 
-- Tabs Backups, UI, Advanced con configuración adicional
-- WelcomeScreen para primera ejecución
-- Build para Windows con MSI installer
+- ~~Tabs Backups, UI, Advanced con configuración adicional~~ ✅ **Completado en v0.2.1**
+- ~~WelcomeScreen para primera ejecución~~ ✅ **Completado en v0.2.1**
+- ~~Build para Windows con MSI installer~~ ✅ **Documentado en v0.2.1** (BUILD_WINDOWS.md)
 - Auto-updater integration (tauri-plugin-updater)
 - Tests unitarios para config y platform
+
+### 2025-10-19 - v0.2.1 - Configuración Completa y Onboarding
+
+**Implementación de Settings Tabs Restantes y WelcomeScreen:**
+
+#### Tab Backups (Settings)
+
+**Características implementadas:**
+
+- Toggle para `auto_backup_enabled` - Habilitar backups automáticos
+- Input numérico para `auto_backup_interval` (días entre backups)
+- Toggle para `cleanup_old_backups` - Limpieza automática de backups antiguos
+- Input numérico para `retention_days` (días a conservar backups)
+- Toggle switches con Tailwind peer classes para UI moderna
+- Validación de inputs (min: 1, max: 30 días para intervalo)
+- Visibilidad condicional con `<Show>` de SolidJS
+
+**Código clave:**
+
+```tsx
+{/* Backup automático habilitado */}
+<div class="flex items-center justify-between">
+  <label class="relative inline-flex cursor-pointer items-center">
+    <input
+      type="checkbox"
+      class="peer sr-only"
+      checked={config()?.backup.auto_backup_enabled || false}
+      onChange={(e) => {
+        const cfg = config();
+        if (cfg) {
+          setConfig({
+            ...cfg,
+            backup: {
+              ...cfg.backup,
+              auto_backup_enabled: e.currentTarget.checked,
+            },
+          });
+        }
+      }}
+    />
+    <div class="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:start-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-blue-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:border-gray-600 dark:bg-gray-700 dark:peer-focus:ring-blue-800 rtl:peer-checked:after:-translate-x-full" />
+  </label>
+</div>
+```
+
+#### Tab Interfaz (UI Settings)
+
+**Características implementadas:**
+
+- Dropdown `theme` con opciones: light, dark, auto (sistema)
+- Dropdown `language` con opciones: Español, English
+- Toggle `confirm_delete` - Confirmación antes de eliminar proyectos
+- Toggle `show_welcome` - Mostrar pantalla de bienvenida en primer inicio
+- Nota informativa sobre reinicio requerido para cambio de idioma
+- Íconos contextuales (☀️ Claro, 🌙 Oscuro, 🔄 Automático)
+
+**Código clave:**
+
+```tsx
+<select
+  class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+  value={config()?.ui.theme || 'auto'}
+  onChange={(e) => {
+    const cfg = config();
+    if (cfg) {
+      setConfig({
+        ...cfg,
+        ui: {
+          ...cfg.ui,
+          theme: e.currentTarget.value as 'light' | 'dark' | 'auto',
+        },
+      });
+    }
+  }}
+>
+  <option value="light">☀️ Claro</option>
+  <option value="dark">🌙 Oscuro</option>
+  <option value="auto">🔄 Automático (sistema)</option>
+</select>
+```
+
+#### Tab Avanzado (Advanced Settings)
+
+**Características implementadas:**
+
+- Dropdown `log_level` con opciones: trace, debug, info, warn, error
+- Toggle `enable_analytics` - Habilitar seguimiento de uso (local)
+- Toggle `enable_auto_update` - Actualizaciones automáticas
+- Nota informativa sobre auto-update disponible en v0.3.0
+- Descripciones detalladas para cada nivel de log
+
+**Código clave:**
+
+```tsx
+<select
+  class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+  value={config()?.advanced.log_level || 'info'}
+  onChange={(e) => {
+    const cfg = config();
+    if (cfg) {
+      setConfig({
+        ...cfg,
+        advanced: {
+          ...cfg.advanced,
+          log_level: e.currentTarget.value as 'trace' | 'debug' | 'info' | 'warn' | 'error',
+        },
+      });
+    }
+  }}
+>
+  <option value="error">Error - Solo errores críticos</option>
+  <option value="warn">Warn - Advertencias y errores</option>
+  <option value="info">Info - Información general</option>
+  <option value="debug">Debug - Modo depuración</option>
+  <option value="trace">Trace - Todo (muy detallado)</option>
+</select>
+```
+
+#### WelcomeScreen Component
+
+**Características del Wizard de Bienvenida:**
+
+- **Multi-step wizard** con 3 pasos de onboarding
+- **Step 1 - ¡Bienvenido!**: Introducción a la aplicación con características principales
+  - 📁 Gestión completa de proyectos locales
+  - 🔗 Enlaces y recursos organizados
+  - 📊 Analytics y estadísticas de uso
+  - 📓 Diario y TODOs por proyecto
+  - ⚙️ Configuración multiplataforma
+
+- **Step 2 - Características Principales**: Funcionalidades destacadas
+  - 🚀 Abrir terminal en el proyecto con un click
+  - 📝 Editor Markdown con preview en tiempo real
+  - 📎 Adjuntar archivos importantes
+  - 🎨 Dark mode y temas personalizables
+  - 🔍 Búsqueda y filtros avanzados
+  - ⭐ Sistema de favoritos
+
+- **Step 3 - Primeros Pasos**: Tutorial rápido
+  - 1️⃣ Crea tu primer proyecto con el botón "+ Nuevo Proyecto"
+  - 2️⃣ Configura tus programas favoritos en "⚙️ Configuración"
+  - 3️⃣ Usa "🚀 Trabajar" para abrir el terminal del proyecto
+  - 4️⃣ Agrega enlaces, notas y TODOs según necesites
+  - 5️⃣ Explora Analytics para ver tu progreso
+
+**Navegación y UX:**
+
+- Navegación con botones "← Anterior" y "Siguiente →"
+- Botón final "¡Empezar! 🚀" que cierra el wizard
+- Indicadores de paso (dots) clickeables para navegación rápida
+- Animación de dot activo (w-8 vs w-2)
+- Botón X para cerrar en cualquier momento
+- Modal con overlay semi-transparente
+- Scroll automático para contenido largo
+
+**Persistencia de estado:**
+
+- Al cerrar (X o "¡Empezar!"), actualiza config: `show_welcome: false`
+- Llamada async a `updateConfig()` con try/catch
+- Integrado en App.tsx con `onMount()` que verifica `config.ui.show_welcome`
+
+**Código del componente** (152 líneas):
+
+```tsx
+export default function WelcomeScreen(props: { onClose: () => void }) {
+  const [currentStep, setCurrentStep] = createSignal(0);
+
+  const steps = [
+    { title: '¡Bienvenido a Gestor de Proyectos!', icon: '👋', description: '...', features: [...] },
+    { title: 'Características Principales', icon: '✨', description: '...', features: [...] },
+    { title: 'Primeros Pasos', icon: '🎯', description: '...', features: [...] },
+  ];
+
+  const handleClose = async () => {
+    try {
+      const config = await getConfig();
+      await updateConfig({
+        ...config,
+        ui: { ...config.ui, show_welcome: false },
+      });
+    } catch (err) {
+      console.error('Error actualizando config:', err);
+    }
+    props.onClose();
+  };
+
+  return (
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+      {/* Multi-step wizard UI */}
+    </div>
+  );
+}
+```
+
+#### Integración en App.tsx
+
+```tsx
+import WelcomeScreen from './components/WelcomeScreen';
+
+const [showWelcome, setShowWelcome] = createSignal(false);
+
+onMount(async () => {
+  store.loadProjects();
+  try {
+    const config = await getConfig();
+    if (config.ui.show_welcome) {
+      setShowWelcome(true);
+    }
+  } catch (err) {
+    console.error('Error cargando config:', err);
+  }
+});
+
+// JSX:
+<Show when={showWelcome()}>
+  <WelcomeScreen onClose={() => setShowWelcome(false)} />
+</Show>
+```
+
+#### Build para Windows - Documentación
+
+**Archivo creado: BUILD_WINDOWS.md** (200+ líneas)
+
+Documentación completa para cross-compilation desde Linux a Windows:
+
+**Requisitos:**
+- Rust target: `x86_64-pc-windows-gnu`
+- Compilador MinGW: `mingw-w64-gcc`
+- Configuración en tauri.conf.json
+
+**Comandos principales:**
+
+```bash
+# Instalar target de Windows
+rustup target add x86_64-pc-windows-gnu
+
+# Instalar MinGW en Manjaro
+sudo pacman -S mingw-w64-gcc
+
+# Cross-compile para Windows
+cargo tauri build --target x86_64-pc-windows-gnu
+```
+
+**Ubicaciones de artefactos Windows:**
+- Binario: `src-tauri/target/x86_64-pc-windows-gnu/release/gestor-proyectos.exe`
+- MSI Installer: `src-tauri/target/x86_64-pc-windows-gnu/release/bundle/msi/`
+- NSIS Setup: `src-tauri/target/x86_64-pc-windows-gnu/release/bundle/nsis/`
+
+**Troubleshooting incluido:**
+- Problemas de linker
+- Dependencias faltantes
+- Errores de WebView2
+- Configuración de certificados
+
+#### Configuración tauri.conf.json
+
+**Cambios en versión 0.2.1:**
+
+```json
+{
+  "productName": "Gestor de Proyectos",
+  "version": "0.2.1",
+  "bundle": {
+    "active": true,
+    "targets": "all",  // Cambiado de array a "all"
+    "windows": {
+      "certificateThumbprint": null,
+      "digestAlgorithm": "sha256",
+      "timestampUrl": ""
+    }
+  }
+}
+```
+
+#### Correcciones de ESLint
+
+**Errores corregidos:**
+
+1. **Unused import**: Eliminado `createEffect` de Settings.tsx
+2. **no-undef**: Cambiado `setTimeout` → `window.setTimeout` (2 ocurrencias)
+3. **solid/prefer-for**: Convertido `array.map()` → `<For>` en WelcomeScreen
+4. **solid/reactivity**: Convertido step indicators a `<Index>` component
+
+**Resultado final:**
+- ✅ 0 errores de ESLint
+- ⚠️ 3 warnings aceptables (any type, props reactivity en onClick handlers)
+
+#### Archivos Modificados/Creados
+
+**Nuevos archivos:**
+- `src/components/WelcomeScreen.tsx` (152 líneas) - Wizard de onboarding
+- `BUILD_WINDOWS.md` (200+ líneas) - Documentación cross-compilation
+
+**Archivos modificados:**
+- `src/components/Settings.tsx` (200+ líneas agregadas) - 3 tabs implementados
+- `src/App.tsx` (modificado) - Integración WelcomeScreen con onMount
+- `src-tauri/tauri.conf.json` (modificado) - Version 0.2.1, targets: "all", windows config
+- `package.json` (modificado) - Version 0.2.1, descripción actualizada
+
+#### Compilación y Artefactos
+
+**Build exitoso:**
+
+```bash
+pnpm run tauri:build
+```
+
+**Artefactos generados (Linux):**
+
+- ✅ Binario: `gestor-proyectos` (17 MB)
+- ✅ Paquete DEB: `Gestor de Proyectos_0.2.1_amd64.deb` (5.8 MB)
+- ✅ Paquete RPM: `Gestor de Proyectos-0.2.1-1.x86_64.rpm` (5.8 MB)
+- ⚠️ AppImage: Error en linuxdeploy (no crítico)
+
+**Warnings de compilación (esperados):**
+- `migrate_if_needed` - Método preparado para futuras migraciones
+- `CreateActivityDTO` fields - Struct preparado para tracking manual
+- `PlatformOperations` methods - Métodos preparados para backups/paths
+- `program_exists` - Función utilitaria preparada
+
+**Instalación:**
+
+```bash
+cp src-tauri/target/release/gestor-proyectos ~/.local/bin/
+chmod +x ~/.local/bin/gestor-proyectos
+```
+
+#### Características Implementadas v0.2.1
+
+✅ **Tab Backups completo** - auto_backup, intervalo, cleanup, retention
+✅ **Tab Interfaz completo** - theme, language, confirm_delete, show_welcome
+✅ **Tab Avanzado completo** - log_level, analytics, auto_update
+✅ **WelcomeScreen wizard** - 3 pasos, navegación, persistencia
+✅ **Documentación Windows** - BUILD_WINDOWS.md con cross-compilation
+✅ **Build 0.2.1** - DEB, RPM, binario instalado
+✅ **ESLint limpio** - 0 errores, warnings aceptables
+✅ **Dark mode** - Soporte completo en todos los componentes nuevos
+✅ **Toggle switches** - UI moderna con Tailwind peer classes
+✅ **Configuración persistente** - JSON en ~/.config/gestor-proyectos/
+
+#### Próximas Funcionalidades (v0.3.0)
+
+- Implementar lógica de backups automáticos (scheduler en Rust)
+- Auto-updater con tauri-plugin-updater
+- Internacionalización (i18n) con archivos de traducción
+- Tests E2E con Playwright para flujo de onboarding
+- Build nativo para Windows (MSI installer funcional)
+- Logs con niveles configurables (integrate log_level)
