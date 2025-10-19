@@ -166,6 +166,7 @@ const App: Component = () => {
                 onEdit={handleEdit}
                 onDelete={handleDelete}
                 onOpenTerminal={handleOpenTerminal}
+                onProjectsChanged={() => store.loadProjects()}
               />
             </Show>
           </Show>
