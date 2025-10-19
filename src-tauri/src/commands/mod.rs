@@ -79,35 +79,14 @@ pub async fn open_terminal(
 }
 
 #[tauri::command]
-pub async fn open_url(url: String) -> Result<(), String> {
-    println!("Intentando abrir URL: {}", url);
-
-    #[cfg(target_os = "linux")]
-    {
-        Command::new("xdg-open")
-            .arg(&url)
-            .spawn()
-            .map_err(|e| format!("Error al abrir URL: {}", e))?;
-    }
-
-    #[cfg(target_os = "macos")]
-    {
-        Command::new("open")
-            .arg(&url)
-            .spawn()
-            .map_err(|e| format!("Error al abrir URL: {}", e))?;
-    }
-
-    #[cfg(target_os = "windows")]
-    {
-        Command::new("cmd")
-            .args(&["/C", "start", &url])
-            .spawn()
-            .map_err(|e| format!("Error al abrir URL: {}", e))?;
-    }
-
-    println!("URL abierta exitosamente");
-    Ok(())
+pub async fn open_url(
+    config_manager: State<'_, ConfigManager>,
+    url: String,
+) -> Result<(), String> {
+    println!("🌐 [URL] Abriendo URL: {}", url);
+    let config = config_manager.get_config()?;
+    let platform = get_platform();
+    platform.open_url(&url, &config)
 }
 
 #[derive(serde::Serialize)]
