@@ -254,3 +254,29 @@ export async function reorderPinnedProjects(
 ): Promise<void> {
   await invoke('reorder_pinned_projects', { projectIds });
 }
+
+// ==================== FUNCIONES PARA CONFIGURACIÓN ====================
+
+export async function getConfig(): Promise<AppConfig> {
+  return await invoke('get_config');
+}
+
+export async function updateConfig(config: AppConfig): Promise<void> {
+  await invoke('update_config', { config });
+}
+
+export async function resetConfig(): Promise<AppConfig> {
+  return await invoke('reset_config');
+}
+
+export async function detectPrograms(): Promise<DetectedPrograms> {
+  return await invoke('detect_programs');
+}
+
+export async function openFileManager(path: string): Promise<void> {
+  await invoke('open_file_manager', { path });
+}
+
+export async function openTextEditor(path: string): Promise<void> {
+  await invoke('open_text_editor', { path });
+}
