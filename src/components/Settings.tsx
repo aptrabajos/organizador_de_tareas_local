@@ -656,13 +656,127 @@ export default function Settings(props: { onClose: () => void }) {
 
             {/* Tab: Avanzado */}
             <Show when={activeTab() === 'advanced'}>
-              <div class="space-y-4">
+              <div class="space-y-6">
                 <p class="mb-4 text-gray-600 dark:text-gray-400">
                   Configuración avanzada del sistema.
                 </p>
-                <div class="rounded-lg border border-yellow-200 bg-yellow-50 p-4 dark:border-yellow-800 dark:bg-yellow-900/20">
-                  <p class="text-yellow-800 dark:text-yellow-200">
-                    🚧 Configuración avanzada - Próximamente
+
+                {/* Nivel de log */}
+                <div class="space-y-4 rounded-lg bg-gray-50 p-4 dark:bg-gray-800">
+                  <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+                    Logs y Depuración
+                  </h3>
+                  <div>
+                    <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Nivel de Logs
+                    </label>
+                    <select
+                      class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                      value={config()?.advanced.log_level || 'info'}
+                      onChange={(e) => {
+                        const cfg = config();
+                        if (cfg) {
+                          setConfig({
+                            ...cfg,
+                            advanced: {
+                              ...cfg.advanced,
+                              log_level: e.currentTarget.value as
+                                | 'trace'
+                                | 'debug'
+                                | 'info'
+                                | 'warn'
+                                | 'error',
+                            },
+                          });
+                        }
+                      }}
+                    >
+                      <option value="error">Error - Solo errores críticos</option>
+                      <option value="warn">Warn - Advertencias y errores</option>
+                      <option value="info">Info - Información general</option>
+                      <option value="debug">Debug - Modo depuración</option>
+                      <option value="trace">Trace - Todo (muy detallado)</option>
+                    </select>
+                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                      Mayor nivel = más logs en consola
+                    </p>
+                  </div>
+                </div>
+
+                {/* Analytics */}
+                <div class="space-y-4 rounded-lg bg-gray-50 p-4 dark:bg-gray-800">
+                  <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+                    Privacidad y Datos
+                  </h3>
+                  <div class="flex items-center justify-between">
+                    <div>
+                      <p class="font-medium text-gray-900 dark:text-white">
+                        Habilitar Analytics
+                      </p>
+                      <p class="text-sm text-gray-600 dark:text-gray-400">
+                        Enviar estadísticas anónimas de uso
+                      </p>
+                    </div>
+                    <label class="relative inline-flex cursor-pointer items-center">
+                      <input
+                        type="checkbox"
+                        class="peer sr-only"
+                        checked={config()?.advanced.enable_analytics ?? true}
+                        onChange={(e) => {
+                          const cfg = config();
+                          if (cfg) {
+                            setConfig({
+                              ...cfg,
+                              advanced: {
+                                ...cfg.advanced,
+                                enable_analytics: e.currentTarget.checked,
+                              },
+                            });
+                          }
+                        }}
+                      />
+                      <div class="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:start-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-blue-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:border-gray-600 dark:bg-gray-700 dark:peer-focus:ring-blue-800 rtl:peer-checked:after:-translate-x-full" />
+                    </label>
+                  </div>
+                </div>
+
+                {/* Auto-updates */}
+                <div class="space-y-4 rounded-lg bg-gray-50 p-4 dark:bg-gray-800">
+                  <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+                    Actualizaciones
+                  </h3>
+                  <div class="flex items-center justify-between">
+                    <div>
+                      <p class="font-medium text-gray-900 dark:text-white">
+                        Actualizaciones Automáticas
+                      </p>
+                      <p class="text-sm text-gray-600 dark:text-gray-400">
+                        Buscar y descargar actualizaciones al iniciar
+                      </p>
+                    </div>
+                    <label class="relative inline-flex cursor-pointer items-center">
+                      <input
+                        type="checkbox"
+                        class="peer sr-only"
+                        checked={config()?.advanced.enable_auto_update ?? true}
+                        onChange={(e) => {
+                          const cfg = config();
+                          if (cfg) {
+                            setConfig({
+                              ...cfg,
+                              advanced: {
+                                ...cfg.advanced,
+                                enable_auto_update: e.currentTarget.checked,
+                              },
+                            });
+                          }
+                        }}
+                      />
+                      <div class="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:start-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-blue-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:border-gray-600 dark:bg-gray-700 dark:peer-focus:ring-blue-800 rtl:peer-checked:after:-translate-x-full" />
+                    </label>
+                  </div>
+                  <p class="text-xs text-gray-500 dark:text-gray-400">
+                    🚧 Nota: Auto-updates estará disponible en v0.3.0
                   </p>
                 </div>
               </div>
