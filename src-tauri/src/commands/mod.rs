@@ -1,5 +1,7 @@
+use crate::config::{AppConfig, ConfigManager, DetectedPrograms};
 use crate::db::Database;
 use crate::models::project::{CreateProjectDTO, CreateLinkDTO, Project, ProjectLink, UpdateProjectDTO, UpdateLinkDTO};
+use crate::platform::{get_platform, ProgramDetector};
 use std::process::Command;
 use std::path::PathBuf;
 use tauri::State;
