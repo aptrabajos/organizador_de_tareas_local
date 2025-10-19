@@ -213,6 +213,11 @@ const App: Component = () => {
         <Show when={showSettings()}>
           <Settings onClose={() => setShowSettings(false)} />
         </Show>
+
+        {/* Welcome Screen */}
+        <Show when={showWelcome()}>
+          <WelcomeScreen onClose={() => setShowWelcome(false)} />
+        </Show>
       </div>
     </ThemeProvider>
   );
