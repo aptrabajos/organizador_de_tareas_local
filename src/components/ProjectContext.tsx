@@ -47,17 +47,20 @@ export default function ProjectContext(props: ProjectContextProps) {
       setError(null);
 
       // Cargar datos en paralelo
-      const [projData, journalData, todosData, linksData] = await Promise.all([
-        getProject(props.projectId),
-        getJournalEntries(props.projectId),
-        getProjectTodos(props.projectId),
-        getProjectLinks(props.projectId),
-      ]);
+      const [projData, journalData, todosData, linksData, attachmentsData] =
+        await Promise.all([
+          getProject(props.projectId),
+          getJournalEntries(props.projectId),
+          getProjectTodos(props.projectId),
+          getProjectLinks(props.projectId),
+          getAttachments(props.projectId),
+        ]);
 
       setProject(projData);
       setJournalEntries(journalData);
       setTodos(todosData);
       setLinks(linksData);
+      setAttachments(attachmentsData);
     } catch (err) {
       console.error('Error al cargar contexto del proyecto:', err);
       setError('Error al cargar el contexto del proyecto');
