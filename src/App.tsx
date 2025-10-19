@@ -17,6 +17,7 @@ const App: Component = () => {
   const [searchQuery, setSearchQuery] = createSignal('');
   const [showForm, setShowForm] = createSignal(false);
   const [showAnalytics, setShowAnalytics] = createSignal(false);
+  const [showSettings, setShowSettings] = createSignal(false);
   const [editingProject, setEditingProject] = createSignal<Project | null>(
     null
   );
