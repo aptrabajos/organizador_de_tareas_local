@@ -362,14 +362,141 @@ export default function Settings(props: { onClose: () => void }) {
 
             {/* Tab: Backups */}
             <Show when={activeTab() === 'backup'}>
-              <div class="space-y-4">
+              <div class="space-y-6">
                 <p class="text-gray-600 dark:text-gray-400 mb-4">
                   Configuración de backups automáticos de proyectos.
                 </p>
-                <div class="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-                  <p class="text-yellow-800 dark:text-yellow-200">
-                    🚧 Configuración de backups - Próximamente
-                  </p>
+
+                {/* Backup automático habilitado */}
+                <div class="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg space-y-4">
+                  <div class="flex items-center justify-between">
+                    <div>
+                      <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+                        Backup Automático
+                      </h3>
+                      <p class="text-sm text-gray-600 dark:text-gray-400">
+                        Crear backups automáticos de tus proyectos
+                      </p>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        class="sr-only peer"
+                        checked={config()?.backup.auto_backup_enabled || false}
+                        onChange={(e) => {
+                          const cfg = config();
+                          if (cfg) {
+                            setConfig({
+                              ...cfg,
+                              backup: {
+                                ...cfg.backup,
+                                auto_backup_enabled: e.currentTarget.checked,
+                              },
+                            });
+                          }
+                        }}
+                      />
+                      <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600" />
+                    </label>
+                  </div>
+
+                  <Show when={config()?.backup.auto_backup_enabled}>
+                    {/* Intervalo de backup */}
+                    <div>
+                      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Intervalo de Backup (días)
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="30"
+                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        value={config()?.backup.auto_backup_interval || 7}
+                        onInput={(e) => {
+                          const cfg = config();
+                          if (cfg) {
+                            setConfig({
+                              ...cfg,
+                              backup: {
+                                ...cfg.backup,
+                                auto_backup_interval: parseInt(
+                                  e.currentTarget.value
+                                ),
+                              },
+                            });
+                          }
+                        }}
+                      />
+                      <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        Crear backup cada N días automáticamente
+                      </p>
+                    </div>
+                  </Show>
+                </div>
+
+                {/* Limpieza de backups antiguos */}
+                <div class="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg space-y-4">
+                  <div class="flex items-center justify-between">
+                    <div>
+                      <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+                        Limpiar Backups Antiguos
+                      </h3>
+                      <p class="text-sm text-gray-600 dark:text-gray-400">
+                        Eliminar backups más antiguos que cierto tiempo
+                      </p>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        class="sr-only peer"
+                        checked={config()?.backup.cleanup_old_backups || false}
+                        onChange={(e) => {
+                          const cfg = config();
+                          if (cfg) {
+                            setConfig({
+                              ...cfg,
+                              backup: {
+                                ...cfg.backup,
+                                cleanup_old_backups: e.currentTarget.checked,
+                              },
+                            });
+                          }
+                        }}
+                      />
+                      <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600" />
+                    </label>
+                  </div>
+
+                  <Show when={config()?.backup.cleanup_old_backups}>
+                    {/* Días de retención */}
+                    <div>
+                      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Días de Retención
+                      </label>
+                      <input
+                        type="number"
+                        min="7"
+                        max="365"
+                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        value={config()?.backup.retention_days || 30}
+                        onInput={(e) => {
+                          const cfg = config();
+                          if (cfg) {
+                            setConfig({
+                              ...cfg,
+                              backup: {
+                                ...cfg.backup,
+                                retention_days: parseInt(e.currentTarget.value),
+                              },
+                            });
+                          }
+                        }}
+                      />
+                      <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        Eliminar backups más antiguos que N días
+                      </p>
+                    </div>
+                  </Show>
                 </div>
               </div>
             </Show>
