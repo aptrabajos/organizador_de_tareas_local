@@ -62,7 +62,7 @@ export default function Settings(props: { onClose: () => void }) {
     try {
       await updateConfig(cfg);
       setSuccessMessage('✅ Configuración guardada exitosamente');
-      setTimeout(() => setSuccessMessage(null), 3000);
+      window.setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err) {
       setError(`Error al guardar: ${err}`);
     } finally {
