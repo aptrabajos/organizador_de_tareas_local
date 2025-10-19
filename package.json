@@ -1,7 +1,7 @@
 {
   "name": "gestor-proyectos",
-  "version": "0.1.0",
-  "description": "Gestor de proyectos local para Linux con Tauri + SolidJS",
+  "version": "0.2.1",
+  "description": "Gestor de proyectos multiplataforma (Linux/Windows) con Tauri + SolidJS",
   "type": "module",
   "scripts": {
     "dev": "vite",
