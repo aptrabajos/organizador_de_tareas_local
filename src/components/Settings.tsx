@@ -372,6 +372,54 @@ export default function Settings(props: { onClose: () => void }) {
                   Configuración de backups automáticos de proyectos.
                 </p>
 
+                {/* Carpeta destino de backups */}
+                <div class="space-y-4 rounded-lg bg-gray-50 p-4 dark:bg-gray-800">
+                  <div>
+                    <h3 class="mb-2 text-lg font-semibold text-gray-900 dark:text-white">
+                      📁 Carpeta de Backups
+                    </h3>
+                    <p class="mb-3 text-sm text-gray-600 dark:text-gray-400">
+                      Ubicación donde se guardarán los backups de tus proyectos
+                    </p>
+                    <div class="flex gap-2">
+                      <input
+                        type="text"
+                        class="flex-1 rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                        value={config()?.backup.default_path || '(No configurada)'}
+                        readonly
+                        placeholder="Selecciona una carpeta..."
+                      />
+                      <button
+                        type="button"
+                        class="rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
+                        onClick={async () => {
+                          try {
+                            const selectedPath = await selectBackupFolder();
+                            if (selectedPath) {
+                              const cfg = config();
+                              if (cfg) {
+                                setConfig({
+                                  ...cfg,
+                                  backup: {
+                                    ...cfg.backup,
+                                    default_path: selectedPath,
+                                  },
+                                });
+                                setSuccessMessage(`Carpeta seleccionada: ${selectedPath}`);
+                                window.setTimeout(() => setSuccessMessage(null), 3000);
+                              }
+                            }
+                          } catch (err) {
+                            setError(`Error al seleccionar carpeta: ${err}`);
+                          }
+                        }}
+                      >
+                        📁 Seleccionar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Backup automático habilitado */}
                 <div class="space-y-4 rounded-lg bg-gray-50 p-4 dark:bg-gray-800">
                   <div class="flex items-center justify-between">
