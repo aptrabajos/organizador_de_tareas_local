@@ -1,4 +1,4 @@
-import { createSignal } from 'solid-js';
+import { createSignal, For, Index } from 'solid-js';
 import { getConfig, updateConfig } from '../services/api';
 
 export default function WelcomeScreen(props: { onClose: () => void }) {
