@@ -103,28 +103,32 @@ export default function WelcomeScreen(props: { onClose: () => void }) {
           </p>
 
           <div class="space-y-4">
-            {currentStepData().features.map((feature) => (
-              <div class="flex items-start gap-3 rounded-lg bg-gray-50 p-4 dark:bg-gray-800">
-                <span class="text-2xl">{feature.split(' ')[0]}</span>
-                <p class="flex-1 text-gray-800 dark:text-gray-200">
-                  {feature.substring(feature.indexOf(' ') + 1)}
-                </p>
-              </div>
-            ))}
+            <For each={currentStepData().features}>
+              {(feature) => (
+                <div class="flex items-start gap-3 rounded-lg bg-gray-50 p-4 dark:bg-gray-800">
+                  <span class="text-2xl">{feature.split(' ')[0]}</span>
+                  <p class="flex-1 text-gray-800 dark:text-gray-200">
+                    {feature.substring(feature.indexOf(' ') + 1)}
+                  </p>
+                </div>
+              )}
+            </For>
           </div>
 
           {/* Step indicator */}
           <div class="mt-8 flex justify-center gap-2">
-            {steps.map((_, index) => (
-              <button
-                onClick={() => setCurrentStep(index)}
-                class={`h-2 w-2 rounded-full transition-all ${
-                  index === currentStep()
-                    ? 'w-8 bg-blue-600'
-                    : 'bg-gray-300 hover:bg-gray-400 dark:bg-gray-600 dark:hover:bg-gray-500'
-                }`}
-              />
-            ))}
+            <Index each={steps}>
+              {(_step, index) => (
+                <button
+                  onClick={() => setCurrentStep(index)}
+                  class={`h-2 w-2 rounded-full transition-all ${
+                    index === currentStep()
+                      ? 'w-8 bg-blue-600'
+                      : 'bg-gray-300 hover:bg-gray-400 dark:bg-gray-600 dark:hover:bg-gray-500'
+                  }`}
+                />
+              )}
+            </Index>
           </div>
         </div>
 
