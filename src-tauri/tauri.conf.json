@@ -1,6 +1,6 @@
 {
   "productName": "Gestor de Proyectos",
-  "version": "0.1.0",
+  "version": "0.2.1",
   "identifier": "com.gestor.proyectos",
   "build": {
     "beforeDevCommand": "pnpm run dev",
