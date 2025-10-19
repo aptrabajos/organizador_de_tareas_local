@@ -511,7 +511,6 @@ Reunión con cliente - nuevos requerimientos:
 ✅ UI completamente funcional con dark mode
 ✅ Migración de BD automática sin pérdida de datos
 
-
 ### 2025-10-18 - FASE 1: Quick Start & Context - Sistema Completo de Organización
 
 **Implementación completa de características para mejorar flujo de trabajo y organización de proyectos**
@@ -519,11 +518,13 @@ Reunión con cliente - nuevos requerimientos:
 #### 1. TodoList Component (TDD)
 
 **Backend (ya implementado previamente):**
+
 - Tabla `project_todos` con campos: id, project_id, content, is_completed, created_at, completed_at
 - CRUD completo: create_todo, get_project_todos, update_todo, delete_todo
 - Relación con proyectos mediante FOREIGN KEY con CASCADE DELETE
 
 **Frontend (SolidJS + TypeScript):**
+
 - Nuevo componente `TodoList.tsx` (219 líneas)
 - Tests comprehensivos `TodoList.test.tsx` (230 líneas) - 11 tests
 - Funcionalidades:
@@ -535,6 +536,7 @@ Reunión con cliente - nuevos requerimientos:
   - Empty states con mensajes informativos
 
 **Integración:**
+
 - Botón ✅ (verde-600) en cada tarjeta de proyecto
 - Modal con header personalizado "✅ Lista de Tareas"
 - Botón de cierre (×) en esquina superior derecha
@@ -542,6 +544,7 @@ Reunión con cliente - nuevos requerimientos:
 #### 2. ProjectContext Component (TDD)
 
 **Frontend (SolidJS + TypeScript):**
+
 - Nuevo componente `ProjectContext.tsx` (323 líneas)
 - Tests comprehensivos `ProjectContext.test.tsx` (268 líneas) - 13 tests
 - Vista consolidada con 5 secciones:
@@ -552,6 +555,7 @@ Reunión con cliente - nuevos requerimientos:
   5. **📎 Archivos Adjuntos**: Lista de attachments con preview de imágenes
 
 **Características de Archivos Adjuntos:**
+
 - Íconos dinámicos por tipo: 🖼️ imágenes, �� videos, 🎵 audio, 📄 PDFs, 📦 comprimidos, 📎 otros
 - Información: nombre del archivo, tamaño en KB, fecha de creación
 - Vista previa de imágenes (thumbnails 48x48px)
@@ -559,6 +563,7 @@ Reunión con cliente - nuevos requerimientos:
 - Responsive con soporte dark mode completo
 
 **Integración:**
+
 - Botón 📋 (cyan-600) en cada tarjeta de proyecto
 - Modal grande (max-w-4xl) con scroll automático
 - Carga de datos en paralelo (Promise.all) para mejor performance
@@ -566,6 +571,7 @@ Reunión con cliente - nuevos requerimientos:
 #### 3. Sistema de Filtros
 
 **Implementación:**
+
 - Barra de filtros superior con diseño responsive
 - Componentes:
   - **Dropdown de Estado**: Todos, Activo, Pausado, Completado, Archivado
@@ -574,6 +580,7 @@ Reunión con cliente - nuevos requerimientos:
   - **Contador**: "X de Y proyectos" actualizado dinámicamente
 
 **Lógica:**
+
 - Función reactiva `filteredProjects()` que combina filtros
 - Filtros aplicables simultáneamente (estado + favoritos)
 - Empty state cuando no hay resultados
@@ -582,6 +589,7 @@ Reunión con cliente - nuevos requerimientos:
 #### 4. Gestión de Estado de Proyectos
 
 **UI:**
+
 - Dropdown en header de cada tarjeta con opciones:
   - 🟢 Activo
   - 🟡 Pausado
@@ -591,29 +599,34 @@ Reunión con cliente - nuevos requerimientos:
 - Actualización reactiva sin reload de página
 
 **Backend:**
+
 - Comando `update_project_status(project_id, status)` ya implementado
 - Actualiza campo `status` y `status_changed_at` en BD
 
 #### 5. Sistema de Favoritos/Pin
 
 **UI:**
+
 - Botón de pin en header de cada tarjeta
 - Estados visuales: 📌 (marcado) / 📍 (sin marcar)
 - Toggle con un solo click
 - Toast de confirmación
 
 **Backend:**
+
 - Comando `toggle_pin_project(project_id)` retorna nuevo estado
 - Proyectos pinned aparecen primero (ORDER BY is_pinned DESC)
 
 #### 6. Mejora de Experiencia UX - Actualización Reactiva
 
 **Eliminación de Recargas Bruscas:**
+
 - Reemplazado `window.location.reload()` por actualización reactiva
 - Sistema de callbacks: `onProjectsChanged={() => store.loadProjects()}`
 - Mantiene scroll position y estado de UI
 
 **Animaciones CSS Suaves:**
+
 - `@keyframes fadeIn`: Entrada suave (0.4s)
 - `@keyframes pulseGreen`: Pulso verde al actualizar (0.6s)
 - Clase `.project-card-updated` combina ambas animaciones
@@ -695,10 +708,12 @@ Reunión con cliente - nuevos requerimientos:
 **Comandos Tauri Agregados (src-tauri/src/commands/mod.rs)**
 
 Comandos migrados a usar platform abstraction:
+
 - `open_terminal(config_manager, path)` - Ahora usa configuración del usuario
 - `open_url(config_manager, url)` - Respeta navegador configurado
 
 6 nuevos comandos agregados:
+
 1. `get_config() -> AppConfig` - Obtener configuración actual
 2. `update_config(config: AppConfig)` - Guardar configuración
 3. `reset_config() -> AppConfig` - Resetear a valores por defecto
@@ -753,12 +768,14 @@ Comandos migrados a usar platform abstraction:
 #### Programas Soportados
 
 **Linux (20+ programas):**
+
 - Terminales: konsole, gnome-terminal, alacritty, kitty, xfce4-terminal, tilix, xterm
 - Navegadores: firefox, chromium, google-chrome, brave, opera, vivaldi, edge
 - File Managers: nautilus, dolphin, thunar, nemo, pcmanfm, caja
 - Editores: vscode, sublime, gedit, kate, vim, nano, emacs
 
 **Windows (20+ programas):**
+
 - Terminales: Windows Terminal, PowerShell, CMD, Git Bash
 - Navegadores: Edge, Chrome, Firefox, Brave, Opera
 - File Manager: Explorer
@@ -767,6 +784,7 @@ Comandos migrados a usar platform abstraction:
 #### Archivos Creados/Modificados
 
 **Backend Rust (8 archivos nuevos):**
+
 - `src-tauri/src/config/mod.rs`
 - `src-tauri/src/config/schema.rs`
 - `src-tauri/src/config/defaults.rs`
@@ -777,12 +795,14 @@ Comandos migrados a usar platform abstraction:
 - `src-tauri/src/platform/windows.rs`
 
 **Frontend TypeScript (2 archivos nuevos, 2 modificados):**
+
 - `src/types/config.ts` (nuevo)
 - `src/components/Settings.tsx` (nuevo)
 - `src/services/api.ts` (modificado - 6 funciones agregadas)
 - `src/App.tsx` (modificado - integración de Settings)
 
 **Archivos de configuración modificados:**
+
 - `src-tauri/src/main.rs` - Registro de módulos config y platform
 - `src-tauri/src/commands/mod.rs` - 6 comandos nuevos + 2 migrados
 
@@ -801,4 +821,3 @@ Comandos migrados a usar platform abstraction:
 - Build para Windows con MSI installer
 - Auto-updater integration (tauri-plugin-updater)
 - Tests unitarios para config y platform
-
