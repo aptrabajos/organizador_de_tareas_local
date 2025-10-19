@@ -114,6 +114,12 @@ const App: Component = () => {
               </h1>
               <div class="flex gap-2">
                 <button
+                  onClick={() => setShowSettings(true)}
+                  class="rounded-lg bg-gray-600 px-4 py-2 text-white hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 dark:bg-gray-500 dark:hover:bg-gray-600"
+                >
+                  ⚙️ Configuración
+                </button>
+                <button
                   onClick={() => setShowAnalytics(!showAnalytics())}
                   class="rounded-lg bg-purple-600 px-4 py-2 text-white hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 dark:bg-purple-500 dark:hover:bg-purple-600"
                 >
