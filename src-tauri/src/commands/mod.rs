@@ -683,3 +683,58 @@ pub async fn get_recent_commits(path: String, limit: usize) -> Result<Vec<GitCom
     }
 }
 
+// ==================== COMANDOS PARA CONFIGURACIÓN ====================
+
+#[tauri::command]
+pub async fn get_config(
+    config_manager: State<'_, ConfigManager>,
+) -> Result<AppConfig, String> {
+    println!("⚙️ [CONFIG] Obteniendo configuración");
+    config_manager.get_config()
+}
+
+#[tauri::command]
+pub async fn update_config(
+    config_manager: State<'_, ConfigManager>,
+    config: AppConfig,
+) -> Result<(), String> {
+    println!("💾 [CONFIG] Actualizando configuración");
+    config_manager.update_config(config)
+}
+
+#[tauri::command]
+pub async fn reset_config(
+    config_manager: State<'_, ConfigManager>,
+) -> Result<AppConfig, String> {
+    println!("🔄 [CONFIG] Reseteando configuración a valores por defecto");
+    config_manager.reset_config()
+}
+
+#[tauri::command]
+pub async fn detect_programs() -> Result<DetectedPrograms, String> {
+    println!("🔍 [DETECTION] Detectando programas instalados");
+    Ok(ProgramDetector::detect_all())
+}
+
+#[tauri::command]
+pub async fn open_file_manager(
+    config_manager: State<'_, ConfigManager>,
+    path: String,
+) -> Result<(), String> {
+    println!("📁 [FILE_MANAGER] Abriendo gestor de archivos en: {}", path);
+    let config = config_manager.get_config()?;
+    let platform = get_platform();
+    platform.open_file_manager(&path, &config)
+}
+
+#[tauri::command]
+pub async fn open_text_editor(
+    config_manager: State<'_, ConfigManager>,
+    path: String,
+) -> Result<(), String> {
+    println!("📝 [TEXT_EDITOR] Abriendo editor de texto: {}", path);
+    let config = config_manager.get_config()?;
+    let platform = get_platform();
+    platform.open_text_editor(&path, &config)
+}
+
