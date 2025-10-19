@@ -103,9 +103,12 @@ const ProjectList: Component<ProjectListProps> = (props) => {
       const message = newPinned
         ? `📌 ${project.name} marcado como favorito`
         : `📌 ${project.name} desmarcado como favorito`;
-      toast.success(message);
-      // Recargar proyectos para reflejar el cambio
-      window.location.reload();
+      toast.success(message, { duration: 2000 });
+
+      // Refrescar lista de proyectos de forma suave
+      if (props.onProjectsChanged) {
+        props.onProjectsChanged();
+      }
     } catch (error) {
       console.error('Error al cambiar pin:', error);
       toast.error('Error al cambiar favorito');
@@ -115,9 +118,12 @@ const ProjectList: Component<ProjectListProps> = (props) => {
   const handleChangeStatus = async (project: Project, newStatus: string) => {
     try {
       await updateProjectStatus(project.id, newStatus);
-      toast.success(`Estado cambiado a: ${newStatus}`);
-      // Recargar proyectos para reflejar el cambio
-      window.location.reload();
+      toast.success(`Estado cambiado a: ${newStatus}`, { duration: 2000 });
+
+      // Refrescar lista de proyectos de forma suave
+      if (props.onProjectsChanged) {
+        props.onProjectsChanged();
+      }
     } catch (error) {
       console.error('Error al cambiar estado:', error);
       toast.error('Error al cambiar estado');
