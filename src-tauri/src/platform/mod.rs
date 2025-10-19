@@ -6,6 +6,8 @@ pub mod windows;
 #[cfg(target_os = "linux")]
 pub mod linux;
 
+pub use detection::ProgramDetector;
+
 use crate::config::AppConfig;
 use std::collections::HashMap;
 use std::path::PathBuf;
