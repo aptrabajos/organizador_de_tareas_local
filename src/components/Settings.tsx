@@ -10,6 +10,7 @@ import {
   updateConfig,
   resetConfig,
   detectPrograms,
+  selectBackupFolder,
 } from '../services/api';
 
 type Tab = 'programs' | 'backup' | 'ui' | 'advanced';
