@@ -2,10 +2,13 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod commands;
+mod config;
 mod db;
 mod models;
+mod platform;
 
 use db::Database;
+use config::ConfigManager;
 
 fn main() {
     // Crear directorio de datos de la app
