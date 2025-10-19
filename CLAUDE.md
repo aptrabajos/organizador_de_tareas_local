@@ -1162,13 +1162,75 @@ cp src-tauri/target/release/gestor-proyectos ~/.local/bin/
 chmod +x ~/.local/bin/gestor-proyectos
 ```
 
+#### Selector de Carpeta para Backups
+
+**Funcionalidad agregada tras pruebas de usuario:**
+
+El usuario solicitó poder elegir la carpeta de destino para los backups. Se implementó:
+
+**Backend (Rust):**
+- Comando Tauri `select_backup_folder()` que abre diálogo nativo del sistema
+- Usa `tauri_plugin_dialog::DialogExt` (compatible con Tauri 2.x)
+- Método `.blocking_pick_folder()` para selección de carpetas
+- Retorna `Option<String>` con la ruta o `None` si se cancela
+
+**Frontend (SolidJS + TypeScript):**
+- Nueva sección en Settings → Tab Backups: "📁 Carpeta de Backups"
+- Input de solo lectura mostrando ruta actual (`backup.default_path`)
+- Botón "📁 Seleccionar" que invoca el diálogo del sistema
+- Al seleccionar, actualiza la configuración automáticamente
+- Mensaje de confirmación temporal (3 segundos): "Carpeta seleccionada: /ruta"
+- Estilo responsive con Tailwind CSS y soporte dark mode
+
+**Código clave (commands/mod.rs):**
+
+```rust
+#[tauri::command]
+pub async fn select_backup_folder(app: tauri::AppHandle) -> Result<Option<String>, String> {
+    println!("📁 [DIALOG] Abriendo diálogo de selección de carpeta");
+
+    let result = tauri_plugin_dialog::DialogExt::dialog(&app)
+        .file()
+        .set_title("Seleccionar carpeta de backups")
+        .blocking_pick_folder();
+
+    match result {
+        Some(path) => {
+            let path_str = path.to_string();
+            println!("✅ [DIALOG] Carpeta seleccionada: {}", path_str);
+            Ok(Some(path_str))
+        }
+        None => {
+            println!("⚠️ [DIALOG] Usuario canceló la selección");
+            Ok(None)
+        }
+    }
+}
+```
+
+**Archivos modificados:**
+- `src-tauri/src/commands/mod.rs` - Comando `select_backup_folder`
+- `src-tauri/src/main.rs` - Registro del comando
+- `src/services/api.ts` - Función `selectBackupFolder()`
+- `src/components/Settings.tsx` - Sección de selección de carpeta
+
+**UX implementada:**
+1. Usuario abre Settings → Tab Backups
+2. Primera sección muestra input con ruta actual o "(No configurada)"
+3. Click en "📁 Seleccionar" → Se abre diálogo nativo del OS
+4. Usuario navega y selecciona carpeta
+5. Ruta aparece en el input
+6. Mensaje verde de confirmación por 3 segundos
+7. Click en "💾 Guardar Configuración" → Persiste en config.json
+
 #### Características Implementadas v0.2.1
 
-✅ **Tab Backups completo** - auto_backup, intervalo, cleanup, retention
+✅ **Tab Backups completo** - auto_backup, intervalo, cleanup, retention, **selector de carpeta**
 ✅ **Tab Interfaz completo** - theme, language, confirm_delete, show_welcome
 ✅ **Tab Avanzado completo** - log_level, analytics, auto_update
 ✅ **WelcomeScreen wizard** - 3 pasos, navegación, persistencia
 ✅ **Documentación Windows** - BUILD_WINDOWS.md con cross-compilation
+✅ **Selector de carpeta nativo** - Diálogo del sistema para elegir ruta de backups
 ✅ **Build 0.2.1** - DEB, RPM, binario instalado
 ✅ **ESLint limpio** - 0 errores, warnings aceptables
 ✅ **Dark mode** - Soporte completo en todos los componentes nuevos
