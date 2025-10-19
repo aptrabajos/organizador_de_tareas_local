@@ -3,5 +3,4 @@ pub mod defaults;
 pub mod manager;
 
 pub use schema::*;
-pub use defaults::*;
 pub use manager::*;
