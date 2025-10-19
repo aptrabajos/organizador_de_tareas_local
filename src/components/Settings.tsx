@@ -385,7 +385,9 @@ export default function Settings(props: { onClose: () => void }) {
                       <input
                         type="text"
                         class="flex-1 rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                        value={config()?.backup.default_path || '(No configurada)'}
+                        value={
+                          config()?.backup.default_path || '(No configurada)'
+                        }
                         readonly
                         placeholder="Selecciona una carpeta..."
                       />
@@ -405,8 +407,13 @@ export default function Settings(props: { onClose: () => void }) {
                                     default_path: selectedPath,
                                   },
                                 });
-                                setSuccessMessage(`Carpeta seleccionada: ${selectedPath}`);
-                                window.setTimeout(() => setSuccessMessage(null), 3000);
+                                setSuccessMessage(
+                                  `Carpeta seleccionada: ${selectedPath}`
+                                );
+                                window.setTimeout(
+                                  () => setSuccessMessage(null),
+                                  3000
+                                );
                               }
                             }
                           } catch (err) {
