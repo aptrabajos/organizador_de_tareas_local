@@ -14,24 +14,68 @@ impl LinuxPlatform {
 
     /// Intentar abrir con diferentes terminales conocidas
     fn try_terminal_fallback(&self, path: &str) -> Result<(), String> {
-        let terminals = vec![
-            ("konsole", vec!["--workdir", path]),
-            ("gnome-terminal", vec!["--working-directory", path]),
-            ("alacritty", vec!["--working-directory", path]),
-            ("kitty", vec!["--directory", path]),
-            ("xfce4-terminal", vec!["--working-directory", path]),
-            ("tilix", vec!["-w", path]),
-            ("xterm", vec!["-e", &format!("cd '{}' && exec $SHELL", path)]),
-        ];
+        // Intentar konsole
+        if Command::new("konsole")
+            .args(&["--workdir", path])
+            .spawn()
+            .is_ok()
+        {
+            return Ok(());
+        }
 
-        for (terminal, args) in terminals {
-            match Command::new(terminal).args(&args).spawn() {
-                Ok(_) => {
-                    println!("✅ Terminal abierta: {}", terminal);
-                    return Ok(());
-                }
-                Err(_) => continue,
-            }
+        // Intentar gnome-terminal
+        if Command::new("gnome-terminal")
+            .args(&["--working-directory", path])
+            .spawn()
+            .is_ok()
+        {
+            return Ok(());
+        }
+
+        // Intentar alacritty
+        if Command::new("alacritty")
+            .args(&["--working-directory", path])
+            .spawn()
+            .is_ok()
+        {
+            return Ok(());
+        }
+
+        // Intentar kitty
+        if Command::new("kitty")
+            .args(&["--directory", path])
+            .spawn()
+            .is_ok()
+        {
+            return Ok(());
+        }
+
+        // Intentar xfce4-terminal
+        if Command::new("xfce4-terminal")
+            .args(&["--working-directory", path])
+            .spawn()
+            .is_ok()
+        {
+            return Ok(());
+        }
+
+        // Intentar tilix
+        if Command::new("tilix")
+            .args(&["-w", path])
+            .spawn()
+            .is_ok()
+        {
+            return Ok(());
+        }
+
+        // Intentar xterm como último recurso
+        let xterm_cmd = format!("cd '{}' && exec $SHELL", path);
+        if Command::new("xterm")
+            .args(&["-e", &xterm_cmd])
+            .spawn()
+            .is_ok()
+        {
+            return Ok(());
         }
 
         Err("No se encontró ningún terminal instalado".to_string())
