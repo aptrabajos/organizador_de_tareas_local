@@ -122,18 +122,18 @@ export default function Settings(props: { onClose: () => void }) {
     const programCfg = cfg.platform[type];
 
     return (
-      <div class="space-y-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+      <div class="space-y-4 rounded-lg bg-gray-50 p-4 dark:bg-gray-800">
         <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
           {title}
         </h3>
 
         {/* Modo de operación */}
         <div>
-          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
             Modo de Operación
           </label>
           <select
-            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
             value={programCfg.mode}
             onChange={(e) =>
               updateProgramConfig(type, {
@@ -142,32 +142,36 @@ export default function Settings(props: { onClose: () => void }) {
             }
           >
             <option value="auto">Auto - Detectar automáticamente</option>
-            <option value="default">Default - Usar predeterminado del sistema</option>
+            <option value="default">
+              Default - Usar predeterminado del sistema
+            </option>
             <option value="custom">Custom - Programa personalizado</option>
-            <option value="script">Script - Ejecutar script personalizado</option>
+            <option value="script">
+              Script - Ejecutar script personalizado
+            </option>
           </select>
         </div>
 
         {/* Programas detectados (solo en modo auto) */}
         <Show when={programCfg.mode === 'auto' && detectedList.length > 0}>
           <div>
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
               Programas Detectados
             </label>
             <div class="space-y-2">
               <For each={detectedList}>
                 {(program) => (
-                  <div class="flex items-center justify-between p-2 bg-white dark:bg-gray-700 rounded border border-gray-200 dark:border-gray-600">
+                  <div class="flex items-center justify-between rounded border border-gray-200 bg-white p-2 dark:border-gray-600 dark:bg-gray-700">
                     <div>
                       <span class="font-medium text-gray-900 dark:text-white">
                         {program.name}
                       </span>
-                      <span class="text-xs text-gray-500 dark:text-gray-400 ml-2">
+                      <span class="ml-2 text-xs text-gray-500 dark:text-gray-400">
                         {program.path}
                       </span>
                     </div>
                     <Show when={program.is_default}>
-                      <span class="text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-2 py-1 rounded">
+                      <span class="rounded bg-blue-100 px-2 py-1 text-xs text-blue-800 dark:bg-blue-900 dark:text-blue-200">
                         Por defecto
                       </span>
                     </Show>
@@ -182,12 +186,12 @@ export default function Settings(props: { onClose: () => void }) {
         <Show when={programCfg.mode === 'custom'}>
           <div class="space-y-3">
             <div>
-              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
                 Ruta del Programa
               </label>
               <input
                 type="text"
-                class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                 placeholder="/usr/bin/programa"
                 value={programCfg.custom_path || ''}
                 onInput={(e) =>
@@ -198,11 +202,11 @@ export default function Settings(props: { onClose: () => void }) {
               />
             </div>
             <div>
-              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
                 Argumentos (uno por línea)
               </label>
               <textarea
-                class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono text-sm"
+                class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 font-mono text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                 rows={3}
                 placeholder="--arg1&#10;--arg2&#10;{path}"
                 value={programCfg.custom_args.join('\n')}
@@ -214,7 +218,7 @@ export default function Settings(props: { onClose: () => void }) {
                   })
                 }
               />
-              <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
                 Variables disponibles: {'{path}'}, {'{url}'}
               </p>
             </div>
@@ -224,11 +228,11 @@ export default function Settings(props: { onClose: () => void }) {
         {/* Configuración script */}
         <Show when={programCfg.mode === 'script'}>
           <div>
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
               Script Personalizado
             </label>
             <textarea
-              class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono text-sm"
+              class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 font-mono text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
               rows={5}
               placeholder="#!/bin/bash&#10;cd {path}&#10;alacritty &"
               value={programCfg.custom_script || ''}
@@ -238,7 +242,7 @@ export default function Settings(props: { onClose: () => void }) {
                 })
               }
             />
-            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
               Variables disponibles: {'{path}'}, {'{url}'}
             </p>
           </div>
@@ -248,25 +252,25 @@ export default function Settings(props: { onClose: () => void }) {
   };
 
   return (
-    <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div class="bg-white dark:bg-gray-900 rounded-lg shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+      <div class="flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-lg bg-white shadow-2xl dark:bg-gray-900">
         {/* Header */}
-        <div class="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
+        <div class="flex items-center justify-between border-b border-gray-200 p-6 dark:border-gray-700">
           <h2 class="text-2xl font-bold text-gray-900 dark:text-white">
             ⚙️ Configuración
           </h2>
           <button
             onClick={props.onClose}
-            class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-2xl"
+            class="text-2xl text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
           >
             ×
           </button>
         </div>
 
         {/* Tabs */}
-        <div class="flex border-b border-gray-200 dark:border-gray-700 px-6">
+        <div class="flex border-b border-gray-200 px-6 dark:border-gray-700">
           <button
-            class={`px-4 py-3 font-medium border-b-2 transition-colors ${
+            class={`border-b-2 px-4 py-3 font-medium transition-colors ${
               activeTab() === 'programs'
                 ? 'border-blue-500 text-blue-600 dark:text-blue-400'
                 : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
@@ -276,7 +280,7 @@ export default function Settings(props: { onClose: () => void }) {
             🖥️ Programas
           </button>
           <button
-            class={`px-4 py-3 font-medium border-b-2 transition-colors ${
+            class={`border-b-2 px-4 py-3 font-medium transition-colors ${
               activeTab() === 'backup'
                 ? 'border-blue-500 text-blue-600 dark:text-blue-400'
                 : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
@@ -286,7 +290,7 @@ export default function Settings(props: { onClose: () => void }) {
             💾 Backups
           </button>
           <button
-            class={`px-4 py-3 font-medium border-b-2 transition-colors ${
+            class={`border-b-2 px-4 py-3 font-medium transition-colors ${
               activeTab() === 'ui'
                 ? 'border-blue-500 text-blue-600 dark:text-blue-400'
                 : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
@@ -296,7 +300,7 @@ export default function Settings(props: { onClose: () => void }) {
             🎨 Interfaz
           </button>
           <button
-            class={`px-4 py-3 font-medium border-b-2 transition-colors ${
+            class={`border-b-2 px-4 py-3 font-medium transition-colors ${
               activeTab() === 'advanced'
                 ? 'border-blue-500 text-blue-600 dark:text-blue-400'
                 : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
@@ -310,19 +314,19 @@ export default function Settings(props: { onClose: () => void }) {
         {/* Content */}
         <div class="flex-1 overflow-y-auto p-6">
           <Show when={isLoading()}>
-            <div class="flex justify-center items-center py-12">
-              <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500" />
+            <div class="flex items-center justify-center py-12">
+              <div class="h-12 w-12 animate-spin rounded-full border-b-2 border-blue-500" />
             </div>
           </Show>
 
           <Show when={error()}>
-            <div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 mb-4">
+            <div class="mb-4 rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/20">
               <p class="text-red-800 dark:text-red-200">{error()}</p>
             </div>
           </Show>
 
           <Show when={successMessage()}>
-            <div class="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4 mb-4">
+            <div class="mb-4 rounded-lg border border-green-200 bg-green-50 p-4 dark:border-green-800 dark:bg-green-900/20">
               <p class="text-green-800 dark:text-green-200">
                 {successMessage()}
               </p>
@@ -333,7 +337,7 @@ export default function Settings(props: { onClose: () => void }) {
             {/* Tab: Programas */}
             <Show when={activeTab() === 'programs'}>
               <div class="space-y-6">
-                <p class="text-gray-600 dark:text-gray-400 mb-4">
+                <p class="mb-4 text-gray-600 dark:text-gray-400">
                   Configura qué programas usar para abrir terminales, enlaces,
                   archivos, etc.
                 </p>
@@ -363,12 +367,12 @@ export default function Settings(props: { onClose: () => void }) {
             {/* Tab: Backups */}
             <Show when={activeTab() === 'backup'}>
               <div class="space-y-6">
-                <p class="text-gray-600 dark:text-gray-400 mb-4">
+                <p class="mb-4 text-gray-600 dark:text-gray-400">
                   Configuración de backups automáticos de proyectos.
                 </p>
 
                 {/* Backup automático habilitado */}
-                <div class="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg space-y-4">
+                <div class="space-y-4 rounded-lg bg-gray-50 p-4 dark:bg-gray-800">
                   <div class="flex items-center justify-between">
                     <div>
                       <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
@@ -378,10 +382,10 @@ export default function Settings(props: { onClose: () => void }) {
                         Crear backups automáticos de tus proyectos
                       </p>
                     </div>
-                    <label class="relative inline-flex items-center cursor-pointer">
+                    <label class="relative inline-flex cursor-pointer items-center">
                       <input
                         type="checkbox"
-                        class="sr-only peer"
+                        class="peer sr-only"
                         checked={config()?.backup.auto_backup_enabled || false}
                         onChange={(e) => {
                           const cfg = config();
@@ -396,21 +400,21 @@ export default function Settings(props: { onClose: () => void }) {
                           }
                         }}
                       />
-                      <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600" />
+                      <div class="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:start-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-blue-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:border-gray-600 dark:bg-gray-700 dark:peer-focus:ring-blue-800 rtl:peer-checked:after:-translate-x-full" />
                     </label>
                   </div>
 
                   <Show when={config()?.backup.auto_backup_enabled}>
                     {/* Intervalo de backup */}
                     <div>
-                      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
                         Intervalo de Backup (días)
                       </label>
                       <input
                         type="number"
                         min="1"
                         max="30"
-                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                         value={config()?.backup.auto_backup_interval || 7}
                         onInput={(e) => {
                           const cfg = config();
@@ -427,7 +431,7 @@ export default function Settings(props: { onClose: () => void }) {
                           }
                         }}
                       />
-                      <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
                         Crear backup cada N días automáticamente
                       </p>
                     </div>
@@ -435,7 +439,7 @@ export default function Settings(props: { onClose: () => void }) {
                 </div>
 
                 {/* Limpieza de backups antiguos */}
-                <div class="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg space-y-4">
+                <div class="space-y-4 rounded-lg bg-gray-50 p-4 dark:bg-gray-800">
                   <div class="flex items-center justify-between">
                     <div>
                       <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
@@ -445,10 +449,10 @@ export default function Settings(props: { onClose: () => void }) {
                         Eliminar backups más antiguos que cierto tiempo
                       </p>
                     </div>
-                    <label class="relative inline-flex items-center cursor-pointer">
+                    <label class="relative inline-flex cursor-pointer items-center">
                       <input
                         type="checkbox"
-                        class="sr-only peer"
+                        class="peer sr-only"
                         checked={config()?.backup.cleanup_old_backups || false}
                         onChange={(e) => {
                           const cfg = config();
@@ -463,21 +467,21 @@ export default function Settings(props: { onClose: () => void }) {
                           }
                         }}
                       />
-                      <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600" />
+                      <div class="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:start-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-blue-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:border-gray-600 dark:bg-gray-700 dark:peer-focus:ring-blue-800 rtl:peer-checked:after:-translate-x-full" />
                     </label>
                   </div>
 
                   <Show when={config()?.backup.cleanup_old_backups}>
                     {/* Días de retención */}
                     <div>
-                      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
                         Días de Retención
                       </label>
                       <input
                         type="number"
                         min="7"
                         max="365"
-                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                         value={config()?.backup.retention_days || 30}
                         onInput={(e) => {
                           const cfg = config();
@@ -492,7 +496,7 @@ export default function Settings(props: { onClose: () => void }) {
                           }
                         }}
                       />
-                      <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
                         Eliminar backups más antiguos que N días
                       </p>
                     </div>
@@ -503,14 +507,149 @@ export default function Settings(props: { onClose: () => void }) {
 
             {/* Tab: UI */}
             <Show when={activeTab() === 'ui'}>
-              <div class="space-y-4">
-                <p class="text-gray-600 dark:text-gray-400 mb-4">
+              <div class="space-y-6">
+                <p class="mb-4 text-gray-600 dark:text-gray-400">
                   Personaliza la apariencia de la aplicación.
                 </p>
-                <div class="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-                  <p class="text-yellow-800 dark:text-yellow-200">
-                    🚧 Configuración de interfaz - Próximamente
-                  </p>
+
+                {/* Tema */}
+                <div class="space-y-4 rounded-lg bg-gray-50 p-4 dark:bg-gray-800">
+                  <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+                    Tema
+                  </h3>
+                  <div>
+                    <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Modo de Color
+                    </label>
+                    <select
+                      class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                      value={config()?.ui.theme || 'auto'}
+                      onChange={(e) => {
+                        const cfg = config();
+                        if (cfg) {
+                          setConfig({
+                            ...cfg,
+                            ui: {
+                              ...cfg.ui,
+                              theme: e.currentTarget.value as
+                                | 'light'
+                                | 'dark'
+                                | 'auto',
+                            },
+                          });
+                        }
+                      }}
+                    >
+                      <option value="light">☀️ Claro</option>
+                      <option value="dark">🌙 Oscuro</option>
+                      <option value="auto">🔄 Automático (sistema)</option>
+                    </select>
+                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                      Modo automático sigue la configuración del sistema
+                    </p>
+                  </div>
+                </div>
+
+                {/* Idioma */}
+                <div class="space-y-4 rounded-lg bg-gray-50 p-4 dark:bg-gray-800">
+                  <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+                    Idioma
+                  </h3>
+                  <div>
+                    <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Idioma de la Interfaz
+                    </label>
+                    <select
+                      class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                      value={config()?.ui.language || 'es'}
+                      onChange={(e) => {
+                        const cfg = config();
+                        if (cfg) {
+                          setConfig({
+                            ...cfg,
+                            ui: {
+                              ...cfg.ui,
+                              language: e.currentTarget.value,
+                            },
+                          });
+                        }
+                      }}
+                    >
+                      <option value="es">🇪🇸 Español</option>
+                      <option value="en">🇺🇸 English</option>
+                    </select>
+                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                      Requiere reiniciar la aplicación
+                    </p>
+                  </div>
+                </div>
+
+                {/* Opciones de confirmación */}
+                <div class="space-y-4 rounded-lg bg-gray-50 p-4 dark:bg-gray-800">
+                  <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+                    Confirmaciones
+                  </h3>
+                  <div class="flex items-center justify-between">
+                    <div>
+                      <p class="font-medium text-gray-900 dark:text-white">
+                        Confirmar antes de eliminar
+                      </p>
+                      <p class="text-sm text-gray-600 dark:text-gray-400">
+                        Pedir confirmación al eliminar proyectos
+                      </p>
+                    </div>
+                    <label class="relative inline-flex cursor-pointer items-center">
+                      <input
+                        type="checkbox"
+                        class="peer sr-only"
+                        checked={config()?.ui.confirm_delete ?? true}
+                        onChange={(e) => {
+                          const cfg = config();
+                          if (cfg) {
+                            setConfig({
+                              ...cfg,
+                              ui: {
+                                ...cfg.ui,
+                                confirm_delete: e.currentTarget.checked,
+                              },
+                            });
+                          }
+                        }}
+                      />
+                      <div class="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:start-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-blue-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:border-gray-600 dark:bg-gray-700 dark:peer-focus:ring-blue-800 rtl:peer-checked:after:-translate-x-full" />
+                    </label>
+                  </div>
+
+                  <div class="flex items-center justify-between">
+                    <div>
+                      <p class="font-medium text-gray-900 dark:text-white">
+                        Mostrar bienvenida
+                      </p>
+                      <p class="text-sm text-gray-600 dark:text-gray-400">
+                        Mostrar pantalla de bienvenida al iniciar
+                      </p>
+                    </div>
+                    <label class="relative inline-flex cursor-pointer items-center">
+                      <input
+                        type="checkbox"
+                        class="peer sr-only"
+                        checked={config()?.ui.show_welcome ?? true}
+                        onChange={(e) => {
+                          const cfg = config();
+                          if (cfg) {
+                            setConfig({
+                              ...cfg,
+                              ui: {
+                                ...cfg.ui,
+                                show_welcome: e.currentTarget.checked,
+                              },
+                            });
+                          }
+                        }}
+                      />
+                      <div class="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:start-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-blue-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:border-gray-600 dark:bg-gray-700 dark:peer-focus:ring-blue-800 rtl:peer-checked:after:-translate-x-full" />
+                    </label>
+                  </div>
                 </div>
               </div>
             </Show>
@@ -518,10 +657,10 @@ export default function Settings(props: { onClose: () => void }) {
             {/* Tab: Avanzado */}
             <Show when={activeTab() === 'advanced'}>
               <div class="space-y-4">
-                <p class="text-gray-600 dark:text-gray-400 mb-4">
+                <p class="mb-4 text-gray-600 dark:text-gray-400">
                   Configuración avanzada del sistema.
                 </p>
-                <div class="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                <div class="rounded-lg border border-yellow-200 bg-yellow-50 p-4 dark:border-yellow-800 dark:bg-yellow-900/20">
                   <p class="text-yellow-800 dark:text-yellow-200">
                     🚧 Configuración avanzada - Próximamente
                   </p>
@@ -532,25 +671,25 @@ export default function Settings(props: { onClose: () => void }) {
         </div>
 
         {/* Footer */}
-        <div class="flex items-center justify-between p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
+        <div class="flex items-center justify-between border-t border-gray-200 bg-gray-50 p-6 dark:border-gray-700 dark:bg-gray-800">
           <button
             onClick={handleReset}
             disabled={isLoading() || isSaving()}
-            class="px-4 py-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors disabled:opacity-50"
+            class="rounded-md px-4 py-2 text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-900/20"
           >
             🔄 Resetear
           </button>
           <div class="flex gap-3">
             <button
               onClick={props.onClose}
-              class="px-6 py-2 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-700 dark:text-gray-300"
+              class="rounded-md border border-gray-300 px-6 py-2 text-gray-700 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
             >
               Cancelar
             </button>
             <button
               onClick={handleSave}
               disabled={isSaving()}
-              class="px-6 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              class="rounded-md bg-blue-500 px-6 py-2 text-white transition-colors hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isSaving() ? 'Guardando...' : '💾 Guardar'}
             </button>
