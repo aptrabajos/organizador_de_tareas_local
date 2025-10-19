@@ -246,6 +246,73 @@ export default function ProjectContext(props: ProjectContextProps) {
                   </div>
                 </Show>
               </section>
+
+              {/* Archivos Adjuntos */}
+              <section>
+                <h4 class="mb-3 text-lg font-semibold text-gray-900 dark:text-white">
+                  📎 Archivos Adjuntos
+                </h4>
+                <Show
+                  when={attachments().length > 0}
+                  fallback={
+                    <p class="text-sm text-gray-500 dark:text-gray-400">
+                      Sin archivos adjuntos
+                    </p>
+                  }
+                >
+                  <div class="space-y-2">
+                    <For each={attachments()}>
+                      {(attachment) => (
+                        <div class="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900">
+                          <div class="flex flex-1 items-center gap-3">
+                            {/* Icono según tipo de archivo */}
+                            <div class="text-2xl">
+                              {attachment.mime_type.startsWith('image/')
+                                ? '🖼️'
+                                : attachment.mime_type.startsWith('video/')
+                                  ? '🎥'
+                                  : attachment.mime_type.startsWith('audio/')
+                                    ? '🎵'
+                                    : attachment.mime_type.includes('pdf')
+                                      ? '📄'
+                                      : attachment.mime_type.includes('zip') ||
+                                          attachment.mime_type.includes(
+                                            'compressed'
+                                          )
+                                        ? '📦'
+                                        : '📎'}
+                            </div>
+                            <div class="flex-1 min-w-0">
+                              <p class="text-sm font-medium text-gray-900 dark:text-white truncate">
+                                {attachment.filename}
+                              </p>
+                              <div class="flex items-center gap-2 mt-1">
+                                <p class="text-xs text-gray-500 dark:text-gray-400">
+                                  {(attachment.file_size / 1024).toFixed(1)} KB
+                                </p>
+                                <span class="text-xs text-gray-400">•</span>
+                                <p class="text-xs text-gray-500 dark:text-gray-400">
+                                  {new Date(attachment.created_at).toLocaleDateString(
+                                    'es-ES'
+                                  )}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                          {/* Vista previa para imágenes */}
+                          <Show when={attachment.mime_type.startsWith('image/')}>
+                            <img
+                              src={attachment.file_data}
+                              alt={attachment.filename}
+                              class="h-12 w-12 rounded object-cover border border-gray-300 dark:border-gray-600"
+                            />
+                          </Show>
+                        </div>
+                      )}
+                    </For>
+                  </div>
+                </Show>
+              </section>
             </div>
           </Show>
         </div>
