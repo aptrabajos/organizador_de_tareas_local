@@ -16,6 +16,7 @@ import type {
   CreateTodoDTO,
   UpdateTodoDTO,
 } from '../types/project';
+import type { AppConfig, DetectedPrograms } from '../types/config';
 
 export async function createProject(
   project: CreateProjectDTO
