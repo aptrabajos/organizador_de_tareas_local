@@ -691,11 +691,17 @@ export default function Settings(props: { onClose: () => void }) {
                         }
                       }}
                     >
-                      <option value="error">Error - Solo errores críticos</option>
-                      <option value="warn">Warn - Advertencias y errores</option>
+                      <option value="error">
+                        Error - Solo errores críticos
+                      </option>
+                      <option value="warn">
+                        Warn - Advertencias y errores
+                      </option>
                       <option value="info">Info - Información general</option>
                       <option value="debug">Debug - Modo depuración</option>
-                      <option value="trace">Trace - Todo (muy detallado)</option>
+                      <option value="trace">
+                        Trace - Todo (muy detallado)
+                      </option>
                     </select>
                     <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
                       Mayor nivel = más logs en consola
