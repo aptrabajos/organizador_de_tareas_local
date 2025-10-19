@@ -1,4 +1,4 @@
-import { createSignal, createEffect, Show, For, onMount } from 'solid-js';
+import { createSignal, Show, For, onMount } from 'solid-js';
 import type {
   AppConfig,
   DetectedPrograms,
