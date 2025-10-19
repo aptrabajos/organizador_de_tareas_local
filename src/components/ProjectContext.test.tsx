@@ -14,6 +14,7 @@ vi.mock('../services/api', () => ({
   getJournalEntries: vi.fn(),
   getProjectTodos: vi.fn(),
   getProjectLinks: vi.fn(),
+  getAttachments: vi.fn(),
 }));
 
 import {
@@ -21,6 +22,7 @@ import {
   getJournalEntries,
   getProjectTodos,
   getProjectLinks,
+  getAttachments,
 } from '../services/api';
 
 describe('ProjectContext', () => {

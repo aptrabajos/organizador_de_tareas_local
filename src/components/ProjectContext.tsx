@@ -282,29 +282,31 @@ export default function ProjectContext(props: ProjectContextProps) {
                                         ? '📦'
                                         : '📎'}
                             </div>
-                            <div class="flex-1 min-w-0">
-                              <p class="text-sm font-medium text-gray-900 dark:text-white truncate">
+                            <div class="min-w-0 flex-1">
+                              <p class="truncate text-sm font-medium text-gray-900 dark:text-white">
                                 {attachment.filename}
                               </p>
-                              <div class="flex items-center gap-2 mt-1">
+                              <div class="mt-1 flex items-center gap-2">
                                 <p class="text-xs text-gray-500 dark:text-gray-400">
                                   {(attachment.file_size / 1024).toFixed(1)} KB
                                 </p>
                                 <span class="text-xs text-gray-400">•</span>
                                 <p class="text-xs text-gray-500 dark:text-gray-400">
-                                  {new Date(attachment.created_at).toLocaleDateString(
-                                    'es-ES'
-                                  )}
+                                  {new Date(
+                                    attachment.created_at
+                                  ).toLocaleDateString('es-ES')}
                                 </p>
                               </div>
                             </div>
                           </div>
                           {/* Vista previa para imágenes */}
-                          <Show when={attachment.mime_type.startsWith('image/')}>
+                          <Show
+                            when={attachment.mime_type.startsWith('image/')}
+                          >
                             <img
                               src={attachment.file_data}
                               alt={attachment.filename}
-                              class="h-12 w-12 rounded object-cover border border-gray-300 dark:border-gray-600"
+                              class="h-12 w-12 rounded border border-gray-300 object-cover dark:border-gray-600"
                             />
                           </Show>
                         </div>
