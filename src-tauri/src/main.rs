@@ -21,6 +21,7 @@ fn main() {
     let db_path = data_dir.join("projects.db");
 
     let db = Database::new(db_path).expect("Error al inicializar la base de datos");
+    let config_manager = ConfigManager::new().expect("Error al inicializar la configuración");
 
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
