@@ -280,3 +280,7 @@ export async function openFileManager(path: string): Promise<void> {
 export async function openTextEditor(path: string): Promise<void> {
   await invoke('open_text_editor', { path });
 }
+
+export async function selectBackupFolder(): Promise<string | null> {
+  return await invoke('select_backup_folder');
+}
