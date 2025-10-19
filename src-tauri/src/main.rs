@@ -28,6 +28,7 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .manage(db)
+        .manage(config_manager)
         .invoke_handler(tauri::generate_handler![
             commands::create_project,
             commands::get_all_projects,
