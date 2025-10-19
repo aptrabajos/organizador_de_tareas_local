@@ -1,0 +1,195 @@
+═══════════════════════════════════════════════════════════════════
+  GESTOR DE PROYECTOS v0.2.1 - Paquete de Distribución para Windows
+═══════════════════════════════════════════════════════════════════
+
+📦 CONTENIDO DEL PAQUETE:
+
+├── README.md                    # Guía completa de instalación y uso
+├── QUICK_START.md               # Inicio rápido (3 minutos)
+├── MANIFEST.txt                 # Este archivo
+│
+├── docs/
+│   └── BUILD_WINDOWS.md         # Guía de compilación desde fuente
+│
+├── scripts/
+│   └── install.ps1              # Script de instalación PowerShell
+│
+└── source/                      # Código fuente completo (opcional)
+    ├── src/                     # Frontend (SolidJS + TypeScript)
+    ├── src-tauri/               # Backend (Rust + Tauri)
+    ├── package.json             # Dependencias Node.js
+    ├── tsconfig.json            # Configuración TypeScript
+    ├── tailwind.config.js       # Configuración Tailwind CSS
+    └── ...
+
+---
+
+🎯 VERSIÓN: 0.2.1
+
+📅 FECHA: 2025-10-19
+
+💻 PLATAFORMA: Windows 10/11 (64-bit)
+
+📦 TAMAÑO APROXIMADO:
+   - Instalador MSI: ~6 MB
+   - Aplicación instalada: ~20 MB
+   - Código fuente: ~200 MB (con node_modules)
+
+---
+
+✨ CARACTERÍSTICAS PRINCIPALES:
+
+✓ Gestión completa de proyectos locales
+✓ Favoritos y búsqueda avanzada
+✓ Enlaces, diarios y TODOs por proyecto
+✓ Analytics y estadísticas de uso
+✓ Integración con Git
+✓ Editor Markdown con preview
+✓ Configuración multiplataforma
+✓ Backups automáticos configurables
+✓ Dark mode completo
+✓ WelcomeScreen para nuevos usuarios
+
+---
+
+📋 REQUISITOS DEL SISTEMA:
+
+Mínimos:
+- OS: Windows 10 (1809+) / Windows 11
+- RAM: 512 MB
+- Disco: 50 MB
+- WebView2 Runtime
+
+Recomendados:
+- OS: Windows 11
+- RAM: 2 GB+
+- Disco: 200 MB
+
+---
+
+🚀 OPCIONES DE INSTALACIÓN:
+
+1. INSTALADOR MSI (Más fácil):
+   - Doble click en el archivo .msi
+   - Sigue el asistente
+   - Listo!
+
+2. SCRIPT POWERSHELL (Automatizado):
+   - Abre PowerShell como Administrador
+   - cd ruta\a\win10
+   - .\scripts\install.ps1
+   - Sigue las instrucciones
+
+3. COMPILAR DESDE FUENTE (Para desarrolladores):
+   - Instala: Node.js, Rust, pnpm
+   - cd source
+   - pnpm install
+   - pnpm run tauri:build
+   - Instala el MSI generado
+
+---
+
+📖 DOCUMENTACIÓN COMPLETA:
+
+1. README.md          → Guía completa (instalación, uso, troubleshooting)
+2. QUICK_START.md     → Inicio rápido (5 minutos)
+3. BUILD_WINDOWS.md   → Compilación desde fuente (desarrolladores)
+
+---
+
+🔧 STACK TECNOLÓGICO:
+
+Frontend:
+- SolidJS 1.9.3 (Framework reactivo)
+- TypeScript 5.7.3 (Tipado estático)
+- Tailwind CSS 3.4.17 (Estilos)
+- Vite 6.0.5 (Build tool)
+
+Backend:
+- Rust 1.70+ (Alto rendimiento)
+- Tauri 2.1.0 (Framework desktop)
+- SQLite (rusqlite 0.32) (Base de datos)
+- Serde (Serialización JSON)
+
+Herramientas:
+- pnpm (Package manager)
+- ESLint + Prettier (Calidad de código)
+- Vitest (Testing)
+
+---
+
+📂 UBICACIONES DE DATOS (Post-instalación):
+
+Aplicación instalada:
+  C:\Users\<TuUsuario>\AppData\Local\Programs\gestor-proyectos\
+
+Configuración y datos:
+  C:\Users\<TuUsuario>\AppData\Local\gestor-proyectos\
+  ├── config.json     # Configuración de la app
+  └── projects.db     # Base de datos SQLite
+
+Backups (configurable):
+  Ubicación elegida por el usuario (ej: D:\Backups\Proyectos\)
+
+---
+
+🆕 NOTAS DE VERSIÓN v0.2.1:
+
+Nuevas funcionalidades:
+- Selector de carpeta nativo para backups
+- WelcomeScreen con wizard de 3 pasos
+- 4 tabs de configuración completos
+- Dark mode en todos los componentes
+- Toggle switches modernos
+
+Mejoras:
+- Configuración persistente mejorada
+- Detección automática de programas optimizada
+- UI/UX refinada
+
+Correcciones:
+- 0 errores de ESLint
+- Warnings de Rust solo en código preparado para futuras features
+
+---
+
+🔮 PRÓXIMAS FUNCIONALIDADES (v0.3.0):
+
+- Scheduler de backups automáticos en Rust
+- Auto-updater funcional
+- Internacionalización completa (i18n)
+- Tests E2E con Playwright
+- Más estadísticas y gráficos
+- Búsqueda global en diarios y TODOs
+
+---
+
+📞 SOPORTE Y CONTRIBUCIONES:
+
+- Reporte de bugs: GitHub Issues
+- Sugerencias: GitHub Discussions
+- Contribuir: Pull Requests bienvenidos
+
+---
+
+📄 LICENCIA:
+
+Ver LICENSE en el repositorio.
+
+---
+
+🙏 AGRADECIMIENTOS:
+
+Construido con:
+- Tauri (https://tauri.app/)
+- SolidJS (https://www.solidjs.com/)
+- Rust (https://www.rust-lang.org/)
+- SQLite (https://www.sqlite.org/)
+- Tailwind CSS (https://tailwindcss.com/)
+
+---
+
+═══════════════════════════════════════════════════════════════════
+  ¡Gracias por elegir Gestor de Proyectos!
+  🚀 Happy Coding!
+═══════════════════════════════════════════════════════════════════
