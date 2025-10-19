@@ -68,53 +68,14 @@ pub async fn search_projects(db: State<'_, Database>, query: String) -> Result<V
 }
 
 #[tauri::command]
-pub async fn open_terminal(path: String) -> Result<(), String> {
-    // Detectar terminal disponible en el sistema
-    let terminals = vec![
-        "konsole",
-        "gnome-terminal",
-        "alacritty",
-        "kitty",
-        "xfce4-terminal",
-        "tilix",
-        "xterm",
-    ];
-
-    for terminal in terminals {
-        let result = match terminal {
-            "konsole" => Command::new(terminal)
-                .arg("--workdir")
-                .arg(&path)
-                .spawn(),
-            "gnome-terminal" => Command::new(terminal)
-                .arg("--working-directory")
-                .arg(&path)
-                .spawn(),
-            "alacritty" | "kitty" => Command::new(terminal)
-                .arg("--working-directory")
-                .arg(&path)
-                .spawn(),
-            "xfce4-terminal" => Command::new(terminal)
-                .arg("--working-directory")
-                .arg(&path)
-                .spawn(),
-            "tilix" => Command::new(terminal)
-                .arg("-w")
-                .arg(&path)
-                .spawn(),
-            "xterm" => Command::new("sh")
-                .arg("-c")
-                .arg(format!("cd {} && xterm", path))
-                .spawn(),
-            _ => continue,
-        };
-
-        if result.is_ok() {
-            return Ok(());
-        }
-    }
-
-    Err("No se encontró ningún terminal instalado".to_string())
+pub async fn open_terminal(
+    config_manager: State<'_, ConfigManager>,
+    path: String,
+) -> Result<(), String> {
+    println!("🚀 [TERMINAL] Abriendo terminal en: {}", path);
+    let config = config_manager.get_config()?;
+    let platform = get_platform();
+    platform.open_terminal(&path, &config)
 }
 
 #[tauri::command]
