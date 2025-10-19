@@ -195,6 +195,11 @@ const App: Component = () => {
             </div>
           </div>
         </Show>
+
+        {/* Modal Settings */}
+        <Show when={showSettings()}>
+          <Settings onClose={() => setShowSettings(false)} />
+        </Show>
       </div>
     </ThemeProvider>
   );
