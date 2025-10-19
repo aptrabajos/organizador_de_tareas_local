@@ -4,12 +4,14 @@ import type {
   JournalEntry,
   ProjectTodo,
   ProjectLink,
+  ProjectAttachment,
 } from '../types/project';
 import {
   getProject,
   getJournalEntries,
   getProjectTodos,
   getProjectLinks,
+  getAttachments,
 } from '../services/api';
 
 interface ProjectContextProps {
