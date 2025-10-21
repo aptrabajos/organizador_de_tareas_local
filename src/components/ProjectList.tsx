@@ -3,7 +3,8 @@ import toast from 'solid-toast';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import type { Project } from '../types/project';
-import GitInfo from './GitInfo';
+import EnhancedGitInfo from './EnhancedGitInfo';
+import GitCommitModal from './GitCommitModal';
 import ProjectJournal from './ProjectJournal';
 import TodoList from './TodoList';
 import ProjectContext from './ProjectContext';
@@ -44,6 +45,11 @@ const ProjectList: Component<ProjectListProps> = (props) => {
 
   // Estado para controlar el modal de contexto del proyecto
   const [contextProjectId, setContextProjectId] = createSignal<number | null>(
+    null
+  );
+
+  // Estado para controlar el modal de commit Git
+  const [commitProjectPath, setCommitProjectPath] = createSignal<string | null>(
     null
   );
 
@@ -349,7 +355,12 @@ const ProjectList: Component<ProjectListProps> = (props) => {
                   <p class="truncate" title={project.local_path}>
                     📁 {project.local_path}
                   </p>
-                  <GitInfo projectPath={project.local_path} />
+                  <EnhancedGitInfo
+                    projectPath={project.local_path}
+                    onCommitClick={() =>
+                      setCommitProjectPath(project.local_path)
+                    }
+                  />
                 </div>
 
                 <Show when={project.notes}>
@@ -507,6 +518,18 @@ const ProjectList: Component<ProjectListProps> = (props) => {
         <ProjectContext
           projectId={contextProjectId()!}
           onClose={() => setContextProjectId(null)}
+        />
+      </Show>
+
+      {/* Git Commit Modal */}
+      <Show when={commitProjectPath() !== null}>
+        <GitCommitModal
+          projectPath={commitProjectPath()!}
+          onClose={() => setCommitProjectPath(null)}
+          onSuccess={() => {
+            // Recargar proyectos después de commit exitoso
+            props.onProjectsChanged?.();
+          }}
         />
       </Show>
     </Show>

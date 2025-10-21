@@ -27,6 +27,7 @@ fn main() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .manage(db)
         .manage(config_manager)
         .invoke_handler(tauri::generate_handler![
@@ -67,6 +68,14 @@ fn main() {
             commands::get_git_branch,
             commands::get_git_status,
             commands::get_recent_commits,
+            commands::get_git_file_count,
+            commands::get_git_modified_files,
+            commands::git_add,
+            commands::git_commit,
+            commands::git_push,
+            commands::git_pull,
+            commands::get_git_remote_url,
+            commands::get_git_ahead_behind,
             commands::get_config,
             commands::update_config,
             commands::reset_config,
@@ -74,6 +83,8 @@ fn main() {
             commands::open_file_manager,
             commands::open_text_editor,
             commands::select_backup_folder,
+            commands::get_shortcuts_config,
+            commands::update_shortcuts_config,
         ])
         .run(tauri::generate_context!())
         .expect("Error al ejecutar la aplicación Tauri");

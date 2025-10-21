@@ -1,6 +1,6 @@
 {
   "productName": "Gestor de Proyectos",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "identifier": "com.gestor.proyectos",
   "build": {
     "beforeDevCommand": "pnpm run dev",
@@ -18,7 +18,8 @@
         "minWidth": 800,
         "minHeight": 600,
         "resizable": true,
-        "fullscreen": false
+        "fullscreen": false,
+        "devtools": true
       }
     ],
     "security": {
@@ -60,7 +61,12 @@
                 { "path": "/home/**" }
               ]
             },
-            "fs:allow-exists"
+            "fs:allow-exists",
+            "global-shortcut:allow-register",
+            "global-shortcut:allow-register-all",
+            "global-shortcut:allow-unregister",
+            "global-shortcut:allow-unregister-all",
+            "global-shortcut:allow-is-registered"
           ]
         }
       ]

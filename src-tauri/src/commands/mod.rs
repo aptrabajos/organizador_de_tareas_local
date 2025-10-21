@@ -683,6 +683,232 @@ pub async fn get_recent_commits(path: String, limit: usize) -> Result<Vec<GitCom
     }
 }
 
+// ==================== COMANDOS GIT MEJORADOS ====================
+
+/// Estructura para conteo de archivos modificados
+#[derive(serde::Serialize)]
+pub struct GitFileCount {
+    pub modified: usize,
+    pub staged: usize,
+    pub untracked: usize,
+}
+
+/// Obtener conteo de archivos modificados, staged y untracked
+#[tauri::command]
+pub async fn get_git_file_count(path: String) -> Result<GitFileCount, String> {
+    let output = Command::new("git")
+        .args(&["-C", &path, "status", "--porcelain"])
+        .output()
+        .map_err(|e| format!("Failed to execute git command: {}", e))?;
+
+    if !output.status.success() {
+        return Err("Not a git repository".to_string());
+    }
+
+    let status = String::from_utf8_lossy(&output.stdout);
+    let mut modified = 0;
+    let mut staged = 0;
+    let mut untracked = 0;
+
+    for line in status.lines() {
+        if line.len() < 3 {
+            continue;
+        }
+
+        let status_code = &line[0..2];
+
+        // Primer carácter: staged (index)
+        // Segundo carácter: working tree
+        match status_code.chars().nth(0).unwrap_or(' ') {
+            'M' | 'A' | 'D' | 'R' | 'C' => staged += 1,
+            _ => {}
+        }
+
+        match status_code.chars().nth(1).unwrap_or(' ') {
+            'M' | 'D' => modified += 1,
+            _ => {}
+        }
+
+        if status_code.starts_with("??") {
+            untracked += 1;
+        }
+    }
+
+    Ok(GitFileCount {
+        modified,
+        staged,
+        untracked,
+    })
+}
+
+/// Obtener lista de archivos modificados
+#[tauri::command]
+pub async fn get_git_modified_files(path: String) -> Result<Vec<String>, String> {
+    let output = Command::new("git")
+        .args(&["-C", &path, "status", "--porcelain"])
+        .output()
+        .map_err(|e| format!("Failed to execute git command: {}", e))?;
+
+    if !output.status.success() {
+        return Err("Not a git repository".to_string());
+    }
+
+    let status = String::from_utf8_lossy(&output.stdout);
+    let files: Vec<String> = status
+        .lines()
+        .filter_map(|line| {
+            if line.len() >= 3 {
+                Some(line[3..].trim().to_string())
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    Ok(files)
+}
+
+/// Stage archivos (git add)
+#[tauri::command]
+pub async fn git_add(path: String, files: Vec<String>) -> Result<String, String> {
+    println!("📝 [GIT] Staging {} archivos", files.len());
+
+    let mut args = vec!["-C", &path, "add"];
+    let file_refs: Vec<&str> = files.iter().map(|s| s.as_str()).collect();
+    args.extend(file_refs);
+
+    let output = Command::new("git")
+        .args(&args)
+        .output()
+        .map_err(|e| format!("Failed to execute git add: {}", e))?;
+
+    if output.status.success() {
+        println!("✅ [GIT] Archivos staged exitosamente");
+        Ok("Archivos staged exitosamente".to_string())
+    } else {
+        let error = String::from_utf8_lossy(&output.stderr);
+        Err(format!("Error staging files: {}", error))
+    }
+}
+
+/// Crear commit (git commit)
+#[tauri::command]
+pub async fn git_commit(path: String, message: String) -> Result<String, String> {
+    println!("💾 [GIT] Creando commit: {}", message);
+
+    let output = Command::new("git")
+        .args(&["-C", &path, "commit", "-m", &message])
+        .output()
+        .map_err(|e| format!("Failed to execute git commit: {}", e))?;
+
+    if output.status.success() {
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        println!("✅ [GIT] Commit creado exitosamente");
+        Ok(stdout.to_string())
+    } else {
+        let error = String::from_utf8_lossy(&output.stderr);
+        Err(format!("Error creating commit: {}", error))
+    }
+}
+
+/// Push a remote (git push)
+#[tauri::command]
+pub async fn git_push(path: String) -> Result<String, String> {
+    println!("🚀 [GIT] Pushing to remote");
+
+    let output = Command::new("git")
+        .args(&["-C", &path, "push"])
+        .output()
+        .map_err(|e| format!("Failed to execute git push: {}", e))?;
+
+    if output.status.success() {
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        println!("✅ [GIT] Push exitoso");
+        Ok(format!("{}{}", stdout, stderr))
+    } else {
+        let error = String::from_utf8_lossy(&output.stderr);
+        Err(format!("Error pushing: {}", error))
+    }
+}
+
+/// Pull from remote (git pull)
+#[tauri::command]
+pub async fn git_pull(path: String) -> Result<String, String> {
+    println!("⬇️ [GIT] Pulling from remote");
+
+    let output = Command::new("git")
+        .args(&["-C", &path, "pull"])
+        .output()
+        .map_err(|e| format!("Failed to execute git pull: {}", e))?;
+
+    if output.status.success() {
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        println!("✅ [GIT] Pull exitoso");
+        Ok(stdout.to_string())
+    } else {
+        let error = String::from_utf8_lossy(&output.stderr);
+        Err(format!("Error pulling: {}", error))
+    }
+}
+
+/// Obtener URL del remote origin
+#[tauri::command]
+pub async fn get_git_remote_url(path: String) -> Result<Option<String>, String> {
+    let output = Command::new("git")
+        .args(&["-C", &path, "remote", "get-url", "origin"])
+        .output()
+        .map_err(|e| format!("Failed to execute git command: {}", e))?;
+
+    if output.status.success() {
+        let url = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        if url.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(url))
+        }
+    } else {
+        Ok(None)
+    }
+}
+
+/// Obtener commits ahead/behind respecto al remote
+#[tauri::command]
+pub async fn get_git_ahead_behind(path: String) -> Result<(u32, u32), String> {
+    // Primero hacer fetch para tener info actualizada
+    let _ = Command::new("git")
+        .args(&["-C", &path, "fetch", "--quiet"])
+        .output();
+
+    let output = Command::new("git")
+        .args(&[
+            "-C",
+            &path,
+            "rev-list",
+            "--left-right",
+            "--count",
+            "HEAD...@{upstream}",
+        ])
+        .output()
+        .map_err(|e| format!("Failed to execute git command: {}", e))?;
+
+    if output.status.success() {
+        let result = String::from_utf8_lossy(&output.stdout);
+        let parts: Vec<&str> = result.trim().split_whitespace().collect();
+
+        if parts.len() == 2 {
+            let ahead = parts[0].parse::<u32>().unwrap_or(0);
+            let behind = parts[1].parse::<u32>().unwrap_or(0);
+            Ok((ahead, behind))
+        } else {
+            Ok((0, 0))
+        }
+    } else {
+        // No hay upstream configurado o no es un repo git
+        Ok((0, 0))
+    }
+}
+
 // ==================== COMANDOS PARA CONFIGURACIÓN ====================
 
 #[tauri::command]
@@ -761,3 +987,29 @@ pub async fn select_backup_folder(app: tauri::AppHandle) -> Result<Option<String
     }
 }
 
+// ==================== COMANDOS PARA SHORTCUTS ====================
+
+/// Obtener la configuración de atajos de teclado
+/// Nota: El registro real de shortcuts se maneja desde el frontend con el plugin
+#[tauri::command]
+pub async fn get_shortcuts_config(
+    config_manager: State<'_, ConfigManager>,
+) -> Result<crate::config::schema::ShortcutsConfig, String> {
+    println!("⌨️ [SHORTCUTS] Obteniendo configuración de atajos");
+    let config = config_manager.get_config()?;
+    Ok(config.shortcuts)
+}
+
+/// Actualizar la configuración de atajos de teclado
+#[tauri::command]
+pub async fn update_shortcuts_config(
+    config_manager: State<'_, ConfigManager>,
+    shortcuts_config: crate::config::schema::ShortcutsConfig,
+) -> Result<(), String> {
+    println!("⌨️ [SHORTCUTS] Actualizando configuración de atajos");
+    let mut config = config_manager.get_config()?;
+    config.shortcuts = shortcuts_config;
+    config_manager.update_config(config)?;
+    println!("✅ [SHORTCUTS] Configuración actualizada exitosamente");
+    Ok(())
+}

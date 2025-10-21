@@ -194,6 +194,32 @@ When adding new dependencies:
 
 ## Changelog
 
+### 2025-10-20 - v0.3.0 - Keyboard Shortcuts & Enhanced Git Integration
+
+**Sistema de Atajos de Teclado:**
+
+- Plugin `tauri-plugin-global-shortcut` v2.0 integrado
+- 6 shortcuts globales: Ctrl+N (nuevo proyecto), Ctrl+F (buscar), Ctrl+Comma (config), Ctrl+Shift+A (analytics), Ctrl+R (recargar), Escape (cerrar modal)
+- Contexto `ShortcutsContext.tsx` con handlers reactivos
+- UI en Settings → Tab "⌨️ Atajos" con toggles individuales
+- Detección automática OS (Ctrl para Linux/Win, Cmd para macOS)
+- **CRÍTICO**: Permisos `global-shortcut:allow-*` en tauri.conf.json (requerido Tauri 2.x)
+
+**Git Integration Mejorado:**
+
+- 7 comandos Tauri: file_count, modified_files, add, commit, push, pull, remote_url, ahead_behind
+- `EnhancedGitInfo.tsx`: badges (rama, archivos, ahead/behind), botones (Stage All, Commit, Push, Pull, Repo)
+- `GitCommitModal.tsx`: crear commits desde UI con push automático opcional
+- Timeline últimos 5 commits, toast notifications
+
+**Archivos creados:** `ShortcutsContext.tsx`, `EnhancedGitInfo.tsx`, `GitCommitModal.tsx`, `types/git.ts`
+
+**Troubleshooting:** Shortcuts no funcionaban - faltaban permisos en tauri.conf.json. Console.log no aparece en terminal (solo println! de Rust). Sin DevTools en apps nativas.
+
+**Resultados:** ✅ Shortcuts funcionando ✅ Git features funcionando ✅ 0 errores ESLint
+
+---
+
 ### 2025-10-12 - Mejoras de Calidad de Código
 
 **Correcciones de ESLint y TypeScript:**

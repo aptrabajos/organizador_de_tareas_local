@@ -14,6 +14,8 @@ pub struct AppConfig {
     pub ui: UiConfig,
     /// Configuración avanzada
     pub advanced: AdvancedConfig,
+    /// Configuración de atajos de teclado
+    pub shortcuts: ShortcutsConfig,
 }
 
 /// Configuración de plataforma (programas y comportamientos del OS)
@@ -168,4 +170,25 @@ impl Default for ProgramConfig {
             custom_script: None,
         }
     }
+}
+
+/// Configuración de atajos de teclado
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ShortcutsConfig {
+    /// Habilitar atajos de teclado globales
+    pub enabled: bool,
+    /// Mapa de acciones a combinaciones de teclas
+    pub shortcuts: HashMap<String, ShortcutBinding>,
+}
+
+/// Configuración de un atajo de teclado individual
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ShortcutBinding {
+    /// Combinación de teclas (ej: "Ctrl+N", "Cmd+T")
+    pub key: String,
+    /// Si este atajo específico está habilitado
+    pub enabled: bool,
+    /// Descripción de la acción
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
 }

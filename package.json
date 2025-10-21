@@ -1,7 +1,7 @@
 {
   "name": "gestor-proyectos",
-  "version": "0.2.1",
-  "description": "Gestor de proyectos multiplataforma (Linux/Windows) con Tauri + SolidJS",
+  "version": "0.3.0",
+  "description": "Gestor de proyectos multiplataforma (Linux/Windows) con atajos y Git mejorado",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -21,6 +21,7 @@
     "@tauri-apps/api": "^2.1.0",
     "@tauri-apps/plugin-dialog": "^2.4.0",
     "@tauri-apps/plugin-fs": "^2.4.2",
+    "@tauri-apps/plugin-global-shortcut": "^2.0.0",
     "@tauri-apps/plugin-shell": "^2.0.0",
     "@types/dompurify": "^3.2.0",
     "@types/marked": "^6.0.0",

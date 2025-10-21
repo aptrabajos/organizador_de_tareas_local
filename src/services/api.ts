@@ -188,6 +188,46 @@ export async function getRecentCommits(
   return await invoke('get_recent_commits', { path, limit });
 }
 
+// Funciones Git mejoradas
+export async function getGitFileCount(
+  path: string
+): Promise<import('../types/git').GitFileCount> {
+  return await invoke('get_git_file_count', { path });
+}
+
+export async function getGitModifiedFiles(path: string): Promise<string[]> {
+  return await invoke('get_git_modified_files', { path });
+}
+
+export async function gitAdd(path: string, files: string[]): Promise<string> {
+  return await invoke('git_add', { path, files });
+}
+
+export async function gitCommit(
+  path: string,
+  message: string
+): Promise<string> {
+  return await invoke('git_commit', { path, message });
+}
+
+export async function gitPush(path: string): Promise<string> {
+  return await invoke('git_push', { path });
+}
+
+export async function gitPull(path: string): Promise<string> {
+  return await invoke('git_pull', { path });
+}
+
+export async function getGitRemoteUrl(path: string): Promise<string | null> {
+  return await invoke('get_git_remote_url', { path });
+}
+
+export async function getGitAheadBehind(
+  path: string
+): Promise<[number, number]> {
+  return await invoke('get_git_ahead_behind', { path });
+}
+
 // ==================== FUNCIONES PARA PROJECT JOURNAL ====================
 
 export async function createJournalEntry(
@@ -283,4 +323,18 @@ export async function openTextEditor(path: string): Promise<void> {
 
 export async function selectBackupFolder(): Promise<string | null> {
   return await invoke('select_backup_folder');
+}
+
+// ==================== FUNCIONES PARA SHORTCUTS ====================
+
+export async function getShortcutsConfig(): Promise<
+  import('../types/config').ShortcutsConfig
+> {
+  return await invoke('get_shortcuts_config');
+}
+
+export async function updateShortcutsConfig(
+  shortcutsConfig: import('../types/config').ShortcutsConfig
+): Promise<void> {
+  await invoke('update_shortcuts_config', { shortcutsConfig });
 }

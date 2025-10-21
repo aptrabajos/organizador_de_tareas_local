@@ -1,7 +1,7 @@
 [package]
 name = "gestor-proyectos"
-version = "0.1.0"
-description = "Gestor de proyectos local para Linux"
+version = "0.3.0"
+description = "Gestor de proyectos multiplataforma (Linux/Windows) con atajos y Git mejorado"
 authors = ["you"]
 edition = "2021"
 
@@ -13,6 +13,7 @@ tauri = { version = "2.1", features = [] }
 tauri-plugin-shell = "2.0"
 tauri-plugin-dialog = "2.0"
 tauri-plugin-fs = "2.0"
+tauri-plugin-global-shortcut = "2.0"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 rusqlite = { version = "0.32", features = ["bundled"] }
