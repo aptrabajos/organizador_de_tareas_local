@@ -1,4 +1,4 @@
-import { Component, For, Show, createSignal } from 'solid-js';
+import { Component, For, Show, createSignal, createEffect } from 'solid-js';
 import toast from 'solid-toast';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
