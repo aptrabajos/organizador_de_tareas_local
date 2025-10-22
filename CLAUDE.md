@@ -194,6 +194,72 @@ When adding new dependencies:
 
 ## Changelog
 
+### 2025-10-22 - v0.3.1 - Drag & Drop para Reordenar Proyectos
+
+**Sistema de Reordenamiento Visual:**
+
+- Biblioteca `@thisbeyond/solid-dnd` v0.7.5 integrada
+- Drag handle visible: ícono `⋮⋮` en cada card de proyecto
+- Reordenamiento persistente con campo `display_order` en base de datos
+- Animaciones suaves con CSS transforms y transitions
+- Feedback visual: opacidad 25% mientras se arrastra, cursor `grab` → `grabbing`
+
+**Backend (Rust + SQLite):**
+
+- Nueva columna `display_order` en tabla `projects` (migración automática con ALTER TABLE)
+- Comando Tauri `update_project_order(project_id, new_order)` implementado
+- Método `db.update_project_order()` para persistir cambios
+- ORDER BY modificado: prioriza `display_order ASC` antes que `is_pinned` y `pinned_order`
+- Queries actualizadas: `get_all_projects()` y `search_projects()` incluyen `display_order`
+
+**Frontend (SolidJS + TypeScript):**
+
+- Componente `ProjectList.tsx` actualizado con drag & drop contexts:
+  - `DragDropProvider` con `closestCenter` collision detector
+  - `SortableProvider` con IDs de proyectos filtrados
+  - `createSortable()` para cada card con transforms reactivos
+- Handler `handleDragEnd`: reordena array local y actualiza todos los proyectos afectados en BD
+- Función API `updateProjectOrder()` agregada en `services/api.ts`
+- Drag handle con spread operator `{...sortable.dragActivators}` para activar arrastre
+
+**UX Implementada:**
+
+1. Click y mantener sobre `⋮⋮` para agarrar card
+2. Arrastrar a nueva posición (visual feedback inmediato)
+3. Soltar para guardar orden automáticamente
+4. Toast de confirmación "Orden actualizado"
+5. Refresh reactivo sin recargas bruscas
+6. Orden persistente entre sesiones
+
+**Archivos Modificados:**
+
+- `src-tauri/src/db/mod.rs` - Migración, queries, método update_project_order
+- `src-tauri/src/models/project.rs` - Campo display_order en struct Project
+- `src-tauri/src/commands/mod.rs` - Comando update_project_order
+- `src-tauri/src/main.rs` - Registro del nuevo comando
+- `src/components/ProjectList.tsx` - Drag & drop completo
+- `src/components/GitCommitModal.tsx` - Fix: array.map → <For> para ESLint
+- `src/services/api.ts` - Función updateProjectOrder()
+- `package.json` - Dependencia @thisbeyond/solid-dnd
+
+**Troubleshooting:**
+
+- Problema inicial: Cards se movían pero regresaban a posición original
+- Causa: ORDER BY priorizaba `is_pinned DESC` antes que `display_order`
+- Solución: Cambiar orden a `display_order ASC, is_pinned DESC, pinned_order ASC`
+- Grid CSS compatible con solid-dnd usando transforms reactivos
+
+**Resultados:**
+
+✅ Drag & drop funcionando perfectamente
+✅ Orden persistente en SQLite
+✅ 0 errores de compilación Rust
+✅ 1 error ESLint corregido (solid/prefer-for en GitCommitModal)
+✅ 4 warnings Rust esperados (dead_code en funciones preparadas para futuro)
+✅ Sin perder funcionalidad existente (Git, TODOs, Journal, Context, etc.)
+
+---
+
 ### 2025-10-20 - v0.3.0 - Keyboard Shortcuts & Enhanced Git Integration
 
 **Sistema de Atajos de Teclado:**
