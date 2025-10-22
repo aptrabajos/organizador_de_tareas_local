@@ -339,10 +339,25 @@ const ProjectList: Component<ProjectListProps> = (props) => {
           </div>
         }
       >
-        <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          <For each={filteredProjects()}>
-            {(project) => (
-              <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md dark:border-gray-700 dark:bg-gray-800">
+        <DragDropProvider
+          onDragEnd={handleDragEnd}
+          collisionDetector={closestCenter}
+        >
+          <DragDropSensors />
+          <SortableProvider ids={filteredProjects().map((p) => p.id)}>
+            <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              <For each={filteredProjects()}>
+                {(project) => {
+                  const sortable = createSortable(project.id);
+                  return (
+                    <div
+                      ref={sortable.ref}
+                      class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md dark:border-gray-700 dark:bg-gray-800"
+                      classList={{
+                        'opacity-25': sortable.isActiveDraggable,
+                        'cursor-move': true,
+                      }}
+                    >
                 {/* Header con botón de pin */}
                 <div class="mb-2 flex items-start justify-between gap-2">
                   <div class="flex flex-1 items-center gap-2">
