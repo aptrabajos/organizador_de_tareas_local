@@ -270,6 +270,7 @@ impl Database {
                 status_changed_at,
                 is_pinned,
                 pinned_order,
+                display_order,
             });
         }
 
@@ -503,6 +504,7 @@ impl Database {
                 status_changed_at,
                 is_pinned,
                 pinned_order,
+                display_order,
             });
         }
 
