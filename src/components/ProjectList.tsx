@@ -2,6 +2,14 @@ import { Component, For, Show, createSignal } from 'solid-js';
 import toast from 'solid-toast';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
+import {
+  DragDropProvider,
+  DragDropSensors,
+  DragOverlay,
+  SortableProvider,
+  createSortable,
+  closestCenter,
+} from '@thisbeyond/solid-dnd';
 import type { Project } from '../types/project';
 import EnhancedGitInfo from './EnhancedGitInfo';
 import GitCommitModal from './GitCommitModal';
@@ -15,6 +23,7 @@ import {
   trackProjectOpen,
   togglePinProject,
   updateProjectStatus,
+  updateProjectOrder,
 } from '../services/api';
 import { open } from '@tauri-apps/plugin-dialog';
 import { invoke } from '@tauri-apps/api/core';
