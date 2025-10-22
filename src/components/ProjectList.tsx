@@ -159,8 +159,17 @@ const ProjectList: Component<ProjectListProps> = (props) => {
     if (oldIndex === -1 || newIndex === -1) return;
 
     try {
-      // Actualizar el orden en la base de datos
-      await updateProjectOrder(activeId, newIndex);
+      // Reordenar array localmente
+      const reordered = [...projects];
+      const [removed] = reordered.splice(oldIndex, 1);
+      reordered.splice(newIndex, 0, removed);
+
+      // Actualizar display_order en BD para todos los proyectos afectados
+      const updates = reordered.map((p, index) =>
+        updateProjectOrder(p.id, index)
+      );
+
+      await Promise.all(updates);
 
       toast.success('Orden actualizado', { duration: 2000 });
 
