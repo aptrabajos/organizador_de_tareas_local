@@ -215,9 +215,9 @@ impl Database {
         let mut stmt = conn.prepare(
             "SELECT id, name, description, local_path, documentation_url, ai_documentation_url, drive_link, notes, image_data,
                     created_at, updated_at, last_opened_at, opened_count, total_time_seconds,
-                    status, status_changed_at, is_pinned, pinned_order
+                    status, status_changed_at, is_pinned, pinned_order, display_order
              FROM projects
-             ORDER BY is_pinned DESC, pinned_order ASC, updated_at DESC"
+             ORDER BY is_pinned DESC, pinned_order ASC, display_order ASC, updated_at DESC"
         )?;
 
         let mut projects = Vec::new();
