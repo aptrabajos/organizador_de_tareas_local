@@ -92,6 +92,20 @@ const ProjectList: Component<ProjectListProps> = (props) => {
     return filtered;
   };
 
+  // Exponer filtros al padre (App.tsx) para renderizar en el header
+  createEffect(() => {
+    if (props.renderFilters) {
+      props.renderFilters({
+        statusFilter,
+        setStatusFilter,
+        showPinnedOnly,
+        setShowPinnedOnly,
+        filteredCount: filteredProjects().length,
+        totalCount: props.projects.length,
+      });
+    }
+  });
+
   // Función helper para renderizar markdown de forma segura
   const renderMarkdown = (markdown: string): string => {
     let html = marked.parse(markdown) as string;
