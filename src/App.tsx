@@ -255,6 +255,7 @@ const AppContent: Component = () => {
               onDelete={handleDelete}
               onOpenTerminal={handleOpenTerminal}
               onProjectsChanged={() => store.loadProjects()}
+              renderFilters={setFilterProps}
             />
           </Show>
         </Show>
