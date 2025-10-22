@@ -213,6 +213,9 @@ const AppContent: Component = () => {
               <div class="min-w-[200px] flex-1">
                 <SearchBar onSearch={handleSearch} value={searchQuery()} />
               </div>
+              <Show when={filterProps()}>
+                <ProjectFilters {...filterProps()!} />
+              </Show>
             </div>
           </Show>
         </div>
