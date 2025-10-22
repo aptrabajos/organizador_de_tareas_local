@@ -1,4 +1,4 @@
-import { Component, createSignal, Show } from 'solid-js';
+import { Component, createSignal, Show, For } from 'solid-js';
 import toast from 'solid-toast';
 import { gitCommit, gitPush, getGitModifiedFiles } from '../services/api';
 
@@ -92,8 +92,8 @@ const GitCommitModal: Component<GitCommitModalProps> = (props) => {
               required
             />
             <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              Mínimo 3 caracteres. Usa formato convencional: feat:, fix:,
-              docs:, etc.
+              Mínimo 3 caracteres. Usa formato convencional: feat:, fix:, docs:,
+              etc.
             </p>
           </div>
 

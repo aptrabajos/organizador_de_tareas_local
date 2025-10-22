@@ -179,7 +179,7 @@ impl Database {
         let project = conn.query_row(
             "SELECT id, name, description, local_path, documentation_url, ai_documentation_url, drive_link, notes, image_data,
                     created_at, updated_at, last_opened_at, opened_count, total_time_seconds,
-                    status, status_changed_at, is_pinned, pinned_order FROM projects WHERE id = ?1",
+                    status, status_changed_at, is_pinned, pinned_order, display_order FROM projects WHERE id = ?1",
             params![id],
             |row| {
                 Ok(Project {
@@ -202,6 +202,7 @@ impl Database {
                     status_changed_at: row.get(15)?,
                     is_pinned: row.get(16)?,
                     pinned_order: row.get(17)?,
+                    display_order: row.get(18)?,
                 })
             },
         )?;
