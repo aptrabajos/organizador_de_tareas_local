@@ -241,12 +241,13 @@ impl Database {
                 row.get::<_, Option<String>>(15)?,  // status_changed_at
                 row.get::<_, Option<bool>>(16)?,  // is_pinned
                 row.get::<_, Option<i64>>(17)?,  // pinned_order
+                row.get::<_, Option<i64>>(18)?,  // display_order
             ))
         })?
         .collect::<Result<Vec<_>>>()?;
 
         // Para cada proyecto, obtener sus enlaces
-        for (id, name, description, local_path, documentation_url, ai_documentation_url, drive_link, notes, image_data, created_at, updated_at, last_opened_at, opened_count, total_time_seconds, status, status_changed_at, is_pinned, pinned_order) in project_rows {
+        for (id, name, description, local_path, documentation_url, ai_documentation_url, drive_link, notes, image_data, created_at, updated_at, last_opened_at, opened_count, total_time_seconds, status, status_changed_at, is_pinned, pinned_order, display_order) in project_rows {
             let links = self.get_project_links_internal(id, &conn).unwrap_or_else(|_| Vec::new());
 
             projects.push(Project {
