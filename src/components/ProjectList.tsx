@@ -354,10 +354,18 @@ const ProjectList: Component<ProjectListProps> = (props) => {
                   const sortable = createSortable(project.id);
                   return (
                     <div
-                      ref={sortable.ref}
+                      use:sortable
                       class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md dark:border-gray-700 dark:bg-gray-800"
                       classList={{
                         'opacity-25': sortable.isActiveDraggable,
+                      }}
+                      style={{
+                        transform: sortable.transform
+                          ? `translate3d(${sortable.transform.x}px, ${sortable.transform.y}px, 0)`
+                          : undefined,
+                        transition: sortable.isActiveDraggable
+                          ? undefined
+                          : 'transform 200ms ease',
                       }}
                     >
                       {/* Header con botón de pin y drag handle */}
