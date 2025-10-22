@@ -223,11 +223,6 @@ const AppContent: Component = () => {
 
         {/* Projects View */}
         <Show when={!showAnalytics()}>
-          {/* Search Bar */}
-          <div class="mb-6">
-            <SearchBar onSearch={handleSearch} value={searchQuery()} />
-          </div>
-
           {/* Error Message */}
           <Show when={store.error()}>
             <div class="mb-4 rounded-lg bg-red-50 p-4 text-red-800 dark:bg-red-900/20 dark:text-red-200">
