@@ -327,6 +327,7 @@ impl Database {
                     status_changed_at: row.get(15)?,
                     is_pinned: row.get(16)?,
                     pinned_order: row.get(17)?,
+                    display_order: row.get(18)?,
                 };
                 println!("✅ [DB] Proyecto leído de BD: '{}'", project.name);
                 Ok(project)
