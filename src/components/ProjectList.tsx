@@ -348,7 +348,7 @@ const ProjectList: Component<ProjectListProps> = (props) => {
         >
           <DragDropSensors />
           <SortableProvider ids={filteredProjects().map((p) => p.id)}>
-            <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <div class="grid auto-rows-fr gap-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
               <For each={filteredProjects()}>
                 {(project) => {
                   const sortable = createSortable(project.id);
@@ -362,7 +362,7 @@ const ProjectList: Component<ProjectListProps> = (props) => {
                   return (
                     <div
                       ref={sortable.ref}
-                      class="rounded-lg border border-gray-200 bg-white p-2 shadow-sm transition-shadow hover:shadow-md dark:border-gray-700 dark:bg-gray-800"
+                      class="flex h-full min-h-[280px] flex-col rounded-lg border border-gray-200 bg-white p-2 shadow-sm transition-shadow hover:shadow-md dark:border-gray-700 dark:bg-gray-800"
                       classList={{
                         'opacity-25': sortable.isActiveDraggable,
                       }}
