@@ -15,6 +15,7 @@ import GitCommitModal from './GitCommitModal';
 import ProjectJournal from './ProjectJournal';
 import TodoList from './TodoList';
 import ProjectContext from './ProjectContext';
+import ProjectFilters from './ProjectFilters';
 import {
   openUrl,
   createProjectBackup,
