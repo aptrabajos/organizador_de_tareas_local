@@ -418,25 +418,25 @@ const ProjectList: Component<ProjectListProps> = (props) => {
                         </button>
                       </div>
 
-                      <div class="flex gap-3">
+                      <div class="flex gap-2">
                         <Show when={project.image_data}>
                           <img
                             src={project.image_data}
                             alt={project.name}
-                            class="h-16 w-16 flex-shrink-0 rounded-lg border-2 border-gray-300 object-cover dark:border-gray-600"
+                            class="h-12 w-12 flex-shrink-0 rounded-lg border-2 border-gray-300 object-cover dark:border-gray-600"
                           />
                         </Show>
                         <div class="flex-1">
-                          <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+                          <h3 class="text-base font-semibold text-gray-900 dark:text-white">
                             {project.name}
                           </h3>
-                          <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">
+                          <p class="mt-0.5 text-xs text-gray-600 dark:text-gray-300">
                             {project.description}
                           </p>
                         </div>
                       </div>
 
-                      <div class="mt-3 space-y-2 text-xs text-gray-500 dark:text-gray-400">
+                      <div class="mt-2 space-y-1 text-xs text-gray-500 dark:text-gray-400">
                         <p class="truncate" title={project.local_path}>
                           📁 {project.local_path}
                         </p>
