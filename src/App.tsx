@@ -175,32 +175,42 @@ const AppContent: Component = () => {
 
       {/* Header */}
       <header class="border-b border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
-        <div class="px-3 py-3 sm:px-4 lg:px-5">
+        <div class="px-3 py-2 sm:px-4 lg:px-5">
+          {/* Primera fila: Título y botones principales */}
           <div class="flex items-center justify-between">
-            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
+            <h1 class="text-xl font-bold text-gray-900 dark:text-white sm:text-2xl">
               Gestor de Proyectos
             </h1>
             <div class="flex gap-2">
               <button
                 onClick={() => setShowSettings(true)}
-                class="rounded-lg bg-gray-600 px-4 py-2 text-white hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 dark:bg-gray-500 dark:hover:bg-gray-600"
+                class="rounded-lg bg-gray-600 px-3 py-1.5 text-sm text-white hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 dark:bg-gray-500 dark:hover:bg-gray-600"
               >
                 ⚙️ Configuración
               </button>
               <button
                 onClick={() => setShowAnalytics(!showAnalytics())}
-                class="rounded-lg bg-purple-600 px-4 py-2 text-white hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 dark:bg-purple-500 dark:hover:bg-purple-600"
+                class="rounded-lg bg-purple-600 px-3 py-1.5 text-sm text-white hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 dark:bg-purple-500 dark:hover:bg-purple-600"
               >
                 📊 {showAnalytics() ? 'Proyectos' : 'Estadísticas'}
               </button>
               <button
                 onClick={handleNewProject}
-                class="rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:bg-blue-500 dark:hover:bg-blue-600"
+                class="rounded-lg bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:bg-blue-500 dark:hover:bg-blue-600"
               >
                 + Nuevo Proyecto
               </button>
             </div>
           </div>
+
+          {/* Segunda fila: Búsqueda y Filtros (solo en vista de proyectos) */}
+          <Show when={!showAnalytics()}>
+            <div class="mt-2 flex flex-wrap items-center gap-2">
+              <div class="flex-1 min-w-[200px]">
+                <SearchBar onSearch={handleSearch} value={searchQuery()} />
+              </div>
+            </div>
+          </Show>
         </div>
       </header>
 
