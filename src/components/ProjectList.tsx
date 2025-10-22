@@ -145,6 +145,41 @@ const ProjectList: Component<ProjectListProps> = (props) => {
     }
   };
 
+  const handleDragEnd = async (event: {
+    draggable: { id: string | number };
+    droppable: { id: string | number } | null;
+  }) => {
+    const { draggable, droppable } = event;
+
+    if (!droppable) return;
+
+    const activeId = Number(draggable.id);
+    const overId = Number(droppable.id);
+
+    if (activeId === overId) return;
+
+    const projects = filteredProjects();
+    const oldIndex = projects.findIndex((p) => p.id === activeId);
+    const newIndex = projects.findIndex((p) => p.id === overId);
+
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    try {
+      // Actualizar el orden en la base de datos
+      await updateProjectOrder(activeId, newIndex);
+
+      toast.success('Orden actualizado', { duration: 2000 });
+
+      // Refrescar lista de proyectos
+      if (props.onProjectsChanged) {
+        props.onProjectsChanged();
+      }
+    } catch (error) {
+      console.error('Error al actualizar orden:', error);
+      toast.error('Error al actualizar orden');
+    }
+  };
+
   const handleBackup = async (project: Project) => {
     try {
       // Pedir al usuario que seleccione la carpeta destino
