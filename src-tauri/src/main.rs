@@ -65,6 +65,7 @@ fn main() {
             commands::update_project_status,
             commands::toggle_pin_project,
             commands::reorder_pinned_projects,
+            commands::update_project_order,
             commands::get_git_branch,
             commands::get_git_status,
             commands::get_recent_commits,
