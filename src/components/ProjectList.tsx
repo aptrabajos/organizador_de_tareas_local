@@ -533,10 +533,13 @@ const ProjectList: Component<ProjectListProps> = (props) => {
                     🗑️
                   </button>
                 </div>
-              </div>
-            )}
-          </For>
-        </div>
+                    </div>
+                  );
+                }}
+              </For>
+            </div>
+          </SortableProvider>
+        </DragDropProvider>
       </Show>
 
       {/* Journal Modal */}
