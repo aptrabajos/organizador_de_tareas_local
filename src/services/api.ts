@@ -295,6 +295,13 @@ export async function reorderPinnedProjects(
   await invoke('reorder_pinned_projects', { projectIds });
 }
 
+export async function updateProjectOrder(
+  projectId: number,
+  newOrder: number
+): Promise<void> {
+  await invoke('update_project_order', { projectId, newOrder });
+}
+
 // ==================== FUNCIONES PARA CONFIGURACIÓN ====================
 
 export async function getConfig(): Promise<AppConfig> {
