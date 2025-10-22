@@ -206,7 +206,7 @@ const AppContent: Component = () => {
           {/* Segunda fila: Búsqueda y Filtros (solo en vista de proyectos) */}
           <Show when={!showAnalytics()}>
             <div class="mt-2 flex flex-wrap items-center gap-2">
-              <div class="flex-1 min-w-[200px]">
+              <div class="min-w-[200px] flex-1">
                 <SearchBar onSearch={handleSearch} value={searchQuery()} />
               </div>
             </div>
