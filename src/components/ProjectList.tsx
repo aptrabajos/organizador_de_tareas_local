@@ -41,6 +41,15 @@ interface ProjectListProps {
   onDelete: (project: Project) => void;
   onOpenTerminal: (project: Project) => void;
   onProjectsChanged?: () => void; // Callback para refrescar proyectos
+  // Props para controlar filtros desde el padre (App.tsx)
+  renderFilters?: (filterProps: {
+    statusFilter: () => string;
+    setStatusFilter: (value: string) => void;
+    showPinnedOnly: () => boolean;
+    setShowPinnedOnly: (value: boolean) => void;
+    filteredCount: number;
+    totalCount: number;
+  }) => void;
 }
 
 const ProjectList: Component<ProjectListProps> = (props) => {
