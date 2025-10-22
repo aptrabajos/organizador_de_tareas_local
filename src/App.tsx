@@ -205,7 +205,7 @@ const AppContent: Component = () => {
       </header>
 
       {/* Main Content */}
-      <main class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+      <main class="px-2 py-4 sm:px-3 lg:px-4">
         {/* Analytics View */}
         <Show when={showAnalytics()}>
           <Analytics />
