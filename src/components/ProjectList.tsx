@@ -349,12 +349,19 @@ const ProjectList: Component<ProjectListProps> = (props) => {
                       class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md dark:border-gray-700 dark:bg-gray-800"
                       classList={{
                         'opacity-25': sortable.isActiveDraggable,
-                        'cursor-move': true,
                       }}
                     >
-                      {/* Header con botón de pin */}
+                      {/* Header con botón de pin y drag handle */}
                       <div class="mb-2 flex items-start justify-between gap-2">
                         <div class="flex flex-1 items-center gap-2">
+                          {/* Drag handle */}
+                          <button
+                            {...sortable.dragActivators}
+                            class="cursor-grab p-1 text-gray-400 hover:text-gray-600 active:cursor-grabbing dark:hover:text-gray-300"
+                            title="Arrastrar para reordenar"
+                          >
+                            ⋮⋮
+                          </button>
                           <Show when={project.status}>
                             <select
                               value={project.status || 'activo'}
