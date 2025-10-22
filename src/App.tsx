@@ -29,6 +29,9 @@ const AppContent: Component = () => {
     null
   );
 
+  // Estado para los filtros (recibidos desde ProjectList)
+  const [filterProps, setFilterProps] = createSignal<any>(null);
+
   onMount(async () => {
     store.loadProjects();
 
