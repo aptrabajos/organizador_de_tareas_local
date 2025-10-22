@@ -450,9 +450,9 @@ impl Database {
         let mut stmt = conn.prepare(
             "SELECT id, name, description, local_path, documentation_url, ai_documentation_url, drive_link, notes, image_data,
                     created_at, updated_at, last_opened_at, opened_count, total_time_seconds,
-                    status, status_changed_at, is_pinned, pinned_order FROM projects
+                    status, status_changed_at, is_pinned, pinned_order, display_order FROM projects
              WHERE name LIKE ?1 OR description LIKE ?1 OR local_path LIKE ?1 OR notes LIKE ?1
-             ORDER BY is_pinned DESC, pinned_order ASC, updated_at DESC"
+             ORDER BY is_pinned DESC, pinned_order ASC, display_order ASC, updated_at DESC"
         )?;
 
         let mut projects = Vec::new();
