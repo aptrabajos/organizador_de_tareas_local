@@ -450,7 +450,7 @@ const ProjectList: Component<ProjectListProps> = (props) => {
 
                       <Show when={project.notes}>
                         <div class="mt-2 rounded bg-gray-50 p-1.5 text-xs text-gray-700 dark:bg-gray-700 dark:text-gray-300">
-                          <p class="font-semibold text-xs">📝 Notas:</p>
+                          <p class="text-xs font-semibold">📝 Notas:</p>
                           <div
                             class="prose-xs prose mt-0.5 max-h-24 max-w-none overflow-y-auto break-words dark:prose-invert"
                             // eslint-disable-next-line solid/no-innerhtml
@@ -491,16 +491,16 @@ const ProjectList: Component<ProjectListProps> = (props) => {
                         </Show>
                       </div>
 
-                      <div class="mt-4 flex flex-wrap gap-2">
+                      <div class="mt-2 flex flex-wrap gap-1">
                         <button
                           onClick={() => handleOpenTerminal(project)}
-                          class="flex-1 rounded bg-purple-600 px-3 py-2 text-sm font-medium text-white hover:bg-purple-700"
+                          class="flex-1 rounded bg-purple-600 px-2 py-1 text-xs font-medium text-white hover:bg-purple-700"
                         >
                           🚀 Trabajar
                         </button>
                         <button
                           onClick={() => setContextProjectId(project.id)}
-                          class="rounded bg-cyan-600 px-3 py-2 text-sm font-medium text-white hover:bg-cyan-700"
+                          class="rounded bg-cyan-600 px-2 py-1 text-xs font-medium text-white hover:bg-cyan-700"
                           aria-label="Contexto"
                           title="Ver contexto del proyecto"
                         >
@@ -508,7 +508,7 @@ const ProjectList: Component<ProjectListProps> = (props) => {
                         </button>
                         <button
                           onClick={() => setJournalProjectId(project.id)}
-                          class="rounded bg-amber-600 px-3 py-2 text-sm font-medium text-white hover:bg-amber-700"
+                          class="rounded bg-amber-600 px-2 py-1 text-xs font-medium text-white hover:bg-amber-700"
                           aria-label="Diario"
                           title="Diario del proyecto"
                         >
@@ -516,7 +516,7 @@ const ProjectList: Component<ProjectListProps> = (props) => {
                         </button>
                         <button
                           onClick={() => setTodosProjectId(project.id)}
-                          class="rounded bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700"
+                          class="rounded bg-green-600 px-2 py-1 text-xs font-medium text-white hover:bg-green-700"
                           aria-label="TODOs"
                           title="Lista de tareas"
                         >
@@ -524,7 +524,7 @@ const ProjectList: Component<ProjectListProps> = (props) => {
                         </button>
                         <button
                           onClick={() => handleBackup(project)}
-                          class="rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                          class="rounded bg-blue-600 px-2 py-1 text-xs font-medium text-white hover:bg-blue-700"
                           aria-label="Crear backup"
                           title="Crear backup - Elegir carpeta"
                         >
@@ -532,7 +532,7 @@ const ProjectList: Component<ProjectListProps> = (props) => {
                         </button>
                         <button
                           onClick={() => handleBackupToMnt(project)}
-                          class="rounded bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+                          class="rounded bg-indigo-600 px-2 py-1 text-xs font-medium text-white hover:bg-indigo-700"
                           aria-label="Backup a disco"
                           title="Backup directo a /mnt/sda1"
                         >
@@ -540,7 +540,7 @@ const ProjectList: Component<ProjectListProps> = (props) => {
                         </button>
                         <button
                           onClick={() => handleSync(project)}
-                          class="rounded bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700"
+                          class="rounded bg-green-600 px-2 py-1 text-xs font-medium text-white hover:bg-green-700"
                           aria-label="Sincronizar"
                           title="Sincronizar con rsync"
                         >
