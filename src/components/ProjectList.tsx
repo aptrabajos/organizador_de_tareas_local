@@ -352,17 +352,22 @@ const ProjectList: Component<ProjectListProps> = (props) => {
               <For each={filteredProjects()}>
                 {(project) => {
                   const sortable = createSortable(project.id);
+                  const transform = () => {
+                    const t = sortable.transform;
+                    if (t) {
+                      return `translate3d(${t.x}px, ${t.y}px, 0)`;
+                    }
+                    return undefined;
+                  };
                   return (
                     <div
-                      use:sortable
+                      ref={sortable.ref}
                       class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md dark:border-gray-700 dark:bg-gray-800"
                       classList={{
                         'opacity-25': sortable.isActiveDraggable,
                       }}
                       style={{
-                        transform: sortable.transform
-                          ? `translate3d(${sortable.transform.x}px, ${sortable.transform.y}px, 0)`
-                          : undefined,
+                        transform: transform(),
                         transition: sortable.isActiveDraggable
                           ? undefined
                           : 'transform 200ms ease',
