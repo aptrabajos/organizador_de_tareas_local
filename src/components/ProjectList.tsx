@@ -449,17 +449,17 @@ const ProjectList: Component<ProjectListProps> = (props) => {
                       </div>
 
                       <Show when={project.notes}>
-                        <div class="mt-3 rounded bg-gray-50 p-2 text-xs text-gray-700 dark:bg-gray-700 dark:text-gray-300">
-                          <p class="font-semibold">📝 Notas:</p>
+                        <div class="mt-2 rounded bg-gray-50 p-1.5 text-xs text-gray-700 dark:bg-gray-700 dark:text-gray-300">
+                          <p class="font-semibold text-xs">📝 Notas:</p>
                           <div
-                            class="prose-xs prose mt-1 max-h-40 max-w-none overflow-y-auto break-words dark:prose-invert"
+                            class="prose-xs prose mt-0.5 max-h-24 max-w-none overflow-y-auto break-words dark:prose-invert"
                             // eslint-disable-next-line solid/no-innerhtml
                             innerHTML={renderMarkdown(project.notes!)}
                           />
                         </div>
                       </Show>
 
-                      <div class="mt-3 flex flex-wrap gap-2">
+                      <div class="mt-2 flex flex-wrap gap-1">
                         <Show when={project.documentation_url}>
                           <button
                             onClick={() => openUrl(project.documentation_url!)}
