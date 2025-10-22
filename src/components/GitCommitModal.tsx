@@ -104,14 +104,16 @@ const GitCommitModal: Component<GitCommitModalProps> = (props) => {
                 Archivos incluidos ({stagedFiles().length}):
               </p>
               <div class="max-h-32 space-y-1 overflow-y-auto">
-                {stagedFiles().map((file) => (
-                  <div class="flex items-center gap-2">
-                    <span class="text-green-600 dark:text-green-400">✓</span>
-                    <code class="text-xs text-gray-600 dark:text-gray-400">
-                      {file}
-                    </code>
-                  </div>
-                ))}
+                <For each={stagedFiles()}>
+                  {(file) => (
+                    <div class="flex items-center gap-2">
+                      <span class="text-green-600 dark:text-green-400">✓</span>
+                      <code class="text-xs text-gray-600 dark:text-gray-400">
+                        {file}
+                      </code>
+                    </div>
+                  )}
+                </For>
               </div>
             </div>
           </Show>
