@@ -604,6 +604,17 @@ pub async fn reorder_pinned_projects(
         .map_err(|e| format!("Error reordering pinned projects: {}", e))
 }
 
+#[tauri::command]
+pub async fn update_project_order(
+    db: State<'_, Database>,
+    project_id: i64,
+    new_order: i64,
+) -> Result<(), String> {
+    println!("↕️ [ORDER] Actualizando orden del proyecto ID: {} a {}", project_id, new_order);
+    db.update_project_order(project_id, new_order)
+        .map_err(|e| format!("Error updating project order: {}", e))
+}
+
 // Git Commands
 #[tauri::command]
 pub async fn get_git_branch(path: String) -> Result<String, String> {
