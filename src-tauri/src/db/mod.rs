@@ -1151,4 +1151,17 @@ impl Database {
 
         Ok(())
     }
+
+    pub fn update_project_order(&self, id: i64, new_order: i64) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+
+        conn.execute(
+            "UPDATE projects
+             SET display_order = ?1
+             WHERE id = ?2",
+            params![new_order, id],
+        )?;
+
+        Ok(())
+    }
 }
