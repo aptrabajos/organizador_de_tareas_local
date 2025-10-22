@@ -194,6 +194,90 @@ When adding new dependencies:
 
 ## Changelog
 
+### 2025-10-22 - v0.3.2 - Optimización de UI y Espacio
+
+**Mejoras de Interfaz y Uso del Espacio:**
+
+Esta versión se enfoca en optimizar el espacio vertical y horizontal para mostrar más proyectos simultáneamente en pantalla.
+
+**Cambios en el Layout Principal:**
+
+- **Cards más compactas**: Reducción de padding de `p-4` → `p-2` en project cards
+- **Imágenes más pequeñas**: Tamaño de miniaturas de `h-16 w-16` → `h-12 w-12`
+- **Tipografía optimizada**:
+  - Títulos: `text-lg` → `text-base`
+  - Descripciones: `text-sm` → `text-xs`
+  - Botones: `px-3 py-2 text-sm` → `px-2 py-1 text-xs`
+- **Espaciado reducido**: Márgenes internos de `mt-3 gap-2` → `mt-2 gap-1`
+- **Grid ampliado**:
+  - Antes: `md:grid-cols-2 lg:grid-cols-3`
+  - Ahora: `md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5`
+  - Agregado `auto-rows-fr` para altura uniforme de cards
+- **Altura fija**: Cards con `min-h-[280px]` y `flex flex-col` para contenido consistente
+
+**Optimización del Espacio Horizontal:**
+
+- **Eliminado contenedor max-width**: Removido `max-w-7xl` de header y main
+- **Padding reducido en header**:
+  - Antes: `px-4 py-4 sm:px-6 lg:px-8`
+  - Ahora: `px-3 py-2 sm:px-4 lg:px-5`
+- **Padding reducido en main**:
+  - Antes: `px-4 py-6 sm:px-6 lg:px-8`
+  - Ahora: `px-2 py-4 sm:px-3 lg:px-4`
+- Las cards ahora ocupan casi todo el ancho disponible de la ventana
+
+**Reorganización del Header:**
+
+- **Nuevo componente `ProjectFilters.tsx`**: Componente reutilizable para filtros
+  - Dropdown de estado (Todos, Activo, Pausado, Completado, Archivado)
+  - Checkbox "📌 Solo favoritos"
+  - Botón "Limpiar filtros" (condicional)
+  - Contador "X de Y proyectos"
+  - Estilos compactos: `text-xs`, `px-2 py-1`
+
+- **Header consolidado en 2 filas**:
+  - **Fila 1**: Título + Botones (Configuración, Estadísticas, Nuevo Proyecto)
+  - **Fila 2**: Barra de búsqueda + Filtros (integrados)
+  - Botones del header más compactos: `px-3 py-1.5 text-sm`
+  - Título responsive: `text-xl sm:text-2xl`
+
+**Arquitectura de Filtros (Parent-Child Communication):**
+
+- `ProjectList.tsx` mantiene el estado interno de los filtros (`statusFilter`, `showPinnedOnly`)
+- Nueva prop `renderFilters` en `ProjectListProps` para comunicación con padre
+- `createEffect` en `ProjectList` que expone filtros hacia `App.tsx`
+- `App.tsx` recibe filtros y los renderiza en el header usando `ProjectFilters`
+- Eliminada barra de filtros duplicada de `ProjectList.tsx`
+
+**Resultado Visual:**
+
+✅ **5 cards visibles** por fila en pantallas grandes (antes 2-3)
+✅ **Ahorro de ~200px verticales** al fusionar barras de búsqueda y filtros en header
+✅ **Márgenes laterales mínimos** para máximo aprovechamiento de ancho
+✅ **Header más compacto** con padding y botones reducidos
+✅ **Interfaz más densa** mostrando más información en menos espacio
+✅ **Altura uniforme** en todas las cards gracias a `auto-rows-fr` y `min-h-[280px]`
+
+**Archivos Creados:**
+
+- `src/components/ProjectFilters.tsx` (67 líneas) - Componente de filtros reutilizable
+
+**Archivos Modificados:**
+
+- `src/App.tsx` - Header consolidado, integración de filtros, padding optimizado
+- `src/components/ProjectList.tsx` - Exportación de filtros, cards compactas, grid ampliado
+- `package.json` - Version 0.3.2
+
+**Compatibilidad:**
+
+✅ Sin cambios en backend (Rust/SQLite)
+✅ Sin cambios en base de datos
+✅ Compatible con v0.3.1 (drag & drop sigue funcionando)
+✅ Dark mode completamente soportado
+✅ Responsive design mantenido
+
+---
+
 ### 2025-10-22 - v0.3.1 - Drag & Drop para Reordenar Proyectos
 
 **Sistema de Reordenamiento Visual:**
