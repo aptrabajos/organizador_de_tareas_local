@@ -362,7 +362,7 @@ const ProjectList: Component<ProjectListProps> = (props) => {
                   return (
                     <div
                       ref={sortable.ref}
-                      class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md dark:border-gray-700 dark:bg-gray-800"
+                      class="rounded-lg border border-gray-200 bg-white p-2 shadow-sm transition-shadow hover:shadow-md dark:border-gray-700 dark:bg-gray-800"
                       classList={{
                         'opacity-25': sortable.isActiveDraggable,
                       }}
@@ -374,7 +374,7 @@ const ProjectList: Component<ProjectListProps> = (props) => {
                       }}
                     >
                       {/* Header con botón de pin y drag handle */}
-                      <div class="mb-2 flex items-start justify-between gap-2">
+                      <div class="mb-1 flex items-start justify-between gap-1">
                         <div class="flex flex-1 items-center gap-2">
                           {/* Drag handle */}
                           <button
