@@ -218,7 +218,7 @@ impl Database {
                     created_at, updated_at, last_opened_at, opened_count, total_time_seconds,
                     status, status_changed_at, is_pinned, pinned_order, display_order
              FROM projects
-             ORDER BY is_pinned DESC, pinned_order ASC, display_order ASC, updated_at DESC"
+             ORDER BY display_order ASC, is_pinned DESC, pinned_order ASC, updated_at DESC"
         )?;
 
         let mut projects = Vec::new();
