@@ -33,6 +33,7 @@ pub struct Project {
     pub status_changed_at: Option<String>,
     pub is_pinned: Option<bool>,
     pub pinned_order: Option<i64>,
+    pub display_order: Option<i64>, // Orden personalizado para drag & drop
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
