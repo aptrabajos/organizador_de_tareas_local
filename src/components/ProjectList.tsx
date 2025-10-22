@@ -548,14 +548,14 @@ const ProjectList: Component<ProjectListProps> = (props) => {
                         </button>
                         <button
                           onClick={() => props.onEdit(project)}
-                          class="rounded border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                          class="rounded border border-gray-300 px-2 py-1 text-xs text-gray-700 hover:bg-gray-50"
                           aria-label="Editar"
                         >
                           ✏️
                         </button>
                         <button
                           onClick={() => props.onDelete(project)}
-                          class="rounded border border-red-300 px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+                          class="rounded border border-red-300 px-2 py-1 text-xs text-red-600 hover:bg-red-50"
                           aria-label="Eliminar"
                         >
                           🗑️
