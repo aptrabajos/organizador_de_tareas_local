@@ -137,6 +137,39 @@ impl Database {
             [],
         );
 
+        // Agregar campo para orden personalizado de las cards
+        let _ = conn.execute(
+            "ALTER TABLE projects ADD COLUMN display_order INTEGER DEFAULT 0",
+            [],
+        );
+
+        // Agregar campos para sistema de grupos de proyectos (v0.4.0)
+        let _ = conn.execute(
+            "ALTER TABLE projects ADD COLUMN parent_id INTEGER",
+            [],
+        );
+
+        let _ = conn.execute(
+            "ALTER TABLE projects ADD COLUMN group_color TEXT",
+            [],
+        );
+
+        let _ = conn.execute(
+            "ALTER TABLE projects ADD COLUMN group_icon TEXT",
+            [],
+        );
+
+        let _ = conn.execute(
+            "ALTER TABLE projects ADD COLUMN is_group_expanded BOOLEAN DEFAULT 1",
+            [],
+        );
+
+        // Crear índice en parent_id para queries eficientes
+        let _ = conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_projects_parent_id ON projects(parent_id)",
+            [],
+        );
+
         // Crear tabla de TODOs por proyecto
         conn.execute(
             "CREATE TABLE IF NOT EXISTS project_todos (
