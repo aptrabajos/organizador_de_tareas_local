@@ -578,6 +578,22 @@ const ProjectList: Component<ProjectListProps> = (props) => {
                         </button>
                       </div>
                     </div>
+                          );
+                        })()
+                      }
+                    >
+                      {/* Render GroupCard para proyectos que son grupos */}
+                      <GroupCard
+                        project={project}
+                        onViewProjects={(group) => {
+                          if (props.onViewGroup) {
+                            props.onViewGroup(group);
+                          }
+                        }}
+                        onEdit={props.onEdit}
+                        onDelete={props.onDelete}
+                      />
+                    </Show>
                   );
                 }}
               </For>
