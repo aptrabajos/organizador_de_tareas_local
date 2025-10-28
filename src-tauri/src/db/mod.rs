@@ -1234,4 +1234,200 @@ impl Database {
 
         Ok(())
     }
+
+    // ==================== MÉTODOS DE GRUPOS DE PROYECTOS (v0.4.0) ====================
+
+    /// Obtener solo proyectos raíz (sin parent_id, grupos principales)
+    pub fn get_root_projects(&self) -> Result<Vec<Project>> {
+        let conn = self.conn.lock().unwrap();
+
+        let mut stmt = conn.prepare(
+            "SELECT id, name, description, local_path, documentation_url, ai_documentation_url, drive_link, notes, image_data,
+                    created_at, updated_at, last_opened_at, opened_count, total_time_seconds,
+                    status, status_changed_at, is_pinned, pinned_order, display_order,
+                    parent_id, group_color, group_icon, is_group_expanded
+             FROM projects
+             WHERE parent_id IS NULL
+             ORDER BY display_order ASC, is_pinned DESC, pinned_order ASC, updated_at DESC"
+        )?;
+
+        let mut projects = Vec::new();
+        let project_rows = stmt.query_map([], |row| {
+            Ok((
+                row.get::<_, i64>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, String>(3)?,
+                row.get::<_, Option<String>>(4)?,
+                row.get::<_, Option<String>>(5)?,
+                row.get::<_, Option<String>>(6)?,
+                row.get::<_, Option<String>>(7)?,
+                row.get::<_, Option<String>>(8)?,
+                row.get::<_, String>(9)?,
+                row.get::<_, String>(10)?,
+                row.get::<_, Option<String>>(11)?,
+                row.get::<_, Option<i64>>(12)?,
+                row.get::<_, Option<i64>>(13)?,
+                row.get::<_, Option<String>>(14)?,
+                row.get::<_, Option<String>>(15)?,
+                row.get::<_, Option<bool>>(16)?,
+                row.get::<_, Option<i64>>(17)?,
+                row.get::<_, Option<i64>>(18)?,
+                row.get::<_, Option<i64>>(19)?,
+                row.get::<_, Option<String>>(20)?,
+                row.get::<_, Option<String>>(21)?,
+                row.get::<_, Option<bool>>(22)?,
+            ))
+        })?
+        .collect::<Result<Vec<_>>>()?;
+
+        for (id, name, description, local_path, documentation_url, ai_documentation_url, drive_link, notes, image_data, created_at, updated_at, last_opened_at, opened_count, total_time_seconds, status, status_changed_at, is_pinned, pinned_order, display_order, parent_id, group_color, group_icon, is_group_expanded) in project_rows {
+            let links = self.get_project_links_internal(id, &conn).unwrap_or_else(|_| Vec::new());
+
+            projects.push(Project {
+                id,
+                name,
+                description,
+                local_path,
+                documentation_url,
+                ai_documentation_url,
+                drive_link,
+                notes,
+                image_data,
+                links: Some(links),
+                created_at,
+                updated_at,
+                last_opened_at,
+                opened_count,
+                total_time_seconds,
+                status,
+                status_changed_at,
+                is_pinned,
+                pinned_order,
+                display_order,
+                parent_id,
+                group_color,
+                group_icon,
+                is_group_expanded,
+            });
+        }
+
+        Ok(projects)
+    }
+
+    /// Obtener subproyectos de un grupo (parent_id = id)
+    pub fn get_subprojects(&self, parent_id: i64) -> Result<Vec<Project>> {
+        let conn = self.conn.lock().unwrap();
+
+        let mut stmt = conn.prepare(
+            "SELECT id, name, description, local_path, documentation_url, ai_documentation_url, drive_link, notes, image_data,
+                    created_at, updated_at, last_opened_at, opened_count, total_time_seconds,
+                    status, status_changed_at, is_pinned, pinned_order, display_order,
+                    parent_id, group_color, group_icon, is_group_expanded
+             FROM projects
+             WHERE parent_id = ?1
+             ORDER BY display_order ASC, name ASC"
+        )?;
+
+        let mut projects = Vec::new();
+        let project_rows = stmt.query_map([parent_id], |row| {
+            Ok((
+                row.get::<_, i64>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, String>(3)?,
+                row.get::<_, Option<String>>(4)?,
+                row.get::<_, Option<String>>(5)?,
+                row.get::<_, Option<String>>(6)?,
+                row.get::<_, Option<String>>(7)?,
+                row.get::<_, Option<String>>(8)?,
+                row.get::<_, String>(9)?,
+                row.get::<_, String>(10)?,
+                row.get::<_, Option<String>>(11)?,
+                row.get::<_, Option<i64>>(12)?,
+                row.get::<_, Option<i64>>(13)?,
+                row.get::<_, Option<String>>(14)?,
+                row.get::<_, Option<String>>(15)?,
+                row.get::<_, Option<bool>>(16)?,
+                row.get::<_, Option<i64>>(17)?,
+                row.get::<_, Option<i64>>(18)?,
+                row.get::<_, Option<i64>>(19)?,
+                row.get::<_, Option<String>>(20)?,
+                row.get::<_, Option<String>>(21)?,
+                row.get::<_, Option<bool>>(22)?,
+            ))
+        })?
+        .collect::<Result<Vec<_>>>()?;
+
+        for (id, name, description, local_path, documentation_url, ai_documentation_url, drive_link, notes, image_data, created_at, updated_at, last_opened_at, opened_count, total_time_seconds, status, status_changed_at, is_pinned, pinned_order, display_order, parent_id, group_color, group_icon, is_group_expanded) in project_rows {
+            let links = self.get_project_links_internal(id, &conn).unwrap_or_else(|_| Vec::new());
+
+            projects.push(Project {
+                id,
+                name,
+                description,
+                local_path,
+                documentation_url,
+                ai_documentation_url,
+                drive_link,
+                notes,
+                image_data,
+                links: Some(links),
+                created_at,
+                updated_at,
+                last_opened_at,
+                opened_count,
+                total_time_seconds,
+                status,
+                status_changed_at,
+                is_pinned,
+                pinned_order,
+                display_order,
+                parent_id,
+                group_color,
+                group_icon,
+                is_group_expanded,
+            });
+        }
+
+        Ok(projects)
+    }
+
+    /// Obtener proyecto con sus hijos
+    pub fn get_project_with_children(&self, id: i64) -> Result<ProjectWithChildren> {
+        let project = self.get_project(id)?;
+        let children = self.get_subprojects(id)?;
+        let subproject_count = children.len() as i64;
+
+        Ok(ProjectWithChildren {
+            project,
+            children,
+            subproject_count,
+        })
+    }
+
+    /// Contar subproyectos de un grupo
+    pub fn count_subprojects(&self, parent_id: i64) -> Result<i64> {
+        let conn = self.conn.lock().unwrap();
+
+        let count: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM projects WHERE parent_id = ?1",
+            params![parent_id],
+            |row| row.get(0),
+        )?;
+
+        Ok(count)
+    }
+
+    /// Asignar proyecto a un grupo (o quitarlo del grupo actual)
+    pub fn assign_project_to_group(&self, child_id: i64, new_parent_id: Option<i64>) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+
+        conn.execute(
+            "UPDATE projects SET parent_id = ?1 WHERE id = ?2",
+            params![new_parent_id, child_id],
+        )?;
+
+        Ok(())
+    }
 }
