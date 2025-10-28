@@ -34,6 +34,11 @@ pub struct Project {
     pub is_pinned: Option<bool>,
     pub pinned_order: Option<i64>,
     pub display_order: Option<i64>, // Orden personalizado para drag & drop
+    // Group/Hierarchy fields (v0.4.0)
+    pub parent_id: Option<i64>, // NULL = grupo raíz, INT = subproyecto
+    pub group_color: Option<String>, // Color hex para identificación visual
+    pub group_icon: Option<String>, // Emoji o nombre de ícono
+    pub is_group_expanded: Option<bool>, // Estado UI: expandido/colapsado
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
