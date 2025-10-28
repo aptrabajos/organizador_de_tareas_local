@@ -36,6 +36,14 @@ export interface Project {
   status_changed_at?: string;
   is_pinned?: boolean;
   pinned_order?: number;
+  // Group/Hierarchy fields (v0.4.0)
+  parent_id?: number | null;
+  group_color?: string;
+  group_icon?: string;
+  is_group_expanded?: boolean;
+  // Computed fields (frontend only)
+  subproject_count?: number;
+  children?: Project[];
 }
 
 export interface ProjectActivity {
