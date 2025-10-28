@@ -80,7 +80,9 @@ const ProjectList: Component<ProjectListProps> = (props) => {
   const [showPinnedOnly, setShowPinnedOnly] = createSignal(false);
 
   // Estado para rastrear qué proyectos son grupos (v0.4.0)
-  const [projectGroups, setProjectGroups] = createSignal<Set<number>>(new Set());
+  const [projectGroups, setProjectGroups] = createSignal<Set<number>>(
+    new Set()
+  );
 
   // Detectar qué proyectos tienen hijos (son grupos)
   createEffect(async () => {
@@ -355,15 +357,25 @@ const ProjectList: Component<ProjectListProps> = (props) => {
             <div class="grid auto-rows-fr gap-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
               <For each={filteredProjects()}>
                 {(project) => {
-                  const sortable = createSortable(project.id);
-                  const transform = () => {
-                    const t = sortable.transform;
-                    if (t) {
-                      return `translate3d(${t.x}px, ${t.y}px, 0)`;
-                    }
-                    return undefined;
-                  };
+                  // Determinar si este proyecto es un grupo (tiene hijos)
+                  const isGroup = () => projectGroups().has(project.id);
+
+                  // Si es un grupo y estamos en vista de grupos, usar GroupCard
                   return (
+                    <Show
+                      when={isGroup() && props.viewMode === 'groups'}
+                      fallback={
+                        // Render regular ProjectCard con drag & drop
+                        (() => {
+                          const sortable = createSortable(project.id);
+                          const transform = () => {
+                            const t = sortable.transform;
+                            if (t) {
+                              return `translate3d(${t.x}px, ${t.y}px, 0)`;
+                            }
+                            return undefined;
+                          };
+                          return (
                     <div
                       ref={sortable.ref}
                       class="flex h-full min-h-[280px] flex-col rounded-lg border border-gray-200 bg-white p-2 shadow-sm transition-shadow hover:shadow-md dark:border-gray-700 dark:bg-gray-800"
