@@ -33,7 +33,8 @@ const AppContent: Component = () => {
   const [filterProps, setFilterProps] = createSignal<any>(null);
 
   onMount(async () => {
-    store.loadProjects();
+    // Cargar proyectos raíz (grupos) por defecto (v0.4.0)
+    store.loadRootProjects();
 
     // Verificar si mostrar welcome screen
     try {
