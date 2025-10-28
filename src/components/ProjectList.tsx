@@ -51,6 +51,9 @@ interface ProjectListProps {
     filteredCount: number;
     totalCount: number;
   }) => void;
+  // Props para sistema de grupos (v0.4.0)
+  viewMode?: 'groups' | 'subprojects'; // Modo de vista actual
+  onViewGroup?: (project: Project) => void; // Callback para navegar a subproyectos
 }
 
 const ProjectList: Component<ProjectListProps> = (props) => {
