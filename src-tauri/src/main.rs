@@ -86,6 +86,12 @@ fn main() {
             commands::select_backup_folder,
             commands::get_shortcuts_config,
             commands::update_shortcuts_config,
+            // Group commands (v0.4.0)
+            commands::get_root_projects,
+            commands::get_subprojects,
+            commands::get_project_with_children,
+            commands::count_subprojects,
+            commands::assign_project_to_group,
         ])
         .run(tauri::generate_context!())
         .expect("Error al ejecutar la aplicación Tauri");
