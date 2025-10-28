@@ -208,8 +208,23 @@ const AppContent: Component = () => {
             </div>
           </div>
 
-          {/* Segunda fila: Búsqueda y Filtros (solo en vista de proyectos) */}
+          {/* Segunda fila: Navegación + Búsqueda y Filtros (solo en vista de proyectos) */}
           <Show when={!showAnalytics()}>
+            {/* Breadcrumb de navegación (v0.4.0) */}
+            <Show when={store.viewMode() === 'subprojects' && store.currentGroup()}>
+              <div class="mt-2 flex items-center gap-2">
+                <button
+                  onClick={() => store.navigateBack()}
+                  class="rounded-lg bg-gray-100 px-3 py-1 text-sm text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                >
+                  ← Volver a Grupos
+                </button>
+                <span class="text-sm text-gray-600 dark:text-gray-400">
+                  / 📁 {store.currentGroup()?.name}
+                </span>
+              </div>
+            </Show>
+
             <div class="mt-2 flex flex-wrap items-center gap-2">
               <div class="min-w-[200px] flex-1">
                 <SearchBar onSearch={handleSearch} value={searchQuery()} />
