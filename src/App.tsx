@@ -105,7 +105,12 @@ const AppContent: Component = () => {
     if (query.trim()) {
       store.searchProjects(query);
     } else {
-      store.loadProjects();
+      // Recargar vista actual según el modo (v0.4.0)
+      if (store.viewMode() === 'groups') {
+        store.loadRootProjects();
+      } else if (store.currentGroup()) {
+        store.loadSubprojects(store.currentGroup()!.id);
+      }
     }
   };
 
