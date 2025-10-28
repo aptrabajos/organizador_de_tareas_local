@@ -1024,3 +1024,51 @@ pub async fn update_shortcuts_config(
     println!("✅ [SHORTCUTS] Configuración actualizada exitosamente");
     Ok(())
 }
+
+// ==================== COMANDOS DE GRUPOS DE PROYECTOS (v0.4.0) ====================
+
+/// Obtener solo proyectos raíz (grupos principales)
+#[tauri::command]
+pub async fn get_root_projects(db: State<'_, Database>) -> Result<Vec<Project>, String> {
+    println!("📁 [GROUPS] Obteniendo proyectos raíz");
+    db.get_root_projects()
+        .map_err(|e| format!("Error getting root projects: {}", e))
+}
+
+/// Obtener subproyectos de un grupo
+#[tauri::command]
+pub async fn get_subprojects(db: State<'_, Database>, parent_id: i64) -> Result<Vec<Project>, String> {
+    println!("📁 [GROUPS] Obteniendo subproyectos del grupo ID: {}", parent_id);
+    db.get_subprojects(parent_id)
+        .map_err(|e| format!("Error getting subprojects: {}", e))
+}
+
+/// Obtener proyecto con sus hijos
+#[tauri::command]
+pub async fn get_project_with_children(
+    db: State<'_, Database>,
+    id: i64,
+) -> Result<ProjectWithChildren, String> {
+    println!("📁 [GROUPS] Obteniendo proyecto con hijos ID: {}", id);
+    db.get_project_with_children(id)
+        .map_err(|e| format!("Error getting project with children: {}", e))
+}
+
+/// Contar subproyectos de un grupo
+#[tauri::command]
+pub async fn count_subprojects(db: State<'_, Database>, parent_id: i64) -> Result<i64, String> {
+    db.count_subprojects(parent_id)
+        .map_err(|e| format!("Error counting subprojects: {}", e))
+}
+
+/// Asignar proyecto a un grupo (o quitarlo si parent_id es null)
+#[tauri::command]
+pub async fn assign_project_to_group(
+    db: State<'_, Database>,
+    child_id: i64,
+    parent_id: Option<i64>,
+) -> Result<(), String> {
+    println!("📁 [GROUPS] Asignando proyecto {} al grupo {:?}", child_id, parent_id);
+    db.assign_project_to_group(child_id, parent_id)
+        .map_err(|e| format!("Error assigning project to group: {}", e))
+}
