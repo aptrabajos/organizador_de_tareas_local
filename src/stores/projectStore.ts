@@ -13,7 +13,9 @@ export function createProjectStore() {
 
   // Estado para navegación de grupos (v0.4.0)
   const [currentGroup, setCurrentGroup] = createSignal<Project | null>(null);
-  const [viewMode, setViewMode] = createSignal<'groups' | 'subprojects'>('groups');
+  const [viewMode, setViewMode] = createSignal<'groups' | 'subprojects'>(
+    'groups'
+  );
 
   async function loadProjects() {
     setIsLoading(true);
@@ -103,6 +105,67 @@ export function createProjectStore() {
     }
   }
 
+  // ==================== FUNCIONES DE GRUPOS (v0.4.0) ====================
+
+  async function loadRootProjects() {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const data = await api.getRootProjects();
+      setProjects(data);
+      setViewMode('groups');
+      setCurrentGroup(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error desconocido');
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  async function loadSubprojects(parentId: number) {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const data = await api.getSubprojects(parentId);
+      setProjects(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error desconocido');
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  async function navigateToGroup(group: Project) {
+    setCurrentGroup(group);
+    setViewMode('subprojects');
+    await loadSubprojects(group.id);
+  }
+
+  async function navigateBack() {
+    setCurrentGroup(null);
+    setViewMode('groups');
+    await loadRootProjects();
+  }
+
+  async function assignToGroup(childId: number, parentId: number | null) {
+    setIsLoading(true);
+    setError(null);
+    try {
+      await api.assignProjectToGroup(childId, parentId);
+      // Recargar la vista actual
+      if (viewMode() === 'groups') {
+        await loadRootProjects();
+      } else if (currentGroup()) {
+        await loadSubprojects(currentGroup()!.id);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error desconocido');
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
   return {
     projects,
     isLoading,
@@ -113,6 +176,14 @@ export function createProjectStore() {
     deleteProject,
     searchProjects,
     openTerminal,
+    // Grupos (v0.4.0)
+    currentGroup,
+    viewMode,
+    loadRootProjects,
+    loadSubprojects,
+    navigateToGroup,
+    navigateBack,
+    assignToGroup,
   };
 }
 
