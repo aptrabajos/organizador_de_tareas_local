@@ -449,6 +449,19 @@ impl Database {
             query_parts.push("image_data = ?");
             params.push(Box::new(image_data));
         }
+        // Group fields (v0.4.0)
+        if let Some(parent_id) = updates.parent_id {
+            query_parts.push("parent_id = ?");
+            params.push(Box::new(parent_id));
+        }
+        if let Some(group_color) = updates.group_color {
+            query_parts.push("group_color = ?");
+            params.push(Box::new(group_color));
+        }
+        if let Some(group_icon) = updates.group_icon {
+            query_parts.push("group_icon = ?");
+            params.push(Box::new(group_icon));
+        }
 
         query_parts.push("updated_at = CURRENT_TIMESTAMP");
         params.push(Box::new(id));
