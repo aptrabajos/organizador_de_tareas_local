@@ -109,6 +109,10 @@ pub struct UpdateProjectDTO {
     pub drive_link: Option<String>,
     pub notes: Option<String>,
     pub image_data: Option<String>,
+    // Group fields (v0.4.0)
+    pub parent_id: Option<i64>,
+    pub group_color: Option<String>,
+    pub group_icon: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
