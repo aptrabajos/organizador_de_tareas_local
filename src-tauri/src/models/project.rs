@@ -68,6 +68,14 @@ pub struct ProjectStats {
     pub recent_activities: Vec<ProjectActivity>,
 }
 
+// Proyecto con sus hijos (subproyectos) para navegación de grupos
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ProjectWithChildren {
+    pub project: Project,
+    pub children: Vec<Project>,
+    pub subproject_count: i64,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct CreateProjectDTO {
     pub name: String,
