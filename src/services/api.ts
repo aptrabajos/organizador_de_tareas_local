@@ -345,3 +345,30 @@ export async function updateShortcutsConfig(
 ): Promise<void> {
   await invoke('update_shortcuts_config', { shortcutsConfig });
 }
+
+// ==================== FUNCIONES PARA GRUPOS DE PROYECTOS (v0.4.0) ====================
+
+export async function getRootProjects(): Promise<Project[]> {
+  return await invoke('get_root_projects');
+}
+
+export async function getSubprojects(parentId: number): Promise<Project[]> {
+  return await invoke('get_subprojects', { parentId });
+}
+
+export async function getProjectWithChildren(
+  id: number
+): Promise<import('../types/project').ProjectWithChildren> {
+  return await invoke('get_project_with_children', { id });
+}
+
+export async function countSubprojects(parentId: number): Promise<number> {
+  return await invoke('count_subprojects', { parentId });
+}
+
+export async function assignProjectToGroup(
+  childId: number,
+  parentId: number | null
+): Promise<void> {
+  await invoke('assign_project_to_group', { childId, parentId });
+}
