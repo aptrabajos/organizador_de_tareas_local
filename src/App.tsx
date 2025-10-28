@@ -211,7 +211,9 @@ const AppContent: Component = () => {
           {/* Segunda fila: Navegación + Búsqueda y Filtros (solo en vista de proyectos) */}
           <Show when={!showAnalytics()}>
             {/* Breadcrumb de navegación (v0.4.0) */}
-            <Show when={store.viewMode() === 'subprojects' && store.currentGroup()}>
+            <Show
+              when={store.viewMode() === 'subprojects' && store.currentGroup()}
+            >
               <div class="mt-2 flex items-center gap-2">
                 <button
                   onClick={() => store.navigateBack()}
@@ -270,8 +272,17 @@ const AppContent: Component = () => {
               onEdit={handleEdit}
               onDelete={handleDelete}
               onOpenTerminal={handleOpenTerminal}
-              onProjectsChanged={() => store.loadProjects()}
+              onProjectsChanged={() => {
+                // Recargar la vista actual (grupos o subproyectos)
+                if (store.viewMode() === 'groups') {
+                  store.loadRootProjects();
+                } else if (store.currentGroup()) {
+                  store.loadSubprojects(store.currentGroup()!.id);
+                }
+              }}
               renderFilters={setFilterProps}
+              viewMode={store.viewMode()}
+              onViewGroup={(group) => store.navigateToGroup(group)}
             />
           </Show>
         </Show>
