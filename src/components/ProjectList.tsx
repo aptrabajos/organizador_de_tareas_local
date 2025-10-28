@@ -15,6 +15,7 @@ import GitCommitModal from './GitCommitModal';
 import ProjectJournal from './ProjectJournal';
 import TodoList from './TodoList';
 import ProjectContext from './ProjectContext';
+import GroupCard from './GroupCard';
 import {
   openUrl,
   createProjectBackup,
@@ -23,6 +24,7 @@ import {
   togglePinProject,
   updateProjectStatus,
   updateProjectOrder,
+  countSubprojects,
 } from '../services/api';
 import { open } from '@tauri-apps/plugin-dialog';
 import { invoke } from '@tauri-apps/api/core';
