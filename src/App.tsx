@@ -75,7 +75,12 @@ const AppContent: Component = () => {
 
     shortcuts.registerHandler('refresh', () => {
       console.log('🎯 [SHORTCUT] Recargar proyectos');
-      store.loadProjects();
+      // Recargar vista actual (v0.4.0)
+      if (store.viewMode() === 'groups') {
+        store.loadRootProjects();
+      } else if (store.currentGroup()) {
+        store.loadSubprojects(store.currentGroup()!.id);
+      }
     });
 
     shortcuts.registerHandler('close_modal', () => {
