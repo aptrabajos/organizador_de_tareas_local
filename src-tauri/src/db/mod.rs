@@ -319,6 +319,10 @@ impl Database {
                 is_pinned,
                 pinned_order,
                 display_order,
+                parent_id,
+                group_color,
+                group_icon,
+                is_group_expanded,
             });
         }
 
@@ -555,6 +559,10 @@ impl Database {
                 is_pinned,
                 pinned_order,
                 display_order,
+                parent_id,
+                group_color,
+                group_icon,
+                is_group_expanded,
             });
         }
 
