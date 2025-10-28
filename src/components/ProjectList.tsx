@@ -79,6 +79,30 @@ const ProjectList: Component<ProjectListProps> = (props) => {
   const [statusFilter, setStatusFilter] = createSignal<string>('all');
   const [showPinnedOnly, setShowPinnedOnly] = createSignal(false);
 
+  // Estado para rastrear qué proyectos son grupos (v0.4.0)
+  const [projectGroups, setProjectGroups] = createSignal<Set<number>>(new Set());
+
+  // Detectar qué proyectos tienen hijos (son grupos)
+  createEffect(async () => {
+    if (props.viewMode === 'groups') {
+      const groupIds = new Set<number>();
+      for (const project of props.projects) {
+        try {
+          const count = await countSubprojects(project.id);
+          if (count > 0) {
+            groupIds.add(project.id);
+          }
+        } catch (err) {
+          console.error('Error contando subproyectos:', err);
+        }
+      }
+      setProjectGroups(groupIds);
+    } else {
+      // En vista de subproyectos, ninguno es grupo (nivel único)
+      setProjectGroups(new Set());
+    }
+  });
+
   // Función para filtrar proyectos
   const filteredProjects = () => {
     let filtered = [...props.projects];
