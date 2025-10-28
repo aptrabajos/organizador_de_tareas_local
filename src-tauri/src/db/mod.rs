@@ -203,7 +203,10 @@ impl Database {
                 project.ai_documentation_url,
                 project.drive_link,
                 project.notes,
-                project.image_data
+                project.image_data,
+                project.parent_id,
+                project.group_color,
+                project.group_icon
             ],
         )?;
 
