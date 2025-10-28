@@ -516,7 +516,9 @@ impl Database {
         let mut stmt = conn.prepare(
             "SELECT id, name, description, local_path, documentation_url, ai_documentation_url, drive_link, notes, image_data,
                     created_at, updated_at, last_opened_at, opened_count, total_time_seconds,
-                    status, status_changed_at, is_pinned, pinned_order, display_order FROM projects
+                    status, status_changed_at, is_pinned, pinned_order, display_order,
+                    parent_id, group_color, group_icon, is_group_expanded
+             FROM projects
              WHERE name LIKE ?1 OR description LIKE ?1 OR local_path LIKE ?1 OR notes LIKE ?1
              ORDER BY display_order ASC, is_pinned DESC, pinned_order ASC, updated_at DESC"
         )?;
@@ -543,12 +545,16 @@ impl Database {
                 row.get::<_, Option<bool>>(16)?,  // is_pinned
                 row.get::<_, Option<i64>>(17)?,  // pinned_order
                 row.get::<_, Option<i64>>(18)?,  // display_order
+                row.get::<_, Option<i64>>(19)?,  // parent_id
+                row.get::<_, Option<String>>(20)?,  // group_color
+                row.get::<_, Option<String>>(21)?,  // group_icon
+                row.get::<_, Option<bool>>(22)?,  // is_group_expanded
             ))
         })?
         .collect::<Result<Vec<_>>>()?;
 
         // Para cada proyecto, obtener sus enlaces
-        for (id, name, description, local_path, documentation_url, ai_documentation_url, drive_link, notes, image_data, created_at, updated_at, last_opened_at, opened_count, total_time_seconds, status, status_changed_at, is_pinned, pinned_order, display_order) in project_rows {
+        for (id, name, description, local_path, documentation_url, ai_documentation_url, drive_link, notes, image_data, created_at, updated_at, last_opened_at, opened_count, total_time_seconds, status, status_changed_at, is_pinned, pinned_order, display_order, parent_id, group_color, group_icon, is_group_expanded) in project_rows {
             let links = self.get_project_links_internal(id, &conn).unwrap_or_else(|_| Vec::new());
 
             projects.push(Project {
