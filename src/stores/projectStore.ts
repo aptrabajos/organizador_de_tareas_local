@@ -11,6 +11,10 @@ export function createProjectStore() {
   const [isLoading, setIsLoading] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
 
+  // Estado para navegación de grupos (v0.4.0)
+  const [currentGroup, setCurrentGroup] = createSignal<Project | null>(null);
+  const [viewMode, setViewMode] = createSignal<'groups' | 'subprojects'>('groups');
+
   async function loadProjects() {
     setIsLoading(true);
     setError(null);
