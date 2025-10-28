@@ -63,6 +63,13 @@ export interface ProjectStats {
   recent_activities: ProjectActivity[];
 }
 
+// Proyecto con sus hijos (v0.4.0)
+export interface ProjectWithChildren {
+  project: Project;
+  children: Project[];
+  subproject_count: number;
+}
+
 export interface CreateProjectDTO {
   name: string;
   description: string;
@@ -72,6 +79,10 @@ export interface CreateProjectDTO {
   drive_link?: string;
   notes?: string;
   image_data?: string;
+  // Group fields (v0.4.0)
+  parent_id?: number | null;
+  group_color?: string;
+  group_icon?: string;
 }
 
 export interface UpdateProjectDTO {
@@ -83,6 +94,10 @@ export interface UpdateProjectDTO {
   drive_link?: string;
   notes?: string;
   image_data?: string;
+  // Group fields (v0.4.0)
+  parent_id?: number | null;
+  group_color?: string;
+  group_icon?: string;
 }
 
 export interface ProjectAttachment {
