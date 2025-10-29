@@ -32,8 +32,15 @@ const GroupCard: Component<GroupCardProps> = (props) => {
 
   return (
     <div
+      ref={droppable.ref}
       class="flex h-full min-h-[280px] flex-col rounded-lg border-2 bg-white p-2 shadow-sm transition-all hover:shadow-md dark:bg-gray-800"
-      style={{ 'border-color': borderColor() }}
+      classList={{
+        'ring-4 ring-offset-2 scale-105': droppable.isActiveDroppable, // Feedback visual al arrastrar sobre el grupo
+      }}
+      style={{
+        'border-color': borderColor(),
+        'ring-color': droppable.isActiveDroppable ? borderColor() : undefined,
+      }}
     >
       {/* Header con icono del grupo */}
       <div class="mb-2 flex items-start justify-between">
