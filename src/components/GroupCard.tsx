@@ -13,6 +13,9 @@ interface GroupCardProps {
 
 const GroupCard: Component<GroupCardProps> = (props) => {
   const [subprojectCount, setSubprojectCount] = createSignal(0);
+  const [showSubprojects, setShowSubprojects] = createSignal(false);
+  const [subprojects, setSubprojects] = createSignal<Project[]>([]);
+  const [loadingSubprojects, setLoadingSubprojects] = createSignal(false);
 
   // v0.4.0 - Hacer el GroupCard droppable para drag & drop
   const droppable = createDroppable(props.project.id);
@@ -25,6 +28,22 @@ const GroupCard: Component<GroupCardProps> = (props) => {
       console.error('Error counting subprojects:', err);
     }
   });
+
+  // Cargar subproyectos cuando se expande la lista
+  const toggleSubprojects = async () => {
+    if (!showSubprojects() && subprojects().length === 0) {
+      setLoadingSubprojects(true);
+      try {
+        const projects = await getSubprojects(props.project.id);
+        setSubprojects(projects);
+      } catch (err) {
+        console.error('Error loading subprojects:', err);
+      } finally {
+        setLoadingSubprojects(false);
+      }
+    }
+    setShowSubprojects(!showSubprojects());
+  };
 
   // Color por defecto si no hay group_color
   const borderColor = () => props.project.group_color || '#3B82F6';
