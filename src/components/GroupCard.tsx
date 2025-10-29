@@ -11,6 +11,28 @@ interface GroupCardProps {
   onDropProject?: (projectId: number, groupId: number) => void; // v0.4.0 - Drag & Drop
 }
 
+// Constantes para colores y estilos
+const DEFAULT_GROUP_COLOR = '#3B82F6';
+const COLOR_OPACITY = '20'; // Para backgrounds translúcidos
+
+// Utilidad para obtener clases de estado
+const getStatusClasses = (status?: string): string => {
+  switch (status) {
+    case 'activo':
+      return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
+    case 'pausado':
+      return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200';
+    case 'completado':
+      return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
+    default:
+      return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200';
+  }
+};
+
+// Utilidad para capitalizar primera letra
+const capitalize = (str: string): string =>
+  str.charAt(0).toUpperCase() + str.slice(1);
+
 const GroupCard: Component<GroupCardProps> = (props) => {
   const [subprojectCount, setSubprojectCount] = createSignal(0);
   const [showSubprojects, setShowSubprojects] = createSignal(false);
@@ -19,6 +41,11 @@ const GroupCard: Component<GroupCardProps> = (props) => {
 
   // v0.4.0 - Hacer el GroupCard droppable para drag & drop
   const droppable = createDroppable(props.project.id);
+
+  // Computed values para lógica reutilizable
+  const borderColor = () => props.project.group_color || DEFAULT_GROUP_COLOR;
+  const hasSubprojects = () => subprojectCount() > 0;
+  const badgeBackgroundColor = () => `${borderColor()}${COLOR_OPACITY}`;
 
   onMount(async () => {
     try {
