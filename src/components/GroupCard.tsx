@@ -96,25 +96,67 @@ const GroupCard: Component<GroupCardProps> = (props) => {
         {props.project.description}
       </p>
 
-      {/* Badge de contador */}
+      {/* Badge de contador clickeable para expandir/colapsar */}
       <div class="mb-2">
-        <span
-          class="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium"
-          style={{
-            'background-color': borderColor() + '20',
-            color: borderColor(),
-          }}
+        <Show
+          when={hasSubprojects()}
+          fallback={
+            <span
+              class="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium"
+              style={{
+                'background-color': borderColor() + '20',
+                color: borderColor(),
+              }}
+            >
+              📂 Sin proyectos
+            </span>
+          }
         >
-          {hasSubprojects() ? (
-            <>
-              📊 {subprojectCount()}{' '}
-              {subprojectCount() === 1 ? 'proyecto' : 'proyectos'}
-            </>
-          ) : (
-            <>📂 Sin proyectos</>
-          )}
-        </span>
+          <button
+            onClick={toggleSubprojects}
+            class="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium transition-all hover:brightness-90"
+            style={{
+              'background-color': borderColor() + '20',
+              color: borderColor(),
+            }}
+            title={
+              showSubprojects()
+                ? 'Ocultar subproyectos'
+                : 'Mostrar subproyectos'
+            }
+          >
+            {showSubprojects() ? '▼' : '▶'} 📊 {subprojectCount()}{' '}
+            {subprojectCount() === 1 ? 'proyecto' : 'proyectos'}
+          </button>
+        </Show>
       </div>
+
+      {/* Lista expandible de subproyectos */}
+      <Show when={showSubprojects()}>
+        <div class="mb-2 max-h-32 overflow-y-auto rounded border border-gray-200 bg-gray-50 p-2 dark:border-gray-600 dark:bg-gray-700">
+          <Show
+            when={!loadingSubprojects()}
+            fallback={
+              <p class="text-center text-xs text-gray-500 dark:text-gray-400">
+                Cargando...
+              </p>
+            }
+          >
+            <ul class="space-y-1">
+              <For each={subprojects()}>
+                {(subproject) => (
+                  <li class="flex items-center gap-2 text-xs">
+                    <span class="text-gray-400">•</span>
+                    <span class="truncate text-gray-700 dark:text-gray-300">
+                      {subproject.name}
+                    </span>
+                  </li>
+                )}
+              </For>
+            </ul>
+          </Show>
+        </div>
+      </Show>
 
       {/* Tags */}
       {props.project.notes && (
