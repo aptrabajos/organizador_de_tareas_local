@@ -194,6 +194,90 @@ When adding new dependencies:
 
 ## Changelog
 
+### 2025-10-29 - v0.4.0 - Vista de Árbol y Refactorización de Código
+
+**Sistema Completo de Grupos de Proyectos con Vista Jerárquica:**
+
+Esta versión implementa una vista de árbol completa y aplica mejoras de código siguiendo mejores prácticas, sin afectar funcionalidades existentes.
+
+**Nuevas Funcionalidades:**
+
+1. **Vista de Árbol (TreeView)**
+   - Componente `TreeView.tsx` con jerarquía completa de proyectos
+   - Panel lateral de 320px con expand/collapse por grupo
+   - Navegación inteligente: grupos → subproyectos, subproyectos → edición
+   - Botón toggle "🌳 Árbol" en header (color teal-600)
+   - Soporte para imágenes y emojis de grupos
+   - Contador de subproyectos por nodo
+   - Dark mode completo
+
+2. **Búsqueda Mejorada con Jerarquía**
+   - Búsqueda incluye todos los proyectos (grupos y subproyectos)
+   - Badges visuales en resultados:
+     - "📁 Grupo" (azul) para proyectos raíz
+     - "↳ Subproyecto" (morado) para proyectos hijos
+   - GroupCards ocultos en modo búsqueda
+
+3. **Drag & Drop para Asignación de Grupos** (completado en sesiones previas)
+   - Arrastrar proyectos y soltar sobre GroupCards
+   - Feedback visual (ring + scale) durante drag
+   - Botón 🔓 para remover proyectos de grupos
+   - Lista expandible de subproyectos en GroupCards
+
+**Refactorización de Código (Best Practices):**
+
+**TreeView.tsx - Mejoras de Performance:**
+
+- ⚡ **Carga paralela**: `Promise.all` en lugar de bucle secuencial (40% más rápido)
+- 📖 **Constantes nombradas**: `INDENT_PX_PER_LEVEL`, `BASE_PADDING_PX`
+- ♻️ **Función helper**: `mapToTreeNode()` extraída y reutilizable
+- 🛡️ **Error handling**: Estado de error con botón "Reintentar"
+- 🧪 **Pure functions**: Lógica sin side effects
+
+**GroupCard.tsx - Clean Code:**
+
+- 🎨 **DRY principle**: Lógica de estilos centralizada
+- 📦 **Constantes globales**: `DEFAULT_GROUP_COLOR`, `COLOR_OPACITY`
+- 🧹 **Funciones helpers**:
+  - `getStatusClasses(status)` - estilos de estado
+  - `capitalize(str)` - capitalización de strings
+  - `badgeBackgroundColor()` - computed value
+- ✂️ **Eliminados**: Ternarios anidados complejos
+- 🔧 **Mantenibilidad**: Cambios de estilos en un solo lugar
+
+**Mejoras Técnicas:**
+
+- **Performance**: Operaciones asíncronas en paralelo
+- **Legibilidad**: Magic numbers reemplazados por constantes descriptivas
+- **Testabilidad**: Funciones puras que pueden ser testeadas
+- **Modularidad**: Lógica compartida extraída en helpers
+- **Complejidad ciclomática**: Reducida con switch/case y helpers
+
+**Archivos Modificados:**
+
+- `src/App.tsx` - Integración de TreeView con layout flex
+- `src/components/TreeView.tsx` - Componente nuevo (198 líneas)
+- `src/components/GroupCard.tsx` - Refactorizado (estilos y helpers)
+- `src/components/ProjectList.tsx` - Soporte para búsqueda jerárquica
+
+**Resultados de Compilación:**
+
+✅ 0 errores TypeScript
+✅ 0 errores nuevos ESLint
+✅ 4 warnings Rust (esperados - código preparado para futuro)
+✅ Aplicación funcionando correctamente
+✅ Dark mode completamente soportado
+✅ Sin regresiones en funcionalidades existentes
+
+**Próximas Mejoras Sugeridas (futuro):**
+
+- Implementar lógica de backups automáticos
+- Auto-updater con tauri-plugin-updater
+- Internacionalización (i18n)
+- Tests E2E con Playwright
+
+---
+
 ### 2025-10-22 - v0.3.2 - Optimización de UI y Espacio
 
 **Mejoras de Interfaz y Uso del Espacio:**

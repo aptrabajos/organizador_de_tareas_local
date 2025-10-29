@@ -1,7 +1,7 @@
 {
   "name": "gestor-proyectos",
-  "version": "0.3.2",
-  "description": "Gestor de proyectos multiplataforma (Linux/Windows) con UI optimizada",
+  "version": "0.4.0",
+  "description": "Gestor de proyectos multiplataforma (Linux/Windows) con vista de árbol jerárquica",
   "type": "module",
   "scripts": {
     "dev": "vite",
