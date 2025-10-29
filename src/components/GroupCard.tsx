@@ -153,7 +153,7 @@ const GroupCard: Component<GroupCardProps> = (props) => {
             onClick={toggleSubprojects}
             class="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium transition-all hover:brightness-90"
             style={{
-              'background-color': borderColor() + '20',
+              'background-color': badgeBackgroundColor(),
               color: borderColor(),
             }}
             title={
