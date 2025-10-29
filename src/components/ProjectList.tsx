@@ -214,12 +214,18 @@ const ProjectList: Component<ProjectListProps> = (props) => {
         duration: 3000,
       });
 
-      // Refrescar lista de proyectos
+      // Actualizar el set de grupos inmediatamente para feedback visual
+      const currentGroups = new Set(projectGroups());
+      currentGroups.add(groupId);
+      setProjectGroups(currentGroups);
+
+      // Refrescar lista de proyectos (esto recargará desde la BD)
       if (props.onProjectsChanged) {
         props.onProjectsChanged();
       }
     } catch (error) {
       console.error('Error al asignar proyecto a grupo:', error);
+      toast.error('Error al asignar proyecto al grupo');
       throw error;
     }
   };
