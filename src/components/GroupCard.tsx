@@ -74,7 +74,8 @@ const GroupCard: Component<GroupCardProps> = (props) => {
         >
           {hasSubprojects() ? (
             <>
-              📊 {subprojectCount()} {subprojectCount() === 1 ? 'proyecto' : 'proyectos'}
+              📊 {subprojectCount()}{' '}
+              {subprojectCount() === 1 ? 'proyecto' : 'proyectos'}
             </>
           ) : (
             <>📂 Sin proyectos</>
@@ -85,11 +86,13 @@ const GroupCard: Component<GroupCardProps> = (props) => {
       {/* Tags */}
       {props.project.notes && (
         <div class="mb-2 flex flex-wrap gap-1">
-          {props.project.notes.split(',').slice(0, 3).map((tag) => (
-            <span class="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-600 dark:bg-gray-700 dark:text-gray-300">
-              {tag.trim()}
-            </span>
-          ))}
+          <For each={props.project.notes
+            .split(',')
+            .slice(0, 3)}>{(tag) => (
+              <span class="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-600 dark:bg-gray-700 dark:text-gray-300">
+                {tag.trim()}
+              </span>
+            )}</For>
         </div>
       )}
 
@@ -107,7 +110,8 @@ const GroupCard: Component<GroupCardProps> = (props) => {
                     : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
             }`}
           >
-            {props.project.status.charAt(0).toUpperCase() + props.project.status.slice(1)}
+            {props.project.status.charAt(0).toUpperCase() +
+              props.project.status.slice(1)}
           </span>
         </div>
       )}

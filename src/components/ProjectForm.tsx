@@ -17,6 +17,7 @@ export interface ProjectFormData {
   drive_link?: string;
   notes?: string;
   image_data?: string;
+  parent_id?: number | null; // v0.4.0 - ID del grupo padre (opcional)
 }
 
 const ProjectForm: Component<ProjectFormProps> = (props) => {
