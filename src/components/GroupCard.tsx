@@ -212,18 +212,9 @@ const GroupCard: Component<GroupCardProps> = (props) => {
       {props.project.status && (
         <div class="mb-2">
           <span
-            class={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${
-              props.project.status === 'activo'
-                ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                : props.project.status === 'pausado'
-                  ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-                  : props.project.status === 'completado'
-                    ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-                    : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
-            }`}
+            class={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${getStatusClasses(props.project.status)}`}
           >
-            {props.project.status.charAt(0).toUpperCase() +
-              props.project.status.slice(1)}
+            {capitalize(props.project.status)}
           </span>
         </div>
       )}
