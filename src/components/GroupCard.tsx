@@ -1,7 +1,7 @@
-import { Component, createSignal, onMount, For } from 'solid-js';
+import { Component, createSignal, onMount, For, Show } from 'solid-js';
 import { createDroppable } from '@thisbeyond/solid-dnd';
 import type { Project } from '../types/project';
-import { countSubprojects } from '../services/api';
+import { countSubprojects, getSubprojects } from '../services/api';
 
 interface GroupCardProps {
   project: Project;
