@@ -11,9 +11,21 @@ interface TreeNode extends Project {
   expanded?: boolean;
 }
 
+// Constantes para evitar magic numbers
+const INDENT_PX_PER_LEVEL = 24;
+const BASE_PADDING_PX = 8;
+
+// Utilidad para mapear proyectos a TreeNodes
+const mapToTreeNode = (project: Project, children: Project[] = []): TreeNode => ({
+  ...project,
+  children: children.map((child) => ({ ...child, children: [] })),
+  expanded: false,
+});
+
 const TreeView: Component<TreeViewProps> = (props) => {
   const [treeData, setTreeData] = createSignal<TreeNode[]>([]);
   const [loading, setLoading] = createSignal(true);
+  const [error, setError] = createSignal<string | null>(null);
 
   onMount(async () => {
     await loadTree();
@@ -21,22 +33,21 @@ const TreeView: Component<TreeViewProps> = (props) => {
 
   const loadTree = async () => {
     setLoading(true);
+    setError(null);
     try {
       const roots = await getRootProjects();
-      const tree: TreeNode[] = [];
 
-      for (const root of roots) {
+      // Performance: Cargar todos los subproyectos en paralelo con Promise.all
+      const treePromises = roots.map(async (root) => {
         const children = await getSubprojects(root.id);
-        tree.push({
-          ...root,
-          children: children.map((child) => ({ ...child, children: [] })),
-          expanded: false,
-        });
-      }
+        return mapToTreeNode(root, children);
+      });
 
+      const tree = await Promise.all(treePromises);
       setTreeData(tree);
     } catch (err) {
       console.error('Error loading tree:', err);
+      setError('Error al cargar el árbol de proyectos');
     } finally {
       setLoading(false);
     }
