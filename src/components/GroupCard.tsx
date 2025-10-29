@@ -63,10 +63,23 @@ const GroupCard: Component<GroupCardProps> = (props) => {
           : undefined,
       }}
     >
-      {/* Header con icono del grupo */}
+      {/* Header con imagen/ícono del grupo y título */}
       <div class="mb-2 flex items-start justify-between">
         <div class="flex items-center gap-2">
-          <span class="text-3xl">{props.project.group_icon || '📁'}</span>
+          {/* Mostrar imagen si existe, sino mostrar ícono del grupo */}
+          <Show
+            when={props.project.image_data}
+            fallback={
+              <span class="text-3xl">{props.project.group_icon || '📁'}</span>
+            }
+          >
+            <img
+              src={props.project.image_data}
+              alt={props.project.name}
+              class="h-12 w-12 flex-shrink-0 rounded-lg border-2 object-cover"
+              style={{ 'border-color': borderColor() }}
+            />
+          </Show>
           <div class="flex-1">
             <h3 class="line-clamp-2 text-base font-semibold text-gray-900 dark:text-white">
               {props.project.name}
