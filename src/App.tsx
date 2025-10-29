@@ -200,6 +200,12 @@ const AppContent: Component = () => {
             </h1>
             <div class="flex gap-2">
               <button
+                onClick={() => setShowTreeView(!showTreeView())}
+                class="rounded-lg bg-teal-600 px-3 py-1.5 text-sm text-white hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 dark:bg-teal-500 dark:hover:bg-teal-600"
+              >
+                🌳 {showTreeView() ? 'Ocultar' : 'Árbol'}
+              </button>
+              <button
                 onClick={() => setShowSettings(true)}
                 class="rounded-lg bg-gray-600 px-3 py-1.5 text-sm text-white hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 dark:bg-gray-500 dark:hover:bg-gray-600"
               >
