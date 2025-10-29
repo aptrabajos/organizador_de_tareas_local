@@ -207,6 +207,27 @@ const ProjectList: Component<ProjectListProps> = (props) => {
     if (activeId === overId) return;
 
     const projects = filteredProjects();
+    const draggedProject = projects.find((p) => p.id === activeId);
+    const targetProject = projects.find((p) => p.id === overId);
+
+    if (!draggedProject || !targetProject) return;
+
+    // v0.4.0 - Detectar si el target es un grupo (tiene hijos)
+    const isTargetGroup = projectGroups().has(overId);
+
+    if (isTargetGroup && props.viewMode === 'groups') {
+      // Caso: Arrastrar proyecto sobre un GroupCard para convertirlo en subproyecto
+      try {
+        await handleDropOnGroup(activeId, overId);
+        return;
+      } catch (error) {
+        console.error('Error al asignar proyecto a grupo:', error);
+        toast.error('Error al asignar proyecto al grupo');
+        return;
+      }
+    }
+
+    // Caso normal: Reordenamiento de proyectos en la lista
     const oldIndex = projects.findIndex((p) => p.id === activeId);
     const newIndex = projects.findIndex((p) => p.id === overId);
 
