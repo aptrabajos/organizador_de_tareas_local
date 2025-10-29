@@ -161,16 +161,32 @@ const TreeView: Component<TreeViewProps> = (props) => {
           </p>
         }
       >
+        {/* Mostrar error si existe */}
         <Show
-          when={treeData().length > 0}
+          when={error()}
           fallback={
-            <p class="text-center text-gray-500 dark:text-gray-400">
-              No hay proyectos
-            </p>
+            <Show
+              when={treeData().length > 0}
+              fallback={
+                <p class="text-center text-gray-500 dark:text-gray-400">
+                  No hay proyectos
+                </p>
+              }
+            >
+              <div class="space-y-1">
+                <For each={treeData()}>{(node) => renderNode(node)}</For>
+              </div>
+            </Show>
           }
         >
-          <div class="space-y-1">
-            <For each={treeData()}>{(node) => renderNode(node)}</For>
+          <div class="rounded-lg bg-red-50 p-3 text-center dark:bg-red-900/20">
+            <p class="text-sm text-red-700 dark:text-red-300">{error()}</p>
+            <button
+              onClick={loadTree}
+              class="mt-2 text-xs text-red-600 underline hover:text-red-800 dark:text-red-400 dark:hover:text-red-200"
+            >
+              Reintentar
+            </button>
           </div>
         </Show>
       </Show>
