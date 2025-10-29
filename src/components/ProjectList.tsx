@@ -439,7 +439,11 @@ const ProjectList: Component<ProjectListProps> = (props) => {
                   // Si es un grupo y estamos en vista de grupos (sin búsqueda), usar GroupCard
                   return (
                     <Show
-                      when={isGroup() && props.viewMode === 'groups' && !props.searchActive}
+                      when={
+                        isGroup() &&
+                        props.viewMode === 'groups' &&
+                        !props.searchActive
+                      }
                       fallback={
                         // Render regular ProjectCard con drag & drop
                         (() => {
@@ -531,6 +535,23 @@ const ProjectList: Component<ProjectListProps> = (props) => {
                                   <p class="mt-0.5 text-xs text-gray-600 dark:text-gray-300">
                                     {project.description}
                                   </p>
+                                  {/* Badge indicando jerarquía en búsqueda */}
+                                  <Show when={props.searchActive}>
+                                    <Show
+                                      when={project.parent_id}
+                                      fallback={
+                                        <Show when={isGroup()}>
+                                          <span class="mt-1 inline-block rounded bg-blue-100 px-1.5 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-900 dark:text-blue-200">
+                                            📁 Grupo
+                                          </span>
+                                        </Show>
+                                      }
+                                    >
+                                      <span class="mt-1 inline-block rounded bg-purple-100 px-1.5 py-0.5 text-xs font-medium text-purple-700 dark:bg-purple-900 dark:text-purple-200">
+                                        ↳ Subproyecto
+                                      </span>
+                                    </Show>
+                                  </Show>
                                 </div>
                               </div>
 
