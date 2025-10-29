@@ -436,10 +436,10 @@ const ProjectList: Component<ProjectListProps> = (props) => {
                   // Determinar si este proyecto es un grupo (tiene hijos)
                   const isGroup = () => projectGroups().has(project.id);
 
-                  // Si es un grupo y estamos en vista de grupos, usar GroupCard
+                  // Si es un grupo y estamos en vista de grupos (sin búsqueda), usar GroupCard
                   return (
                     <Show
-                      when={isGroup() && props.viewMode === 'groups'}
+                      when={isGroup() && props.viewMode === 'groups' && !props.searchActive}
                       fallback={
                         // Render regular ProjectCard con drag & drop
                         (() => {
