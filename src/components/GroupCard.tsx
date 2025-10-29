@@ -39,7 +39,9 @@ const GroupCard: Component<GroupCardProps> = (props) => {
       }}
       style={{
         'border-color': borderColor(),
-        'ring-color': droppable.isActiveDroppable ? borderColor() : undefined,
+        '--tw-ring-color': droppable.isActiveDroppable
+          ? borderColor()
+          : undefined,
       }}
     >
       {/* Header con icono del grupo */}
