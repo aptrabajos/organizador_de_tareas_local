@@ -293,6 +293,7 @@ const AppContent: Component = () => {
               renderFilters={setFilterProps}
               viewMode={store.viewMode()}
               onViewGroup={(group) => store.navigateToGroup(group)}
+              searchActive={searchQuery().trim().length > 0}
             />
           </Show>
         </Show>
