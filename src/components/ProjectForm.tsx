@@ -224,6 +224,37 @@ const ProjectForm: Component<ProjectFormProps> = (props) => {
         />
       </div>
 
+      {/* v0.4.0 - Selector de grupo padre */}
+      <div>
+        <label
+          for="parent_id"
+          class="block text-sm font-medium text-gray-700 dark:text-gray-300"
+        >
+          📁 Grupo Padre (opcional)
+        </label>
+        <select
+          id="parent_id"
+          value={parentId() || ''}
+          onChange={(e) => {
+            const value = e.currentTarget.value;
+            setParentId(value ? Number(value) : null);
+          }}
+          class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400 dark:focus:ring-blue-800"
+        >
+          <option value="">Sin grupo (proyecto independiente)</option>
+          <For each={availableGroups()}>
+            {(group) => (
+              <option value={group.id}>
+                {group.group_icon || '📁'} {group.name}
+              </option>
+            )}
+          </For>
+        </select>
+        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+          Selecciona un grupo para agregar este proyecto como subproyecto
+        </p>
+      </div>
+
       <div>
         <label
           for="documentation_url"
