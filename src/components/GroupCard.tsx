@@ -14,6 +14,9 @@ interface GroupCardProps {
 const GroupCard: Component<GroupCardProps> = (props) => {
   const [subprojectCount, setSubprojectCount] = createSignal(0);
 
+  // v0.4.0 - Hacer el GroupCard droppable para drag & drop
+  const droppable = createDroppable(props.project.id);
+
   onMount(async () => {
     try {
       const count = await countSubprojects(props.project.id);
