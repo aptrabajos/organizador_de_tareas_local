@@ -10,6 +10,7 @@ import Analytics from './components/Analytics';
 import Settings from './components/Settings';
 import WelcomeScreen from './components/WelcomeScreen';
 import ProjectFilters from './components/ProjectFilters';
+import TreeView from './components/TreeView';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { ShortcutsProvider, useShortcuts } from './contexts/ShortcutsContext';
 import type { Project } from './types/project';
