@@ -1,6 +1,7 @@
-import { Component, createSignal, Show } from 'solid-js';
+import { Component, createSignal, Show, onMount, For } from 'solid-js';
 import type { Project } from '../types/project';
 import MarkdownEditor from './MarkdownEditor';
+import { getRootProjects } from '../services/api';
 
 interface ProjectFormProps {
   project?: Project;
