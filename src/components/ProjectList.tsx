@@ -590,6 +590,17 @@ const ProjectList: Component<ProjectListProps> = (props) => {
                                 >
                                   🚀 Trabajar
                                 </button>
+                                {/* v0.4.0 - Botón para sacar proyecto del grupo (solo en vista de subproyectos) */}
+                                <Show when={props.viewMode === 'subprojects'}>
+                                  <button
+                                    onClick={() => handleRemoveFromGroup(project)}
+                                    class="rounded bg-orange-600 px-2 py-1 text-xs font-medium text-white hover:bg-orange-700"
+                                    aria-label="Sacar del grupo"
+                                    title="Sacar este proyecto del grupo"
+                                  >
+                                    🔓
+                                  </button>
+                                </Show>
                                 <button
                                   onClick={() =>
                                     setContextProjectId(project.id)
