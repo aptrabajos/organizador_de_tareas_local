@@ -198,6 +198,33 @@ const ProjectList: Component<ProjectListProps> = (props) => {
     }
   };
 
+  // v0.4.0 - Handler para cuando se suelta un proyecto sobre un GroupCard
+  const handleDropOnGroup = async (projectId: number, groupId: number) => {
+    const project = filteredProjects().find((p) => p.id === projectId);
+    const group = filteredProjects().find((p) => p.id === groupId);
+
+    if (!project || !group) return;
+
+    try {
+      // Usar el comando assign_project_to_group de la API
+      const { assignProjectToGroup } = await import('../services/api');
+      await assignProjectToGroup(projectId, groupId);
+
+      toast.success(
+        `✅ "${project.name}" agregado al grupo "${group.name}"`,
+        { duration: 3000 }
+      );
+
+      // Refrescar lista de proyectos
+      if (props.onProjectsChanged) {
+        props.onProjectsChanged();
+      }
+    } catch (error) {
+      console.error('Error al asignar proyecto a grupo:', error);
+      throw error;
+    }
+  };
+
   const handleDragEnd = async ({ draggable, droppable }: any) => {
     if (!droppable) return;
 
