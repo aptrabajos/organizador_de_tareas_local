@@ -54,6 +54,7 @@ interface ProjectListProps {
   // Props para sistema de grupos (v0.4.0)
   viewMode?: 'groups' | 'subprojects'; // Modo de vista actual
   onViewGroup?: (project: Project) => void; // Callback para navegar a subproyectos
+  searchActive?: boolean; // Indica si hay una búsqueda activa (mostrar todos los resultados)
 }
 
 const ProjectList: Component<ProjectListProps> = (props) => {
