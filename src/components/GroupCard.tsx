@@ -141,7 +141,7 @@ const GroupCard: Component<GroupCardProps> = (props) => {
             <span
               class="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium"
               style={{
-                'background-color': borderColor() + '20',
+                'background-color': badgeBackgroundColor(),
                 color: borderColor(),
               }}
             >
