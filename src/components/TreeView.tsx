@@ -16,7 +16,10 @@ const INDENT_PX_PER_LEVEL = 24;
 const BASE_PADDING_PX = 8;
 
 // Utilidad para mapear proyectos a TreeNodes
-const mapToTreeNode = (project: Project, children: Project[] = []): TreeNode => ({
+const mapToTreeNode = (
+  project: Project,
+  children: Project[] = []
+): TreeNode => ({
   ...project,
   children: children.map((child) => ({ ...child, children: [] })),
   expanded: false,
@@ -66,13 +69,13 @@ const TreeView: Component<TreeViewProps> = (props) => {
 
   const renderNode = (node: TreeNode, level: number = 0) => {
     const hasChildren = node.children && node.children.length > 0;
-    const indent = level * 24; // 24px por nivel
+    const indent = level * INDENT_PX_PER_LEVEL;
 
     return (
       <div>
         <div
           class="group flex cursor-pointer items-center gap-2 rounded-lg py-2 pl-2 pr-2 hover:bg-gray-100 dark:hover:bg-gray-700"
-          style={{ 'padding-left': `${indent + 8}px` }}
+          style={{ 'padding-left': `${indent + BASE_PADDING_PX}px` }}
           onClick={() => {
             if (hasChildren) {
               toggleExpanded(node.id);
@@ -83,9 +86,7 @@ const TreeView: Component<TreeViewProps> = (props) => {
           {/* Indicador de expansión */}
           <div class="w-4 flex-shrink-0">
             {hasChildren ? (
-              <span class="text-gray-500">
-                {node.expanded ? '▼' : '▶'}
-              </span>
+              <span class="text-gray-500">{node.expanded ? '▼' : '▶'}</span>
             ) : (
               <span class="text-gray-300">•</span>
             )}
