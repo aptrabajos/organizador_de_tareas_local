@@ -1,4 +1,5 @@
 import { Component, createSignal, onMount, For } from 'solid-js';
+import { createDroppable } from '@thisbeyond/solid-dnd';
 import type { Project } from '../types/project';
 import { countSubprojects } from '../services/api';
 
@@ -7,6 +8,7 @@ interface GroupCardProps {
   onViewProjects: (project: Project) => void;
   onEdit: (project: Project) => void;
   onDelete: (project: Project) => void;
+  onDropProject?: (projectId: number, groupId: number) => void; // v0.4.0 - Drag & Drop
 }
 
 const GroupCard: Component<GroupCardProps> = (props) => {
