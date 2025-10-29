@@ -87,7 +87,8 @@ const ProjectList: Component<ProjectListProps> = (props) => {
 
   // Detectar qué proyectos tienen hijos (son grupos)
   createEffect(async () => {
-    if (props.viewMode === 'groups') {
+    // En búsqueda o vista de grupos, detectar qué proyectos son grupos
+    if (props.viewMode === 'groups' || props.searchActive) {
       const groupIds = new Set<number>();
       for (const project of props.projects) {
         try {
@@ -101,7 +102,7 @@ const ProjectList: Component<ProjectListProps> = (props) => {
       }
       setProjectGroups(groupIds);
     } else {
-      // En vista de subproyectos, ninguno es grupo (nivel único)
+      // En vista de subproyectos (sin búsqueda), ninguno es grupo (nivel único)
       setProjectGroups(new Set());
     }
   });
