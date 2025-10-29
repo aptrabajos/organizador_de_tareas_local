@@ -26,6 +26,7 @@ const AppContent: Component = () => {
   const [showAnalytics, setShowAnalytics] = createSignal(false);
   const [showSettings, setShowSettings] = createSignal(false);
   const [showWelcome, setShowWelcome] = createSignal(false);
+  const [showTreeView, setShowTreeView] = createSignal(false);
   const [editingProject, setEditingProject] = createSignal<Project | null>(
     null
   );
