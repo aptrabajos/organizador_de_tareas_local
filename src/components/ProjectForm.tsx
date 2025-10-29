@@ -35,6 +35,7 @@ const ProjectForm: Component<ProjectFormProps> = (props) => {
       driveLink: p?.drive_link || '',
       notes: p?.notes || '',
       imageData: p?.image_data || '',
+      parentId: p?.parent_id || null,
     };
   })();
 
@@ -51,6 +52,21 @@ const ProjectForm: Component<ProjectFormProps> = (props) => {
   const [notes, setNotes] = createSignal(initialValues.notes);
   const [imageData, setImageData] = createSignal(initialValues.imageData);
   const [imageError, setImageError] = createSignal('');
+  const [parentId, setParentId] = createSignal<number | null>(
+    initialValues.parentId
+  );
+
+  // v0.4.0 - Cargar grupos disponibles
+  const [availableGroups, setAvailableGroups] = createSignal<Project[]>([]);
+
+  onMount(async () => {
+    try {
+      const groups = await getRootProjects();
+      setAvailableGroups(groups);
+    } catch (err) {
+      console.error('Error cargando grupos:', err);
+    }
+  });
 
   const handleImageChange = async (e: Event) => {
     const input = e.currentTarget as HTMLInputElement;
