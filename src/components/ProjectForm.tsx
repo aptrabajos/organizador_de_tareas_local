@@ -163,6 +163,7 @@ const ProjectForm: Component<ProjectFormProps> = (props) => {
       drive_link: driveLink().trim() || undefined,
       notes: notes().trim() || undefined,
       image_data: imageData() || undefined,
+      parent_id: parentId(), // v0.4.0 - ID del grupo padre
     };
 
     console.log('✅ [FRONTEND] Enviando datos:', formData);
