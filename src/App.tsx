@@ -266,44 +266,66 @@ const AppContent: Component = () => {
 
         {/* Projects View */}
         <Show when={!showAnalytics()}>
-          {/* Error Message */}
-          <Show when={store.error()}>
-            <div class="mb-4 rounded-lg bg-red-50 p-4 text-red-800 dark:bg-red-900/20 dark:text-red-200">
-              <p class="font-medium">Error:</p>
-              <p>{store.error()}</p>
-            </div>
-          </Show>
+          <div class="flex gap-4">
+            {/* TreeView Sidebar - Solo visible cuando showTreeView es true */}
+            <Show when={showTreeView()}>
+              <div class="w-80 flex-shrink-0">
+                <TreeView
+                  onSelectProject={(project) => {
+                    // Si es un grupo, navegar a sus subproyectos
+                    if (!project.parent_id) {
+                      store.navigateToGroup(project);
+                    } else {
+                      // Si es un subproyecto, editarlo
+                      handleEdit(project);
+                    }
+                  }}
+                />
+              </div>
+            </Show>
 
-          {/* Loading State */}
-          <Show when={store.isLoading()}>
-            <div class="py-12 text-center">
-              <p class="text-gray-600 dark:text-gray-400">
-                Cargando proyectos...
-              </p>
-            </div>
-          </Show>
+            {/* Main Content Area */}
+            <div class="flex-1">
+              {/* Error Message */}
+              <Show when={store.error()}>
+                <div class="mb-4 rounded-lg bg-red-50 p-4 text-red-800 dark:bg-red-900/20 dark:text-red-200">
+                  <p class="font-medium">Error:</p>
+                  <p>{store.error()}</p>
+                </div>
+              </Show>
 
-          {/* Project List */}
-          <Show when={!store.isLoading()}>
-            <ProjectList
-              projects={store.projects()}
-              onEdit={handleEdit}
-              onDelete={handleDelete}
-              onOpenTerminal={handleOpenTerminal}
-              onProjectsChanged={() => {
-                // Recargar la vista actual (grupos o subproyectos)
-                if (store.viewMode() === 'groups') {
-                  store.loadRootProjects();
-                } else if (store.currentGroup()) {
-                  store.loadSubprojects(store.currentGroup()!.id);
-                }
-              }}
-              renderFilters={setFilterProps}
-              viewMode={store.viewMode()}
-              onViewGroup={(group) => store.navigateToGroup(group)}
-              searchActive={searchQuery().trim().length > 0}
-            />
-          </Show>
+              {/* Loading State */}
+              <Show when={store.isLoading()}>
+                <div class="py-12 text-center">
+                  <p class="text-gray-600 dark:text-gray-400">
+                    Cargando proyectos...
+                  </p>
+                </div>
+              </Show>
+
+              {/* Project List */}
+              <Show when={!store.isLoading()}>
+                <ProjectList
+                  projects={store.projects()}
+                  onEdit={handleEdit}
+                  onDelete={handleDelete}
+                  onOpenTerminal={handleOpenTerminal}
+                  onProjectsChanged={() => {
+                    // Recargar la vista actual (grupos o subproyectos)
+                    if (store.viewMode() === 'groups') {
+                      store.loadRootProjects();
+                    } else if (store.currentGroup()) {
+                      store.loadSubprojects(store.currentGroup()!.id);
+                    }
+                  }}
+                  renderFilters={setFilterProps}
+                  viewMode={store.viewMode()}
+                  onViewGroup={(group) => store.navigateToGroup(group)}
+                  searchActive={searchQuery().trim().length > 0}
+                />
+              </Show>
+            </div>
+          </div>
         </Show>
       </main>
 
