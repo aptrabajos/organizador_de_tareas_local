@@ -210,10 +210,9 @@ const ProjectList: Component<ProjectListProps> = (props) => {
       const { assignProjectToGroup } = await import('../services/api');
       await assignProjectToGroup(projectId, groupId);
 
-      toast.success(
-        `✅ "${project.name}" agregado al grupo "${group.name}"`,
-        { duration: 3000 }
-      );
+      toast.success(`✅ "${project.name}" agregado al grupo "${group.name}"`, {
+        duration: 3000,
+      });
 
       // Refrescar lista de proyectos
       if (props.onProjectsChanged) {
@@ -222,6 +221,27 @@ const ProjectList: Component<ProjectListProps> = (props) => {
     } catch (error) {
       console.error('Error al asignar proyecto a grupo:', error);
       throw error;
+    }
+  };
+
+  // v0.4.0 - Handler para sacar un proyecto de un grupo
+  const handleRemoveFromGroup = async (project: Project) => {
+    try {
+      // Usar el comando assign_project_to_group con parent_id = null
+      const { assignProjectToGroup } = await import('../services/api');
+      await assignProjectToGroup(project.id, null);
+
+      toast.success(`🔓 "${project.name}" removido del grupo`, {
+        duration: 3000,
+      });
+
+      // Refrescar lista de proyectos
+      if (props.onProjectsChanged) {
+        props.onProjectsChanged();
+      }
+    } catch (error) {
+      console.error('Error al remover proyecto del grupo:', error);
+      toast.error('Error al remover proyecto del grupo');
     }
   };
 
