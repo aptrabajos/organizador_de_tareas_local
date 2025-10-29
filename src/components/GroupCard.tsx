@@ -1,4 +1,4 @@
-import { Component, createSignal, onMount } from 'solid-js';
+import { Component, createSignal, onMount, For } from 'solid-js';
 import type { Project } from '../types/project';
 import { countSubprojects } from '../services/api';
 
