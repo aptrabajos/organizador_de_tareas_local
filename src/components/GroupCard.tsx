@@ -58,6 +58,7 @@ const GroupCard: Component<GroupCardProps> = (props) => {
 
   // Cargar subproyectos cuando se expande la lista
   const toggleSubprojects = async () => {
+    // Solo cargar si es la primera vez que expandimos
     if (!showSubprojects() && subprojects().length === 0) {
       setLoadingSubprojects(true);
       try {
@@ -71,10 +72,6 @@ const GroupCard: Component<GroupCardProps> = (props) => {
     }
     setShowSubprojects(!showSubprojects());
   };
-
-  // Color por defecto si no hay group_color
-  const borderColor = () => props.project.group_color || '#3B82F6';
-  const hasSubprojects = () => subprojectCount() > 0;
 
   return (
     <div
