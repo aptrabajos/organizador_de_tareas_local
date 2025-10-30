@@ -1072,3 +1072,39 @@ pub async fn assign_project_to_group(
     db.assign_project_to_group(child_id, parent_id)
         .map_err(|e| format!("Error assigning project to group: {}", e))
 }
+
+/// Exportar proyecto a PDF
+#[tauri::command]
+pub async fn export_project_to_pdf(
+    db: State<'_, Database>,
+    project_id: i64,
+) -> Result<String, String> {
+    println!("📄 [PDF] Exportando proyecto ID: {}", project_id);
+
+    // Obtener proyecto de la base de datos
+    let project = db.get_project(project_id)
+        .map_err(|e| format!("Error getting project: {}", e))?;
+
+    // Crear directorio de exportación si no existe
+    let export_dir = dirs::document_dir()
+        .ok_or("No se pudo obtener directorio de documentos")?
+        .join("GestorProyectos_PDFs");
+
+    std::fs::create_dir_all(&export_dir)
+        .map_err(|e| format!("Error creando directorio de exportación: {}", e))?;
+
+    // Nombre del archivo con timestamp
+    let timestamp = Local::now().format("%Y%m%d_%H%M%S");
+    let safe_project_name = project.name.replace(" ", "_").replace("/", "-");
+    let filename = format!("{}_{}.pdf", safe_project_name, timestamp);
+    let output_path = export_dir.join(&filename);
+
+    println!("📄 [PDF] Generando PDF en: {:?}", output_path);
+
+    // Exportar a PDF
+    crate::pdf_export::export_project_to_pdf(&db, &project, output_path.to_str().unwrap())?;
+
+    println!("✅ [PDF] PDF generado exitosamente");
+
+    Ok(output_path.to_str().unwrap().to_string())
+}
