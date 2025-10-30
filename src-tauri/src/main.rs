@@ -6,6 +6,7 @@ mod config;
 mod db;
 mod models;
 mod platform;
+mod pdf_export;
 
 use db::Database;
 use config::ConfigManager;
