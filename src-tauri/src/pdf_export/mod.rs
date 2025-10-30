@@ -42,14 +42,14 @@ pub fn export_project_to_pdf(
     y_position -= Mm(10.0);
 
     // Descripción
-    if let Some(desc) = &project.description {
+    if !project.description.is_empty() {
         current_layer.set_fill_color(Color::Rgb(Rgb::new(
             COLOR_GRAY.0,
             COLOR_GRAY.1,
             COLOR_GRAY.2,
             None,
         )));
-        current_layer.use_text(desc, FONT_SIZE_BODY, Mm(20.0), y_position, &font);
+        current_layer.use_text(&project.description, FONT_SIZE_BODY, Mm(20.0), y_position, &font);
         y_position -= Mm(8.0);
     }
 
