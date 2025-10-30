@@ -1085,13 +1085,13 @@ pub async fn export_project_to_pdf(
     let project = db.get_project(project_id)
         .map_err(|e| format!("Error getting project: {}", e))?;
 
-    // Crear directorio de exportación si no existe
-    let export_dir = dirs::document_dir()
-        .ok_or("No se pudo obtener directorio de documentos")?
-        .join("GestorProyectos_PDFs");
+    // Exportar en la carpeta del proyecto (local_path)
+    let export_dir = PathBuf::from(&project.local_path);
 
-    std::fs::create_dir_all(&export_dir)
-        .map_err(|e| format!("Error creando directorio de exportación: {}", e))?;
+    // Verificar que el directorio existe
+    if !export_dir.exists() {
+        return Err(format!("El directorio del proyecto no existe: {}", project.local_path));
+    }
 
     // Nombre del archivo con timestamp
     let timestamp = Local::now().format("%Y%m%d_%H%M%S");
