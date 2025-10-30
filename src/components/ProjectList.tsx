@@ -25,6 +25,7 @@ import {
   updateProjectStatus,
   updateProjectOrder,
   countSubprojects,
+  exportProjectToPdf,
 } from '../services/api';
 import { open } from '@tauri-apps/plugin-dialog';
 import { invoke } from '@tauri-apps/api/core';
@@ -381,13 +382,10 @@ const ProjectList: Component<ProjectListProps> = (props) => {
     const toastId = toast.loading(`📄 Generando PDF de "${project.name}"...`);
     try {
       const pdfPath = await exportProjectToPdf(project.id);
-      toast.success(
-        `✅ PDF exportado exitosamente:\n${pdfPath}`,
-        {
-          id: toastId,
-          duration: 6000,
-        }
-      );
+      toast.success(`✅ PDF exportado exitosamente:\n${pdfPath}`, {
+        id: toastId,
+        duration: 6000,
+      });
     } catch (error) {
       console.error('Error al exportar PDF:', error);
       toast.error(`❌ Error al exportar PDF: ${error}`, { id: toastId });
