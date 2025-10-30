@@ -194,6 +194,74 @@ When adding new dependencies:
 
 ## Changelog
 
+### 2025-10-30 - v0.4.1 - Exportación a PDF Interactivo
+
+**Nueva Funcionalidad: Exportar Proyectos a PDF**
+
+Esta versión agrega la capacidad de exportar cualquier proyecto a un PDF profesional con toda su información y enlaces.
+
+**Funcionalidad Implementada:**
+
+1. **Botón de Exportación PDF**
+   - Botón 📄 rojo en cada tarjeta de proyecto
+   - Toast notifications (loading + success/error)
+   - Exportación directa en la carpeta del proyecto
+
+2. **Contenido del PDF Generado:**
+   - **Portada**: Nombre, descripción, estado, fecha de exportación
+   - **Información General**: Path local, tags, grupo padre
+   - **Enlaces Importantes**: Lista completa con formato mejorado
+     - Tipo de enlace en negrita con bullet point
+     - URL en azul, en línea separada e indentada
+     - Fácilmente copiable
+   - **Notas del Proyecto**: Contenido completo con word wrap
+
+3. **Ubicación del PDF:**
+   - Se guarda en la carpeta de trabajo del proyecto
+   - Formato de nombre: `NombreProyecto_YYYYMMDD_HHMMSS.pdf`
+   - Ejemplo: `/home/user/mis-proyectos/app/app_20251030_005500.pdf`
+
+**Implementación Técnica:**
+
+**Backend (Rust):**
+- Nueva dependencia: `printpdf` v0.7.0
+- Módulo `src-tauri/src/pdf_export/mod.rs` (220+ líneas)
+- Comando Tauri: `export_project_to_pdf(project_id)`
+- Generación de PDF con fuentes Helvetica built-in
+- Colores organizados: azul para enlaces, gris para metadata
+
+**Frontend (TypeScript/SolidJS):**
+- Nueva función API: `exportProjectToPdf(projectId)`
+- Handler `handleExportPdf()` en ProjectList.tsx
+- Botón integrado en cada project card
+- Toast feedback durante el proceso
+
+**Archivos Creados/Modificados:**
+
+- `src-tauri/Cargo.toml` - Dependencia printpdf
+- `src-tauri/src/pdf_export/mod.rs` - Módulo completo de PDF (nuevo)
+- `src-tauri/src/commands/mod.rs` - Comando export_project_to_pdf
+- `src-tauri/src/main.rs` - Registro del comando
+- `src/services/api.ts` - Función exportProjectToPdf()
+- `src/components/ProjectList.tsx` - Botón + handler
+
+**Mejoras Aplicadas:**
+
+- ✅ URLs visibles y legibles con formato mejorado
+- ✅ Exportación en carpeta de trabajo (fácil acceso)
+- ✅ Formato profesional con espaciado optimizado
+- ✅ Error handling completo
+- ✅ Timestamps para versionado de PDFs
+
+**Resultados de Compilación:**
+
+✅ 0 errores TypeScript
+✅ 0 errores Rust
+✅ Dependencias compiladas exitosamente (printpdf + 8 crates)
+✅ Funcionalidad probada y funcionando
+
+---
+
 ### 2025-10-29 - v0.4.0 - Vista de Árbol y Refactorización de Código
 
 **Sistema Completo de Grupos de Proyectos con Vista Jerárquica:**
