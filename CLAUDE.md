@@ -224,6 +224,7 @@ Esta versión agrega la capacidad de exportar cualquier proyecto a un PDF profes
 **Implementación Técnica:**
 
 **Backend (Rust):**
+
 - Nueva dependencia: `printpdf` v0.7.0
 - Módulo `src-tauri/src/pdf_export/mod.rs` (220+ líneas)
 - Comando Tauri: `export_project_to_pdf(project_id)`
@@ -231,6 +232,7 @@ Esta versión agrega la capacidad de exportar cualquier proyecto a un PDF profes
 - Colores organizados: azul para enlaces, gris para metadata
 
 **Frontend (TypeScript/SolidJS):**
+
 - Nueva función API: `exportProjectToPdf(projectId)`
 - Handler `handleExportPdf()` en ProjectList.tsx
 - Botón integrado en cada project card
