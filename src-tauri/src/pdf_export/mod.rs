@@ -159,15 +159,21 @@ pub fn export_project_to_pdf(
                 y_position -= Mm(6.0);
             } else {
                 for link in links {
-                    // Color azul para enlaces
-                    current_layer.set_fill_color(Color::Rgb(Rgb::new(0.0, 0.0, 0.8, None)));
-                    let link_text = format!("{}: {}", link.link_type, link.url);
-                    current_layer.use_text(&link_text, FONT_SIZE_BODY, Mm(20.0), y_position, &font);
+                    // Tipo de enlace en color normal
+                    current_layer.set_fill_color(Color::Rgb(Rgb::new(
+                        COLOR_TEXT.0,
+                        COLOR_TEXT.1,
+                        COLOR_TEXT.2,
+                        None,
+                    )));
+                    let link_type_text = format!("• {} →", link.link_type);
+                    current_layer.use_text(&link_type_text, FONT_SIZE_BODY, Mm(20.0), y_position, &font_bold);
+                    y_position -= Mm(5.0);
 
-                    // Añadir acción de enlace (clickeable en el PDF)
-                    // Nota: printpdf 0.7 soporta enlaces pero con API compleja
-                    // Por ahora el texto es azul y se puede copiar
-                    y_position -= Mm(6.0);
+                    // URL en azul (una línea abajo)
+                    current_layer.set_fill_color(Color::Rgb(Rgb::new(0.0, 0.2, 0.8, None)));
+                    current_layer.use_text(&link.url, FONT_SIZE_BODY, Mm(25.0), y_position, &font);
+                    y_position -= Mm(7.0);
 
                     if y_position.0 < 30.0 {
                         // Nueva página si nos quedamos sin espacio
