@@ -372,3 +372,9 @@ export async function assignProjectToGroup(
 ): Promise<void> {
   await invoke('assign_project_to_group', { childId, parentId });
 }
+
+// ==================== FUNCIONES PARA EXPORTACIÓN PDF (v0.4.1) ====================
+
+export async function exportProjectToPdf(projectId: number): Promise<string> {
+  return await invoke('export_project_to_pdf', { projectId });
+}
