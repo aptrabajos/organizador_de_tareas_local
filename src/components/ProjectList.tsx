@@ -377,6 +377,23 @@ const ProjectList: Component<ProjectListProps> = (props) => {
     }
   };
 
+  const handleExportPdf = async (project: Project) => {
+    const toastId = toast.loading(`📄 Generando PDF de "${project.name}"...`);
+    try {
+      const pdfPath = await exportProjectToPdf(project.id);
+      toast.success(
+        `✅ PDF exportado exitosamente:\n${pdfPath}`,
+        {
+          id: toastId,
+          duration: 6000,
+        }
+      );
+    } catch (error) {
+      console.error('Error al exportar PDF:', error);
+      toast.error(`❌ Error al exportar PDF: ${error}`, { id: toastId });
+    }
+  };
+
   const handleSync = async (project: Project) => {
     try {
       // Sincronizar directamente al backup en /mnt/sda1 con rsync
