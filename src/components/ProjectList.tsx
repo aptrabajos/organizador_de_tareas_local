@@ -661,6 +661,14 @@ const ProjectList: Component<ProjectListProps> = (props) => {
                                   ✅
                                 </button>
                                 <button
+                                  onClick={() => handleExportPdf(project)}
+                                  class="rounded bg-red-600 px-2 py-1 text-xs font-medium text-white hover:bg-red-700"
+                                  aria-label="Exportar PDF"
+                                  title="Exportar proyecto a PDF"
+                                >
+                                  📄
+                                </button>
+                                <button
                                   onClick={() => handleBackup(project)}
                                   class="rounded bg-blue-600 px-2 py-1 text-xs font-medium text-white hover:bg-blue-700"
                                   aria-label="Crear backup"
