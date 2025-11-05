@@ -33,7 +33,7 @@ const AppContent: Component = () => {
   );
 
   // Estado para los filtros (recibidos desde ProjectList)
-  const [filterProps, setFilterProps] = createSignal<any>(null);
+  const [filterProps, setFilterProps] = createSignal<ProjectFiltersProps | null>(null);
 
   onMount(async () => {
     // Cargar proyectos raíz (grupos) por defecto (v0.4.0)
