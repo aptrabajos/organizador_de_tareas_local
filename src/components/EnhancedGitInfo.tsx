@@ -201,7 +201,7 @@ const EnhancedGitInfo: Component<EnhancedGitInfoProps> = (props) => {
                 📝 Stage All
               </button>
               <button
-                onClick={() => props.onCommitClick()}
+                onClick={() => props.onCommitClick?.()}
                 class="rounded bg-blue-600 px-2 py-1 text-xs text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
               >
                 💾 Commit
