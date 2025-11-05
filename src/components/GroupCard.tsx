@@ -34,13 +34,16 @@ const capitalize = (str: string): string =>
   str.charAt(0).toUpperCase() + str.slice(1);
 
 const GroupCard: Component<GroupCardProps> = (props) => {
+  // Capturar valores inmutables de props (id no cambia durante el lifecycle)
+  const projectId = props.project.id;
+
   const [subprojectCount, setSubprojectCount] = createSignal(0);
   const [showSubprojects, setShowSubprojects] = createSignal(false);
   const [subprojects, setSubprojects] = createSignal<Project[]>([]);
   const [loadingSubprojects, setLoadingSubprojects] = createSignal(false);
 
   // v0.4.0 - Hacer el GroupCard droppable para drag & drop
-  const droppable = createDroppable(props.project.id);
+  const droppable = createDroppable(projectId);
 
   // Computed values para lógica reutilizable
   const borderColor = () => props.project.group_color || DEFAULT_GROUP_COLOR;
