@@ -1,7 +1,7 @@
 import { Component, Show } from 'solid-js';
 import type { Accessor } from 'solid-js';
 
-interface ProjectFiltersProps {
+export interface ProjectFiltersProps {
   statusFilter: Accessor<string>;
   setStatusFilter: (value: string) => void;
   showPinnedOnly: Accessor<boolean>;
