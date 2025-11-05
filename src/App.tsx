@@ -72,6 +72,11 @@ const AppContent: Component = () => {
       setShowSettings(true);
     });
 
+    shortcuts.registerHandler('about', () => {
+      console.log('🎯 [SHORTCUT] Abrir acerca de');
+      setShowAbout(true);
+    });
+
     shortcuts.registerHandler('refresh', () => {
       console.log('🎯 [SHORTCUT] Recargar proyectos');
       // Recargar vista actual (v0.4.0)
