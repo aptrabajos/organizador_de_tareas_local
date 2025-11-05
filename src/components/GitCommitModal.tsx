@@ -15,16 +15,14 @@ const GitCommitModal: Component<GitCommitModalProps> = (props) => {
   const [stagedFiles, setStagedFiles] = createSignal<string[]>([]);
 
   // Cargar archivos staged al montar
-  const loadStagedFiles = async () => {
+  onMount(async () => {
     try {
       const files = await getGitModifiedFiles(props.projectPath);
       setStagedFiles(files);
     } catch (error) {
       console.error('Error loading files:', error);
     }
-  };
-
-  loadStagedFiles();
+  });
 
   const handleSubmit = async (e: Event) => {
     e.preventDefault();
