@@ -304,7 +304,6 @@ const AppContent: Component = () => {
               </Show>
             </div>
           </div>
-        </div>
       </main>
 
       {/* Modal Form */}
