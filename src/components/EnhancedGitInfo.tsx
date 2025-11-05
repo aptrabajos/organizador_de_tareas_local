@@ -4,7 +4,6 @@ import {
   onMount,
   Show,
   For,
-  createEffect,
 } from 'solid-js';
 import toast from 'solid-toast';
 import type { GitCommit, GitFileCount } from '../types/git';
