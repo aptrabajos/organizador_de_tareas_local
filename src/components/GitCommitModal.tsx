@@ -1,4 +1,4 @@
-import { Component, createSignal, Show, For } from 'solid-js';
+import { Component, createSignal, Show, For, onMount } from 'solid-js';
 import toast from 'solid-toast';
 import { gitCommit, gitPush, getGitModifiedFiles } from '../services/api';
 
