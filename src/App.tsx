@@ -339,6 +339,11 @@ const AppContent: Component = () => {
       <Show when={showWelcome()}>
         <WelcomeScreen onClose={() => setShowWelcome(false)} />
       </Show>
+
+      {/* About Modal */}
+      <Show when={showAbout()}>
+        <About onClose={() => setShowAbout(false)} />
+      </Show>
     </div>
   );
 };
