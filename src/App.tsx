@@ -90,6 +90,8 @@ const AppContent: Component = () => {
         setEditingProject(null);
       } else if (showSettings()) {
         setShowSettings(false);
+      } else if (showAbout()) {
+        setShowAbout(false);
       }
     });
 
