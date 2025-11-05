@@ -120,12 +120,31 @@ const About: Component<AboutProps> = (props) => {
             </p>
           </div>
 
+          {/* Developer Info */}
+          <div class="rounded-lg bg-blue-50 p-4 dark:bg-blue-900/20">
+            <h4 class="mb-2 font-semibold text-gray-900 dark:text-white">
+              👨‍💻 Desarrollador
+            </h4>
+            <div class="space-y-1 text-sm text-gray-700 dark:text-gray-300">
+              <p>
+                <span class="font-medium">Nombre:</span> Alejandro Palestrini
+              </p>
+              <p class="flex items-center gap-2">
+                <span class="font-medium">Email:</span>
+                <a
+                  href="mailto:apalestrini@gmail.com"
+                  class="text-blue-600 hover:underline dark:text-blue-400"
+                >
+                  apalestrini@gmail.com
+                </a>
+              </p>
+            </div>
+          </div>
+
           {/* Footer */}
           <div class="border-t border-gray-200 pt-4 text-center text-xs text-gray-500 dark:border-gray-700 dark:text-gray-400">
-            <p>
-              Desarrollado con ❤️ usando tecnologías open source
-            </p>
-            <p class="mt-1">© 2025 Gestor de Proyectos</p>
+            <p>Desarrollado con ❤️ usando tecnologías open source</p>
+            <p class="mt-1">© 2025 Alejandro Palestrini</p>
           </div>
         </div>
       </div>
