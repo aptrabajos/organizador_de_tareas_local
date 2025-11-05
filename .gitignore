@@ -40,5 +40,6 @@ dist-ssr/
 .env.local
 .env.*.local
 
-# Windows distribution build
+# Distribution builds
 win10/
+release-*/
