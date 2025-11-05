@@ -23,7 +23,6 @@ const AppContent: Component = () => {
   const shortcuts = useShortcuts();
   const [searchQuery, setSearchQuery] = createSignal('');
   const [showForm, setShowForm] = createSignal(false);
-  const [showAnalytics, setShowAnalytics] = createSignal(false);
   const [showSettings, setShowSettings] = createSignal(false);
   const [showWelcome, setShowWelcome] = createSignal(false);
   const [showTreeView, setShowTreeView] = createSignal(false);
