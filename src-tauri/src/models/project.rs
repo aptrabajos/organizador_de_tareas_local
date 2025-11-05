@@ -52,6 +52,7 @@ pub struct ProjectActivity {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)] // DTO preparado para registro manual de actividades
 pub struct CreateActivityDTO {
     pub project_id: i64,
     pub activity_type: String,
