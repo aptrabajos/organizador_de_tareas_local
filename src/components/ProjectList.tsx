@@ -255,7 +255,8 @@ const ProjectList: Component<ProjectListProps> = (props) => {
     }
   };
 
-  const handleDragEnd = async ({ draggable, droppable }: any) => {
+  const handleDragEnd = async (event: DragEvent) => {
+    const { draggable, droppable } = event;
     if (!droppable) return;
 
     const activeId = Number(draggable.id);
