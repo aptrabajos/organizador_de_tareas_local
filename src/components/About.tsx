@@ -29,7 +29,7 @@ const About: Component<AboutProps> = (props) => {
               Gestor de Proyectos
             </h3>
             <p class="text-sm text-gray-600 dark:text-gray-400">
-              Versión: <span class="font-mono font-semibold">0.4.2</span>
+              Versión: <span class="font-mono font-semibold">0.4.3</span>
             </p>
             <p class="mt-2 text-gray-700 dark:text-gray-300">
               Gestor de proyectos multiplataforma con código optimizado y 100%
