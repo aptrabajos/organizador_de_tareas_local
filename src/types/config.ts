@@ -115,7 +115,7 @@ export type ShortcutAction =
   | 'new_project'
   | 'search'
   | 'settings'
-  | 'analytics'
+  | 'about'
   | 'refresh'
   | 'close_modal';
 
@@ -124,7 +124,7 @@ export const SHORTCUT_DESCRIPTIONS: Record<ShortcutAction, string> = {
   new_project: 'Crear nuevo proyecto',
   search: 'Buscar proyectos',
   settings: 'Abrir configuración',
-  analytics: 'Abrir estadísticas',
+  about: 'Abrir acerca de',
   refresh: 'Recargar lista de proyectos',
   close_modal: 'Cerrar modal activo',
 };
