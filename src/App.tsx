@@ -6,7 +6,6 @@ import ProjectList from './components/ProjectList';
 import ProjectFormTabs from './components/ProjectFormTabs';
 import { type ProjectFormData } from './components/ProjectForm';
 import ThemeToggle from './components/ThemeToggle';
-import Analytics from './components/Analytics';
 import Settings from './components/Settings';
 import WelcomeScreen from './components/WelcomeScreen';
 import ProjectFilters from './components/ProjectFilters';
