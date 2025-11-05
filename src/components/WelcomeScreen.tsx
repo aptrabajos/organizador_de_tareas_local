@@ -40,7 +40,7 @@ export default function WelcomeScreen(props: { onClose: () => void }) {
         '2️⃣ Configura tus programas favoritos en "⚙️ Configuración"',
         '3️⃣ Usa "🚀 Trabajar" para abrir el terminal del proyecto',
         '4️⃣ Agrega enlaces, notas y TODOs según necesites',
-        '5️⃣ Explora Analytics para ver tu progreso',
+        '5️⃣ Organiza tus proyectos en grupos y usa drag & drop',
       ],
     },
   ];
