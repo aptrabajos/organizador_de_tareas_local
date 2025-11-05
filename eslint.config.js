@@ -55,6 +55,7 @@ export default [
       'src-tauri/**',
       '.vite/**',
       'tailwind.config.js',
+      'win10/**',
     ],
   },
 ];
