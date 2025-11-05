@@ -1,5 +1,4 @@
 use super::schema::*;
-use std::collections::HashMap;
 
 const CONFIG_VERSION: &str = "0.3.0";
 
