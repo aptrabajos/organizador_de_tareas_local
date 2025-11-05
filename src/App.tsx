@@ -8,6 +8,7 @@ import { type ProjectFormData } from './components/ProjectForm';
 import ThemeToggle from './components/ThemeToggle';
 import Settings from './components/Settings';
 import WelcomeScreen from './components/WelcomeScreen';
+import About from './components/About';
 import ProjectFilters from './components/ProjectFilters';
 import type { ProjectFiltersProps } from './components/ProjectFilters';
 import TreeView from './components/TreeView';
