@@ -239,6 +239,7 @@ impl ProgramDetector {
     }
 
     /// Verificar si un programa existe en una ruta específica
+    #[allow(dead_code)] // Utilidad preparada para validación futura
     pub fn program_exists(path: &str) -> bool {
         std::path::Path::new(path).exists()
     }
