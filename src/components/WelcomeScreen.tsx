@@ -13,7 +13,7 @@ export default function WelcomeScreen(props: { onClose: () => void }) {
       features: [
         '📁 Gestión completa de proyectos locales',
         '🔗 Enlaces y recursos organizados',
-        '📊 Analytics y estadísticas de uso',
+        '📊 Tracking de actividad y progreso',
         '📓 Diario y TODOs por proyecto',
         '⚙️ Configuración multiplataforma',
       ],

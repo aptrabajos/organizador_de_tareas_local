@@ -928,8 +928,7 @@ export default function Settings(props: { onClose: () => void }) {
                           type="checkbox"
                           class="peer sr-only"
                           checked={
-                            config()?.shortcuts.shortcuts.about?.enabled ??
-                            true
+                            config()?.shortcuts.shortcuts.about?.enabled ?? true
                           }
                           onChange={(e) => {
                             const cfg = config();
