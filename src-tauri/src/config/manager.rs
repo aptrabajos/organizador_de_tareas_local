@@ -155,6 +155,7 @@ impl ConfigManager {
     }
 
     /// Migrar configuración de versión anterior si es necesario
+    #[allow(dead_code)] // Preparado para futuras migraciones de esquema de configuración
     pub fn migrate_if_needed(&self) -> Result<(), String> {
         let config = self.get_config()?;
 
