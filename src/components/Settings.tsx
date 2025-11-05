@@ -2,6 +2,7 @@ import { createSignal, Show, For, onMount } from 'solid-js';
 import type {
   AppConfig,
   DetectedPrograms,
+  DetectedProgram,
   ProgramMode,
   ProgramConfig,
 } from '../types/config';
