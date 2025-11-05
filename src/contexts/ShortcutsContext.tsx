@@ -93,7 +93,6 @@ export const ShortcutsProvider: ParentComponent = (props) => {
     }
 
     console.log(`✅ [SHORTCUTS] Total registrados: ${registered.length}`);
-    setRegisteredShortcuts(registered);
   };
 
   // Registrar un handler para una acción
