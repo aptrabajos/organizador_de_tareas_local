@@ -1,10 +1,4 @@
-import {
-  Component,
-  createSignal,
-  onMount,
-  Show,
-  For,
-} from 'solid-js';
+import { Component, createSignal, onMount, Show, For } from 'solid-js';
 import toast from 'solid-toast';
 import type { GitCommit, GitFileCount } from '../types/git';
 import {
@@ -47,10 +41,9 @@ const EnhancedGitInfo: Component<EnhancedGitInfoProps> = (props) => {
           getGitFileCount(props.projectPath).catch(() => null),
           getRecentCommits(props.projectPath, 5).catch(() => []),
           getGitRemoteUrl(props.projectPath).catch(() => null),
-          getGitAheadBehind(props.projectPath).catch(() => [0, 0] as [
-            number,
-            number
-          ]),
+          getGitAheadBehind(props.projectPath).catch(
+            () => [0, 0] as [number, number]
+          ),
         ]);
 
       setFileCount(count);
@@ -154,7 +147,7 @@ const EnhancedGitInfo: Component<EnhancedGitInfoProps> = (props) => {
                   d="M11.75 2.5a.75.75 0 100 1.5.75.75 0 000-1.5zm-2.25.75a2.25 2.25 0 113 2.122V6A2.5 2.5 0 0110 8.5H6a1 1 0 00-1 1v1.128a2.251 2.251 0 11-1.5 0V5.372a2.25 2.25 0 111.5 0v1.836A2.492 2.492 0 016 7h4a1 1 0 001-1v-.628A2.25 2.25 0 019.5 3.25zM4.25 12a.75.75 0 100 1.5.75.75 0 000-1.5zM3.5 3.25a.75.75 0 111.5 0 .75.75 0 01-1.5 0z"
                 />
               </svg>
-              <span class="text-xs font-mono font-medium text-blue-700 dark:text-blue-300">
+              <span class="font-mono text-xs font-medium text-blue-700 dark:text-blue-300">
                 {branch()}
               </span>
             </div>

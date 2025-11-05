@@ -28,9 +28,6 @@ export const ShortcutsProvider: ParentComponent = (props) => {
   const [handlers, setHandlers] = createSignal<
     Map<ShortcutAction, ShortcutHandler>
   >(new Map());
-  const [registeredShortcuts, setRegisteredShortcuts] = createSignal<string[]>(
-    []
-  );
 
   // Cargar configuración de shortcuts al montar
   onMount(async () => {
