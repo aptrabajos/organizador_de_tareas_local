@@ -16,18 +16,6 @@ impl Default for AppConfig {
     }
 }
 
-impl Default for PlatformConfig {
-    fn default() -> Self {
-        Self {
-            terminal: ProgramConfig::default(),
-            browser: ProgramConfig::default(),
-            file_manager: ProgramConfig::default(),
-            text_editor: ProgramConfig::default(),
-            environment: HashMap::new(),
-        }
-    }
-}
-
 impl Default for BackupConfig {
     fn default() -> Self {
         Self {
