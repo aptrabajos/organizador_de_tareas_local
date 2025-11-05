@@ -19,7 +19,7 @@ pub struct AppConfig {
 }
 
 /// Configuración de plataforma (programas y comportamientos del OS)
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct PlatformConfig {
     /// Configuración de terminal
     pub terminal: ProgramConfig,

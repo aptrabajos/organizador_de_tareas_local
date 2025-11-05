@@ -619,7 +619,7 @@ pub async fn update_project_order(
 #[tauri::command]
 pub async fn get_git_branch(path: String) -> Result<String, String> {
     let output = Command::new("git")
-        .args(&["-C", &path, "rev-parse", "--abbrev-ref", "HEAD"])
+        .args(["-C", &path, "rev-parse", "--abbrev-ref", "HEAD"])
         .output()
         .map_err(|e| format!("Failed to execute git command: {}", e))?;
 
@@ -636,7 +636,7 @@ pub async fn get_git_branch(path: String) -> Result<String, String> {
 #[tauri::command]
 pub async fn get_git_status(path: String) -> Result<String, String> {
     let output = Command::new("git")
-        .args(&["-C", &path, "status", "--porcelain"])
+        .args(["-C", &path, "status", "--porcelain"])
         .output()
         .map_err(|e| format!("Failed to execute git command: {}", e))?;
 
@@ -660,7 +660,7 @@ pub struct GitCommit {
 pub async fn get_recent_commits(path: String, limit: usize) -> Result<Vec<GitCommit>, String> {
     let limit_str = limit.to_string();
     let output = Command::new("git")
-        .args(&[
+        .args([
             "-C",
             &path,
             "log",
@@ -708,7 +708,7 @@ pub struct GitFileCount {
 #[tauri::command]
 pub async fn get_git_file_count(path: String) -> Result<GitFileCount, String> {
     let output = Command::new("git")
-        .args(&["-C", &path, "status", "--porcelain"])
+        .args(["-C", &path, "status", "--porcelain"])
         .output()
         .map_err(|e| format!("Failed to execute git command: {}", e))?;
 
@@ -730,7 +730,7 @@ pub async fn get_git_file_count(path: String) -> Result<GitFileCount, String> {
 
         // Primer carácter: staged (index)
         // Segundo carácter: working tree
-        match status_code.chars().nth(0).unwrap_or(' ') {
+        match status_code.chars().next().unwrap_or(' ') {
             'M' | 'A' | 'D' | 'R' | 'C' => staged += 1,
             _ => {}
         }
@@ -756,7 +756,7 @@ pub async fn get_git_file_count(path: String) -> Result<GitFileCount, String> {
 #[tauri::command]
 pub async fn get_git_modified_files(path: String) -> Result<Vec<String>, String> {
     let output = Command::new("git")
-        .args(&["-C", &path, "status", "--porcelain"])
+        .args(["-C", &path, "status", "--porcelain"])
         .output()
         .map_err(|e| format!("Failed to execute git command: {}", e))?;
 
@@ -808,7 +808,7 @@ pub async fn git_commit(path: String, message: String) -> Result<String, String>
     println!("💾 [GIT] Creando commit: {}", message);
 
     let output = Command::new("git")
-        .args(&["-C", &path, "commit", "-m", &message])
+        .args(["-C", &path, "commit", "-m", &message])
         .output()
         .map_err(|e| format!("Failed to execute git commit: {}", e))?;
 
@@ -828,7 +828,7 @@ pub async fn git_push(path: String) -> Result<String, String> {
     println!("🚀 [GIT] Pushing to remote");
 
     let output = Command::new("git")
-        .args(&["-C", &path, "push"])
+        .args(["-C", &path, "push"])
         .output()
         .map_err(|e| format!("Failed to execute git push: {}", e))?;
 
@@ -849,7 +849,7 @@ pub async fn git_pull(path: String) -> Result<String, String> {
     println!("⬇️ [GIT] Pulling from remote");
 
     let output = Command::new("git")
-        .args(&["-C", &path, "pull"])
+        .args(["-C", &path, "pull"])
         .output()
         .map_err(|e| format!("Failed to execute git pull: {}", e))?;
 
@@ -867,7 +867,7 @@ pub async fn git_pull(path: String) -> Result<String, String> {
 #[tauri::command]
 pub async fn get_git_remote_url(path: String) -> Result<Option<String>, String> {
     let output = Command::new("git")
-        .args(&["-C", &path, "remote", "get-url", "origin"])
+        .args(["-C", &path, "remote", "get-url", "origin"])
         .output()
         .map_err(|e| format!("Failed to execute git command: {}", e))?;
 
@@ -888,11 +888,11 @@ pub async fn get_git_remote_url(path: String) -> Result<Option<String>, String> 
 pub async fn get_git_ahead_behind(path: String) -> Result<(u32, u32), String> {
     // Primero hacer fetch para tener info actualizada
     let _ = Command::new("git")
-        .args(&["-C", &path, "fetch", "--quiet"])
+        .args(["-C", &path, "fetch", "--quiet"])
         .output();
 
     let output = Command::new("git")
-        .args(&[
+        .args([
             "-C",
             &path,
             "rev-list",
@@ -905,7 +905,7 @@ pub async fn get_git_ahead_behind(path: String) -> Result<(u32, u32), String> {
 
     if output.status.success() {
         let result = String::from_utf8_lossy(&output.stdout);
-        let parts: Vec<&str> = result.trim().split_whitespace().collect();
+        let parts: Vec<&str> = result.split_whitespace().collect();
 
         if parts.len() == 2 {
             let ahead = parts[0].parse::<u32>().unwrap_or(0);

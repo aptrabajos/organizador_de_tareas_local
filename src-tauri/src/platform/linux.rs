@@ -16,7 +16,7 @@ impl LinuxPlatform {
     fn try_terminal_fallback(&self, path: &str) -> Result<(), String> {
         // Intentar konsole
         if Command::new("konsole")
-            .args(&["--workdir", path])
+            .args(["--workdir", path])
             .spawn()
             .is_ok()
         {
@@ -25,7 +25,7 @@ impl LinuxPlatform {
 
         // Intentar gnome-terminal
         if Command::new("gnome-terminal")
-            .args(&["--working-directory", path])
+            .args(["--working-directory", path])
             .spawn()
             .is_ok()
         {
@@ -34,7 +34,7 @@ impl LinuxPlatform {
 
         // Intentar alacritty
         if Command::new("alacritty")
-            .args(&["--working-directory", path])
+            .args(["--working-directory", path])
             .spawn()
             .is_ok()
         {
@@ -43,7 +43,7 @@ impl LinuxPlatform {
 
         // Intentar kitty
         if Command::new("kitty")
-            .args(&["--directory", path])
+            .args(["--directory", path])
             .spawn()
             .is_ok()
         {
@@ -52,7 +52,7 @@ impl LinuxPlatform {
 
         // Intentar xfce4-terminal
         if Command::new("xfce4-terminal")
-            .args(&["--working-directory", path])
+            .args(["--working-directory", path])
             .spawn()
             .is_ok()
         {
@@ -61,7 +61,7 @@ impl LinuxPlatform {
 
         // Intentar tilix
         if Command::new("tilix")
-            .args(&["-w", path])
+            .args(["-w", path])
             .spawn()
             .is_ok()
         {
@@ -71,7 +71,7 @@ impl LinuxPlatform {
         // Intentar xterm como último recurso
         let xterm_cmd = format!("cd '{}' && exec $SHELL", path);
         if Command::new("xterm")
-            .args(&["-e", &xterm_cmd])
+            .args(["-e", &xterm_cmd])
             .spawn()
             .is_ok()
         {
