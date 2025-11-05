@@ -117,11 +117,11 @@ impl Default for ShortcutsConfig {
         );
 
         shortcuts.insert(
-            "analytics".to_string(),
+            "about".to_string(),
             ShortcutBinding {
                 key: format!("{}+Shift+A", modifier),
                 enabled: true,
-                description: Some("Abrir estadísticas".to_string()),
+                description: Some("Abrir acerca de".to_string()),
             },
         );
 
