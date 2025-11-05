@@ -70,11 +70,6 @@ const AppContent: Component = () => {
       setShowSettings(true);
     });
 
-    shortcuts.registerHandler('analytics', () => {
-      console.log('🎯 [SHORTCUT] Toggle analytics');
-      setShowAnalytics((prev) => !prev);
-    });
-
     shortcuts.registerHandler('refresh', () => {
       console.log('🎯 [SHORTCUT] Recargar proyectos');
       // Recargar vista actual (v0.4.0)
