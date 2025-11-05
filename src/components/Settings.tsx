@@ -912,15 +912,15 @@ export default function Settings(props: { onClose: () => void }) {
                     </div>
                   </div>
 
-                  {/* Analytics */}
+                  {/* About / Acerca de */}
                   <div class="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
                     <div class="mb-2 flex items-center justify-between">
                       <div>
                         <p class="font-medium text-gray-900 dark:text-white">
-                          Estadísticas
+                          Acerca de
                         </p>
                         <p class="text-sm text-gray-600 dark:text-gray-400">
-                          Toggle vista de estadísticas
+                          Ver información de la aplicación
                         </p>
                       </div>
                       <label class="relative inline-flex cursor-pointer items-center">
@@ -928,7 +928,7 @@ export default function Settings(props: { onClose: () => void }) {
                           type="checkbox"
                           class="peer sr-only"
                           checked={
-                            config()?.shortcuts.shortcuts.analytics?.enabled ??
+                            config()?.shortcuts.shortcuts.about?.enabled ??
                             true
                           }
                           onChange={(e) => {
@@ -940,8 +940,8 @@ export default function Settings(props: { onClose: () => void }) {
                                   ...cfg.shortcuts,
                                   shortcuts: {
                                     ...cfg.shortcuts.shortcuts,
-                                    analytics: {
-                                      ...cfg.shortcuts.shortcuts.analytics,
+                                    about: {
+                                      ...cfg.shortcuts.shortcuts.about,
                                       enabled: e.currentTarget.checked,
                                     },
                                   },
@@ -955,7 +955,7 @@ export default function Settings(props: { onClose: () => void }) {
                     </div>
                     <div class="flex items-center gap-2">
                       <kbd class="rounded border border-gray-300 bg-gray-100 px-2 py-1 font-mono text-xs text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white">
-                        {config()?.shortcuts.shortcuts.analytics?.key ||
+                        {config()?.shortcuts.shortcuts.about?.key ||
                           'Ctrl+Shift+A'}
                       </kbd>
                     </div>
