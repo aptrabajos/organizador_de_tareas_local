@@ -242,6 +242,7 @@ Esta versión elimina el componente de Analytics/Estadísticas (que no era útil
 **Archivos Modificados:**
 
 **Frontend (7 archivos):**
+
 - `src/components/About.tsx` (nuevo) - Componente completo de About
 - `src/App.tsx` - Integración del componente y shortcut
 - `src/types/config.ts` - Actualización de tipos de shortcuts
@@ -249,9 +250,11 @@ Esta versión elimina el componente de Analytics/Estadísticas (que no era útil
 - `src/components/WelcomeScreen.tsx` - Actualización de referencias
 
 **Backend (1 archivo):**
+
 - `src-tauri/src/config/defaults.rs` - Shortcut "analytics" → "about"
 
 **Archivos Eliminados:**
+
 - `src/components/Analytics.tsx` - Componente removido completamente
 
 **Resultados de Compilación:**
