@@ -8,6 +8,7 @@ import {
   SortableProvider,
   createSortable,
   closestCenter,
+  type DragEvent,
 } from '@thisbeyond/solid-dnd';
 import type { Project } from '../types/project';
 import EnhancedGitInfo from './EnhancedGitInfo';
