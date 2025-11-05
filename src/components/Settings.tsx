@@ -1223,7 +1223,7 @@ export default function Settings(props: { onClose: () => void }) {
           </button>
           <div class="flex gap-3">
             <button
-              onClick={props.onClose}
+              onClick={() => props.onClose()}
               class="rounded-md border border-gray-300 px-6 py-2 text-gray-700 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
             >
               Cancelar
