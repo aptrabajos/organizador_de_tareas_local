@@ -116,7 +116,7 @@ export default function Settings(props: { onClose: () => void }) {
   const renderProgramConfig = (
     title: string,
     type: 'terminal' | 'browser' | 'file_manager' | 'text_editor',
-    detectedList: any[]
+    detectedList: DetectedProgram[]
   ) => {
     const cfg = config();
     if (!cfg) return null;
