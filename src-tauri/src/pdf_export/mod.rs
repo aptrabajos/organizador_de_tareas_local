@@ -6,6 +6,7 @@ use std::io::BufWriter;
 
 const FONT_SIZE_TITLE: f32 = 24.0;
 const FONT_SIZE_SUBTITLE: f32 = 18.0;
+#[allow(dead_code)] // Preparado para futuras mejoras en PDF
 const FONT_SIZE_HEADING: f32 = 14.0;
 const FONT_SIZE_BODY: f32 = 11.0;
 const FONT_SIZE_SMALL: f32 = 9.0;
