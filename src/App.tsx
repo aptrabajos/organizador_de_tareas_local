@@ -207,6 +207,12 @@ const AppContent: Component = () => {
                 ⚙️ Configuración
               </button>
               <button
+                onClick={() => setShowAbout(true)}
+                class="rounded-lg bg-indigo-600 px-3 py-1.5 text-sm text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:bg-indigo-500 dark:hover:bg-indigo-600"
+              >
+                📖 Acerca de
+              </button>
+              <button
                 onClick={handleNewProject}
                 class="rounded-lg bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:bg-blue-500 dark:hover:bg-blue-600"
               >
