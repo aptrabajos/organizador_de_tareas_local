@@ -239,6 +239,7 @@ Esta versión se enfoca en mejorar la calidad del código, eliminar warnings y a
 **Archivos Modificados:**
 
 **TypeScript/SolidJS (9 archivos):**
+
 - `.gitignore` - Ignorar win10/
 - `eslint.config.js` - Ignorar win10/
 - `src/App.tsx` - Tipo correcto para filterProps
@@ -251,6 +252,7 @@ Esta versión se enfoca en mejorar la calidad del código, eliminar warnings y a
 - `src/contexts/ShortcutsContext.tsx` - Variable no usada eliminada
 
 **Rust (5 archivos):**
+
 - `src-tauri/src/config/schema.rs` - Derive Default
 - `src-tauri/src/config/defaults.rs` - HashMap import restaurado
 - `src-tauri/src/config/manager.rs` - allow(dead_code)
