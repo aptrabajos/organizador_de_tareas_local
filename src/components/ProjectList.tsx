@@ -105,7 +105,7 @@ const ProjectList: Component<ProjectListProps> = (props) => {
       setProjectGroups(groupIds);
     } else {
       // En vista de subproyectos (sin búsqueda), ninguno es grupo (nivel único)
-      setProjectGroups(new Set());
+      setProjectGroups(new Set<number>());
     }
   });
 
