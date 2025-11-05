@@ -244,14 +244,7 @@ const AppContent: Component = () => {
 
       {/* Main Content */}
       <main class="px-2 py-4 sm:px-3 lg:px-4">
-        {/* Analytics View */}
-        <Show when={showAnalytics()}>
-          <Analytics />
-        </Show>
-
-        {/* Projects View */}
-        <Show when={!showAnalytics()}>
-          <div class="flex gap-4">
+        <div class="flex gap-4">
             {/* TreeView Sidebar - Solo visible cuando showTreeView es true */}
             <Show when={showTreeView()}>
               <div class="w-80 flex-shrink-0">
