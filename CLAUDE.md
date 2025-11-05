@@ -194,6 +194,85 @@ When adding new dependencies:
 
 ## Changelog
 
+### 2025-11-05 - v0.4.3 - Componente About y Eliminación de Analytics
+
+**Reemplazo de Analytics por About/Acerca de:**
+
+Esta versión elimina el componente de Analytics/Estadísticas (que no era útil) y lo reemplaza con un componente About/Acerca de completo con información del desarrollador y de la aplicación.
+
+**Cambios Principales:**
+
+1. **Eliminación Completa de Analytics**
+   - ❌ Eliminado componente `Analytics.tsx`
+   - ❌ Eliminado botón "📊 Estadísticas" del header
+   - ❌ Eliminados todos los estados `showAnalytics` y `setShowAnalytics`
+   - ❌ Eliminados bloques `<Show>` que verificaban `showAnalytics()`
+   - ❌ Eliminado shortcut handler para analytics
+
+2. **Nuevo Componente About.tsx**
+   - ✅ Modal con información completa de la aplicación
+   - ✅ Versión actual (0.4.2)
+   - ✅ 8 características principales destacadas
+   - ✅ Tech stack detallado (Frontend + Backend)
+   - ✅ Información de plataforma (Linux, Windows)
+   - ✅ **Sección de desarrollador** con nombre y email
+   - ✅ Email clickeable con `mailto:`
+   - ✅ Copyright actualizado con nombre del desarrollador
+   - ✅ Dark mode completo
+
+3. **Integración en la Aplicación**
+   - ✅ Botón "📖 Acerca de" en header (color indigo-600)
+   - ✅ Shortcut Ctrl+Shift+A para abrir About
+   - ✅ Integrado en `close_modal` shortcut (Escape)
+   - ✅ Estado `showAbout` y `setShowAbout`
+
+4. **Limpieza de Código Relacionado**
+   - ✅ Backend: Reemplazado shortcut `"analytics"` → `"about"` en `defaults.rs`
+   - ✅ Frontend: Actualizado `ShortcutAction` type en `config.ts`
+   - ✅ Frontend: Actualizado `SHORTCUT_DESCRIPTIONS` en `config.ts`
+   - ✅ Settings: Reemplazada sección shortcut de Analytics → About
+   - ✅ WelcomeScreen: Actualizadas referencias a analytics
+
+**Información del Desarrollador:**
+
+- **Nombre:** Alejandro Palestrini
+- **Email:** apalestrini@gmail.com
+- Información obtenida automáticamente desde la configuración de Git
+
+**Archivos Modificados:**
+
+**Frontend (7 archivos):**
+- `src/components/About.tsx` (nuevo) - Componente completo de About
+- `src/App.tsx` - Integración del componente y shortcut
+- `src/types/config.ts` - Actualización de tipos de shortcuts
+- `src/components/Settings.tsx` - Reemplazo de sección Analytics
+- `src/components/WelcomeScreen.tsx` - Actualización de referencias
+
+**Backend (1 archivo):**
+- `src-tauri/src/config/defaults.rs` - Shortcut "analytics" → "about"
+
+**Archivos Eliminados:**
+- `src/components/Analytics.tsx` - Componente removido completamente
+
+**Resultados de Compilación:**
+
+✅ **0 errores de TypeScript**
+✅ **0 errores de Rust**
+✅ **0 errores ESLint** (solo 3 warnings pre-existentes aceptables)
+✅ **Aplicación funcionando correctamente**
+✅ **Dark mode completo en About**
+✅ **Shortcut Ctrl+Shift+A funcionando**
+
+**UI/UX Mejorada:**
+
+- Sección de desarrollador con fondo azul destacado
+- Email clickeable que abre cliente de correo
+- Copyright personalizado en footer
+- Diseño responsive y profesional
+- Información técnica completa y organizada
+
+---
+
 ### 2025-11-04 - v0.4.2 - Mejoras de Calidad de Código
 
 **Limpieza y Optimización del Código Base:**
