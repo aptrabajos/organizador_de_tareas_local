@@ -27,12 +27,15 @@ pub trait PlatformOperations {
     fn open_text_editor(&self, path: &str, config: &AppConfig) -> Result<(), String>;
 
     /// Obtener directorio de configuración de la aplicación
+    #[allow(dead_code)] // Preparado para futuras funcionalidades
     fn get_config_dir(&self) -> Result<PathBuf, String>;
 
     /// Obtener directorio de datos de la aplicación
+    #[allow(dead_code)] // Preparado para futuras funcionalidades
     fn get_data_dir(&self) -> Result<PathBuf, String>;
 
     /// Obtener ruta predeterminada para backups
+    #[allow(dead_code)] // Preparado para sistema de backups automáticos
     fn get_default_backup_path(&self) -> Result<PathBuf, String>;
 
     /// Ejecutar script personalizado con variables
