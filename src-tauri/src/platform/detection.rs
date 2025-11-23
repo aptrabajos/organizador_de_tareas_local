@@ -21,44 +21,29 @@ impl ProgramDetector {
 
         #[cfg(target_os = "windows")]
         {
-            // Windows Terminal
-            if let Some(wt) = Self::find_program("wt") {
-                terminals.push(DetectedProgram {
-                    name: "Windows Terminal".to_string(),
-                    path: wt,
-                    version: None,
-                    is_default: true,
-                });
-            }
+            let windows_terminals = vec![
+                ("wt", "Windows Terminal"),
+                ("WindowsTerminal", "Windows Terminal"),
+                ("pwsh", "PowerShell 7"),
+                ("powershell", "PowerShell"),
+                ("cmd", "Command Prompt"),
+                ("bash", "Git Bash"),
+                ("ubuntu", "WSL Ubuntu"),
+                ("debian", "WSL Debian"),
+            ];
 
-            // PowerShell
-            if let Some(ps) = Self::find_program("powershell") {
-                terminals.push(DetectedProgram {
-                    name: "PowerShell".to_string(),
-                    path: ps,
-                    version: None,
-                    is_default: terminals.is_empty(),
-                });
-            }
-
-            // CMD
-            if let Some(cmd) = Self::find_program("cmd") {
-                terminals.push(DetectedProgram {
-                    name: "Command Prompt".to_string(),
-                    path: cmd,
-                    version: None,
-                    is_default: terminals.is_empty(),
-                });
-            }
-
-            // Git Bash
-            if let Some(bash) = Self::find_program("bash") {
-                terminals.push(DetectedProgram {
-                    name: "Git Bash".to_string(),
-                    path: bash,
-                    version: None,
-                    is_default: false,
-                });
+            for (cmd, name) in windows_terminals {
+                if let Some(path) = Self::find_program_windows(cmd) {
+                    // Evitar duplicados (ej: wt y WindowsTerminal son lo mismo)
+                    if !terminals.iter().any(|t| t.name == name) {
+                        terminals.push(DetectedProgram {
+                            name: name.to_string(),
+                            path,
+                            version: None,
+                            is_default: terminals.is_empty(),
+                        });
+                    }
+                }
             }
         }
 
