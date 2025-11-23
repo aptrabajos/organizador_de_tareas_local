@@ -104,8 +104,7 @@
         "featureGroupRefs": [],
         "featureRefs": [],
         "mergeRefs": [],
-        "skipWebviewInstall": false,
-        "enableElevatedUpdateInstall": false,
+        "enableElevatedUpdateTask": false,
         "bannerPath": null,
         "dialogImagePath": null
       },
