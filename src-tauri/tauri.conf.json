@@ -82,6 +82,11 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
+    "publisher": "Gestor de Proyectos",
+    "copyright": "Copyright © 2025. Todos los derechos reservados.",
+    "category": "DeveloperTool",
+    "shortDescription": "Gestor visual de proyectos locales",
+    "longDescription": "Aplicación de escritorio para gestionar proyectos de desarrollo de manera eficiente. Incluye organización de proyectos, sistema de diario, TODOs, analytics, integración con Git, atajos de teclado y más.",
     "linux": {
       "deb": {
         "depends": []
@@ -90,7 +95,37 @@
     "windows": {
       "certificateThumbprint": null,
       "digestAlgorithm": "sha256",
-      "timestampUrl": ""
+      "timestampUrl": "",
+      "wix": {
+        "language": "es-ES",
+        "template": null,
+        "fragmentPaths": [],
+        "componentRefs": [],
+        "featureGroupRefs": [],
+        "featureRefs": [],
+        "mergeRefs": [],
+        "skipWebviewInstall": false,
+        "license": null,
+        "enableElevatedUpdateInstall": false,
+        "bannerPath": null,
+        "dialogImagePath": null
+      },
+      "nsis": {
+        "license": null,
+        "headerImage": null,
+        "sidebarImage": null,
+        "installerIcon": null,
+        "installMode": "perMachine",
+        "languages": ["es-ES", "en-US"],
+        "displayLanguageSelector": true,
+        "compression": "lzma",
+        "template": null
+      },
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper"
+      },
+      "allowDowngrades": false,
+      "fileAssociations": []
     }
   },
   "plugins": {}
