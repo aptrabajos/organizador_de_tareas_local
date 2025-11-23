@@ -21,6 +21,9 @@ pub struct AppConfig {
 /// Configuración de plataforma (programas y comportamientos del OS)
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct PlatformConfig {
+    /// Sistema operativo a utilizar (Auto detecta automáticamente)
+    #[serde(default)]
+    pub os_override: OsOverride,
     /// Configuración de terminal
     pub terminal: ProgramConfig,
     /// Configuración de navegador
