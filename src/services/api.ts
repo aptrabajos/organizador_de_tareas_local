@@ -332,6 +332,34 @@ export async function selectBackupFolder(): Promise<string | null> {
   return await invoke('select_backup_folder');
 }
 
+// ==================== DIÁLOGOS NATIVOS ====================
+
+export async function selectFolder(title?: string): Promise<string | null> {
+  return await invoke('select_folder', { title });
+}
+
+export async function selectFile(
+  title?: string,
+  filters?: Array<[string, string[]]>
+): Promise<string | null> {
+  return await invoke('select_file', { title, filters });
+}
+
+export async function selectFiles(
+  title?: string,
+  filters?: Array<[string, string[]]>
+): Promise<string[]> {
+  return await invoke('select_files', { title, filters });
+}
+
+export async function saveFileDialog(
+  title?: string,
+  defaultName?: string,
+  filters?: Array<[string, string[]]>
+): Promise<string | null> {
+  return await invoke('save_file_dialog', { title, defaultName, filters });
+}
+
 // ==================== FUNCIONES PARA SHORTCUTS ====================
 
 export async function getShortcutsConfig(): Promise<
