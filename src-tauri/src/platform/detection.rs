@@ -243,4 +243,124 @@ impl ProgramDetector {
     pub fn program_exists(path: &str) -> bool {
         std::path::Path::new(path).exists()
     }
+
+    /// Buscar programa en ubicaciones comunes de Windows
+    #[cfg(target_os = "windows")]
+    fn find_in_windows_paths(executable_name: &str) -> Option<String> {
+        use std::env;
+        use std::path::Path;
+
+        // Lista de ubicaciones comunes en Windows
+        let common_paths = vec![
+            // Program Files
+            format!(
+                "C:\\Program Files\\{}\\{}",
+                executable_name, executable_name
+            ),
+            format!("C:\\Program Files\\{}.exe", executable_name),
+            format!(
+                "C:\\Program Files (x86)\\{}\\{}",
+                executable_name, executable_name
+            ),
+            format!("C:\\Program Files (x86)\\{}.exe", executable_name),
+            // AppData Local
+            format!(
+                "{}\\AppData\\Local\\Programs\\{}\\{}",
+                env::var("USERPROFILE").unwrap_or_default(),
+                executable_name,
+                executable_name
+            ),
+            format!(
+                "{}\\AppData\\Local\\{}\\{}",
+                env::var("USERPROFILE").unwrap_or_default(),
+                executable_name,
+                executable_name
+            ),
+            // Scoop
+            format!(
+                "{}\\scoop\\apps\\{}\\current\\{}",
+                env::var("USERPROFILE").unwrap_or_default(),
+                executable_name,
+                executable_name
+            ),
+            // Chocolatey
+            format!("C:\\ProgramData\\chocolatey\\bin\\{}.exe", executable_name),
+        ];
+
+        for path_str in common_paths {
+            let path = Path::new(&path_str);
+            if path.exists() {
+                return Some(path_str);
+            }
+            // Intentar con .exe si no se especificó
+            if !path_str.ends_with(".exe") {
+                let exe_path = format!("{}.exe", path_str);
+                if Path::new(&exe_path).exists() {
+                    return Some(exe_path);
+                }
+            }
+        }
+
+        None
+    }
+
+    /// Buscar programa primero en PATH, luego en ubicaciones comunes de Windows
+    #[cfg(target_os = "windows")]
+    fn find_program_windows(name: &str) -> Option<String> {
+        // Primero intentar con 'where' (PATH del sistema)
+        if let Some(path) = Self::find_program(name) {
+            return Some(path);
+        }
+
+        // Si no se encontró en PATH, buscar en ubicaciones comunes
+        Self::find_in_windows_paths(name)
+    }
+
+    /// Detectar programas específicos de Windows con búsqueda mejorada
+    #[cfg(target_os = "windows")]
+    pub fn detect_windows_specific() -> Vec<DetectedProgram> {
+        let mut programs = Vec::new();
+
+        // Terminales adicionales para Windows
+        let windows_terminals = vec![
+            ("wt", "Windows Terminal"),
+            ("WindowsTerminal", "Windows Terminal"),
+            ("pwsh", "PowerShell 7"),
+            ("bash", "Git Bash"),
+            ("ubuntu", "WSL Ubuntu"),
+            ("debian", "WSL Debian"),
+        ];
+
+        for (cmd, name) in windows_terminals {
+            if let Some(path) = Self::find_program_windows(cmd) {
+                programs.push(DetectedProgram {
+                    name: name.to_string(),
+                    path,
+                    version: None,
+                    is_default: programs.is_empty(),
+                });
+            }
+        }
+
+        // Editores de código comunes en Windows
+        let windows_editors = vec![
+            ("code", "Visual Studio Code"),
+            ("notepad++", "Notepad++"),
+            ("sublime_text", "Sublime Text"),
+            ("atom", "Atom"),
+        ];
+
+        for (cmd, name) in windows_editors {
+            if let Some(path) = Self::find_program_windows(cmd) {
+                programs.push(DetectedProgram {
+                    name: name.to_string(),
+                    path,
+                    version: None,
+                    is_default: false,
+                });
+            }
+        }
+
+        programs
+    }
 }
