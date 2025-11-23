@@ -85,6 +85,10 @@ fn main() {
             commands::open_file_manager,
             commands::open_text_editor,
             commands::select_backup_folder,
+            commands::select_folder,
+            commands::select_file,
+            commands::select_files,
+            commands::save_file_dialog,
             commands::get_shortcuts_config,
             commands::update_shortcuts_config,
             // Group commands (v0.4.0)
