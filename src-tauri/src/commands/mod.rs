@@ -1126,7 +1126,8 @@ pub async fn save_file_dialog(
     // Agregar filtros si se proporcionan
     if let Some(filter_list) = filters {
         for (name, extensions) in filter_list {
-            dialog = dialog.add_filter(&name, &extensions);
+            let ext_refs: Vec<&str> = extensions.iter().map(|s| s.as_str()).collect();
+            dialog = dialog.add_filter(&name, &ext_refs);
         }
     }
 
