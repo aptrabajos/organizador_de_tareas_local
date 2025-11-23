@@ -353,6 +353,55 @@ export default function Settings(props: { onClose: () => void }) {
                   Configura qué programas usar para abrir terminales, enlaces,
                   archivos, etc.
                 </p>
+
+                {/* Selector de Sistema Operativo */}
+                <div class="rounded-lg bg-blue-50 p-4 dark:bg-blue-900/20">
+                  <h3 class="mb-2 text-lg font-semibold text-gray-900 dark:text-white">
+                    💻 Sistema Operativo
+                  </h3>
+                  <p class="mb-3 text-sm text-gray-600 dark:text-gray-400">
+                    Selecciona el sistema operativo para detectar y configurar
+                    las herramientas apropiadas
+                  </p>
+                  <div>
+                    <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Sistema Operativo
+                    </label>
+                    <select
+                      class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                      value={config()?.platform.os_override || 'auto'}
+                      onChange={(e) => {
+                        const cfg = config();
+                        if (cfg) {
+                          setConfig({
+                            ...cfg,
+                            platform: {
+                              ...cfg.platform,
+                              os_override: e.currentTarget.value as
+                                | 'auto'
+                                | 'linux'
+                                | 'windows',
+                            },
+                          });
+                        }
+                      }}
+                    >
+                      <option value="auto">
+                        🔄 Auto - Detectar automáticamente
+                      </option>
+                      <option value="linux">🐧 Linux - Herramientas Linux</option>
+                      <option value="windows">
+                        🪟 Windows - Herramientas Windows
+                      </option>
+                    </select>
+                    <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                      💡 Tip: Usa "Auto" para detección automática. Solo cambia
+                      manualmente si necesitas forzar herramientas específicas de
+                      un sistema operativo.
+                    </p>
+                  </div>
+                </div>
+
                 {renderProgramConfig(
                   '🖥️ Terminal',
                   'terminal',
