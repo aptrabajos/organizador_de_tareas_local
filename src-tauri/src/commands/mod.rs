@@ -998,6 +998,151 @@ pub async fn select_backup_folder(app: tauri::AppHandle) -> Result<Option<String
     }
 }
 
+/// Selector de carpeta genérico
+#[tauri::command]
+pub async fn select_folder(
+    app: tauri::AppHandle,
+    title: Option<String>,
+) -> Result<Option<String>, String> {
+    let dialog_title = title.unwrap_or_else(|| "Seleccionar carpeta".to_string());
+    println!("📁 [DIALOG] Abriendo selector de carpeta: {}", dialog_title);
+
+    let result = tauri_plugin_dialog::DialogExt::dialog(&app)
+        .file()
+        .set_title(&dialog_title)
+        .blocking_pick_folder();
+
+    match result {
+        Some(path) => {
+            let path_str = path.to_string();
+            println!("✅ [DIALOG] Carpeta seleccionada: {}", path_str);
+            Ok(Some(path_str))
+        }
+        None => {
+            println!("⚠️ [DIALOG] Usuario canceló la selección");
+            Ok(None)
+        }
+    }
+}
+
+/// Selector de archivo único
+#[tauri::command]
+pub async fn select_file(
+    app: tauri::AppHandle,
+    title: Option<String>,
+    filters: Option<Vec<(String, Vec<String>)>>,
+) -> Result<Option<String>, String> {
+    let dialog_title = title.unwrap_or_else(|| "Seleccionar archivo".to_string());
+    println!("📄 [DIALOG] Abriendo selector de archivo: {}", dialog_title);
+
+    let mut dialog = tauri_plugin_dialog::DialogExt::dialog(&app)
+        .file()
+        .set_title(&dialog_title);
+
+    // Agregar filtros si se proporcionan
+    if let Some(filter_list) = filters {
+        for (name, extensions) in filter_list {
+            dialog = dialog.add_filter(&name, &extensions);
+        }
+    }
+
+    let result = dialog.blocking_pick_file();
+
+    match result {
+        Some(path) => {
+            let path_str = path.to_string();
+            println!("✅ [DIALOG] Archivo seleccionado: {}", path_str);
+            Ok(Some(path_str))
+        }
+        None => {
+            println!("⚠️ [DIALOG] Usuario canceló la selección");
+            Ok(None)
+        }
+    }
+}
+
+/// Selector de múltiples archivos
+#[tauri::command]
+pub async fn select_files(
+    app: tauri::AppHandle,
+    title: Option<String>,
+    filters: Option<Vec<(String, Vec<String>)>>,
+) -> Result<Vec<String>, String> {
+    let dialog_title = title.unwrap_or_else(|| "Seleccionar archivos".to_string());
+    println!(
+        "📄 [DIALOG] Abriendo selector de múltiples archivos: {}",
+        dialog_title
+    );
+
+    let mut dialog = tauri_plugin_dialog::DialogExt::dialog(&app)
+        .file()
+        .set_title(&dialog_title);
+
+    // Agregar filtros si se proporcionan
+    if let Some(filter_list) = filters {
+        for (name, extensions) in filter_list {
+            dialog = dialog.add_filter(&name, &extensions);
+        }
+    }
+
+    let result = dialog.blocking_pick_files();
+
+    match result {
+        Some(paths) => {
+            let path_strings: Vec<String> =
+                paths.iter().map(|p| p.to_string()).collect();
+            println!("✅ [DIALOG] {} archivos seleccionados", path_strings.len());
+            Ok(path_strings)
+        }
+        None => {
+            println!("⚠️ [DIALOG] Usuario canceló la selección");
+            Ok(Vec::new())
+        }
+    }
+}
+
+/// Diálogo para guardar archivo
+#[tauri::command]
+pub async fn save_file_dialog(
+    app: tauri::AppHandle,
+    title: Option<String>,
+    default_name: Option<String>,
+    filters: Option<Vec<(String, Vec<String>)>>,
+) -> Result<Option<String>, String> {
+    let dialog_title = title.unwrap_or_else(|| "Guardar archivo".to_string());
+    println!("💾 [DIALOG] Abriendo diálogo guardar: {}", dialog_title);
+
+    let mut dialog = tauri_plugin_dialog::DialogExt::dialog(&app)
+        .file()
+        .set_title(&dialog_title);
+
+    // Nombre por defecto
+    if let Some(name) = default_name {
+        dialog = dialog.set_file_name(&name);
+    }
+
+    // Agregar filtros si se proporcionan
+    if let Some(filter_list) = filters {
+        for (name, extensions) in filter_list {
+            dialog = dialog.add_filter(&name, &extensions);
+        }
+    }
+
+    let result = dialog.blocking_save_file();
+
+    match result {
+        Some(path) => {
+            let path_str = path.to_string();
+            println!("✅ [DIALOG] Ubicación de guardado: {}", path_str);
+            Ok(Some(path_str))
+        }
+        None => {
+            println!("⚠️ [DIALOG] Usuario canceló el guardado");
+            Ok(None)
+        }
+    }
+}
+
 // ==================== COMANDOS PARA SHORTCUTS ====================
 
 /// Obtener la configuración de atajos de teclado
