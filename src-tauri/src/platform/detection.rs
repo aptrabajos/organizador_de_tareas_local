@@ -190,13 +190,38 @@ impl ProgramDetector {
 
         #[cfg(target_os = "windows")]
         {
-            // Notepad (siempre disponible)
-            editors.push(DetectedProgram {
-                name: "Notepad".to_string(),
-                path: "notepad".to_string(),
-                version: None,
-                is_default: editors.is_empty(),
-            });
+            // Editores comunes en Windows
+            let windows_editors = vec![
+                ("code", "Visual Studio Code"),
+                ("notepad++", "Notepad++"),
+                ("sublime_text", "Sublime Text"),
+                ("atom", "Atom"),
+                ("vim", "Vim"),
+                ("nvim", "Neovim"),
+            ];
+
+            for (cmd, name) in windows_editors {
+                if let Some(path) = Self::find_program_windows(cmd) {
+                    if !editors.iter().any(|e| e.name == name) {
+                        editors.push(DetectedProgram {
+                            name: name.to_string(),
+                            path,
+                            version: None,
+                            is_default: editors.is_empty(),
+                        });
+                    }
+                }
+            }
+
+            // Notepad (siempre disponible como fallback)
+            if editors.is_empty() {
+                editors.push(DetectedProgram {
+                    name: "Notepad".to_string(),
+                    path: "notepad".to_string(),
+                    version: None,
+                    is_default: true,
+                });
+            }
         }
 
         editors
