@@ -105,13 +105,11 @@
         "featureRefs": [],
         "mergeRefs": [],
         "skipWebviewInstall": false,
-        "license": null,
         "enableElevatedUpdateInstall": false,
         "bannerPath": null,
         "dialogImagePath": null
       },
       "nsis": {
-        "license": null,
         "headerImage": null,
         "sidebarImage": null,
         "installerIcon": null,
