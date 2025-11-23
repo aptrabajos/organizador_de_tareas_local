@@ -3,6 +3,7 @@
 export type ProgramMode = 'auto' | 'default' | 'custom' | 'script';
 export type ThemeMode = 'light' | 'dark' | 'auto';
 export type LogLevel = 'trace' | 'debug' | 'info' | 'warn' | 'error';
+export type OsOverride = 'auto' | 'linux' | 'windows';
 
 // Configuración de un programa (terminal, navegador, etc.)
 export interface ProgramConfig {
