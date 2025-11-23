@@ -15,6 +15,7 @@ export interface ProgramConfig {
 
 // Configuración de plataforma
 export interface PlatformConfig {
+  os_override: OsOverride;
   terminal: ProgramConfig;
   browser: ProgramConfig;
   file_manager: ProgramConfig;
