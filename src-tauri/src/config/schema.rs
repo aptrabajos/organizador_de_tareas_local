@@ -131,6 +131,24 @@ pub enum LogLevel {
     Debug,
 }
 
+/// Sistema operativo a utilizar
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum OsOverride {
+    /// Detectar automáticamente el sistema operativo
+    Auto,
+    /// Forzar comportamiento de Linux
+    Linux,
+    /// Forzar comportamiento de Windows
+    Windows,
+}
+
+impl Default for OsOverride {
+    fn default() -> Self {
+        Self::Auto
+    }
+}
+
 /// Programa detectado en el sistema
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct DetectedProgram {
