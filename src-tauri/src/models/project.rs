@@ -169,7 +169,29 @@ pub struct UpdateJournalEntryDTO {
     pub tags: Option<String>,
 }
 
-// ==================== PROJECT TODOS ====================
+// ==================== DASHBOARD DATA ====================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DashboardTodo {
+    #[serde(flatten)]
+    pub todo: ProjectTodo,
+    pub project_name: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DashboardJournalEntry {
+    #[serde(flatten)]
+    pub entry: JournalEntry,
+    pub project_name: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DashboardData {
+    pub recent_projects: Vec<Project>,
+    pub pending_todos: Vec<DashboardTodo>,
+    pub recent_journal_entries: Vec<DashboardJournalEntry>,
+}
+
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProjectTodo {

@@ -12,6 +12,7 @@ import About from './components/About';
 import ProjectFilters from './components/ProjectFilters';
 import type { ProjectFiltersProps } from './components/ProjectFilters';
 import TreeView from './components/TreeView';
+import Dashboard from './components/Dashboard'; // Importar el nuevo componente
 import { ThemeProvider } from './contexts/ThemeContext';
 import { ShortcutsProvider, useShortcuts } from './contexts/ShortcutsContext';
 import type { Project } from './types/project';
@@ -28,6 +29,7 @@ const AppContent: Component = () => {
   const [showWelcome, setShowWelcome] = createSignal(false);
   const [showTreeView, setShowTreeView] = createSignal(false);
   const [showAbout, setShowAbout] = createSignal(false);
+  const [showDashboard, setShowDashboard] = createSignal(true); // Mostrar dashboard por defecto
   const [editingProject, setEditingProject] = createSignal<Project | null>(
     null
   );
@@ -202,6 +204,12 @@ const AppContent: Component = () => {
             </h1>
             <div class="flex gap-2">
               <button
+                onClick={() => setShowDashboard(!showDashboard())}
+                class="rounded-lg bg-purple-600 px-3 py-1.5 text-sm text-white hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 dark:bg-purple-500 dark:hover:bg-purple-600"
+              >
+                📊 {showDashboard() ? 'Ver Proyectos' : 'Ver Dashboard'}
+              </button>
+              <button
                 onClick={() => setShowTreeView(!showTreeView())}
                 class="rounded-lg bg-teal-600 px-3 py-1.5 text-sm text-white hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 dark:bg-teal-500 dark:hover:bg-teal-600"
               >
@@ -258,67 +266,76 @@ const AppContent: Component = () => {
       </header>
 
       {/* Main Content */}
-      <main class="px-2 py-4 sm:px-3 lg:px-4">
-        <div class="flex gap-4">
-          {/* TreeView Sidebar - Solo visible cuando showTreeView es true */}
-          <Show when={showTreeView()}>
-            <div class="w-80 flex-shrink-0">
-              <TreeView
-                onSelectProject={(project) => {
-                  // Si es un grupo, navegar a sus subproyectos
-                  if (!project.parent_id) {
-                    store.navigateToGroup(project);
-                  } else {
-                    // Si es un subproyecto, editarlo
-                    handleEdit(project);
-                  }
-                }}
-              />
+      <main>
+        <Show
+          when={showDashboard()}
+          fallback={
+            <div class="px-2 py-4 sm:px-3 lg:px-4">
+              <div class="flex gap-4">
+                {/* TreeView Sidebar - Solo visible cuando showTreeView es true */}
+                <Show when={showTreeView()}>
+                  <div class="w-80 flex-shrink-0">
+                    <TreeView
+                      onSelectProject={(project) => {
+                        // Si es un grupo, navegar a sus subproyectos
+                        if (!project.parent_id) {
+                          store.navigateToGroup(project);
+                        } else {
+                          // Si es un subproyecto, editarlo
+                          handleEdit(project);
+                        }
+                      }}
+                    />
+                  </div>
+                </Show>
+
+                {/* Main Content Area */}
+                <div class="flex-1">
+                  {/* Error Message */}
+                  <Show when={store.error()}>
+                    <div class="mb-4 rounded-lg bg-red-50 p-4 text-red-800 dark:bg-red-900/20 dark:text-red-200">
+                      <p class="font-medium">Error:</p>
+                      <p>{store.error()}</p>
+                    </div>
+                  </Show>
+
+                  {/* Loading State */}
+                  <Show when={store.isLoading()}>
+                    <div class="py-12 text-center">
+                      <p class="text-gray-600 dark:text-gray-400">
+                        Cargando proyectos...
+                      </p>
+                    </div>
+                  </Show>
+
+                  {/* Project List */}
+                  <Show when={!store.isLoading()}>
+                    <ProjectList
+                      projects={store.projects()}
+                      onEdit={handleEdit}
+                      onDelete={handleDelete}
+                      onOpenTerminal={handleOpenTerminal}
+                      onProjectsChanged={() => {
+                        // Recargar la vista actual (grupos o subproyectos)
+                        if (store.viewMode() === 'groups') {
+                          store.loadRootProjects();
+                        } else if (store.currentGroup()) {
+                          store.loadSubprojects(store.currentGroup()!.id);
+                        }
+                      }}
+                      renderFilters={setFilterProps}
+                      viewMode={store.viewMode()}
+                      onViewGroup={(group) => store.navigateToGroup(group)}
+                      searchActive={searchQuery().trim().length > 0}
+                    />
+                  </Show>
+                </div>
+              </div>
             </div>
-          </Show>
-
-          {/* Main Content Area */}
-          <div class="flex-1">
-            {/* Error Message */}
-            <Show when={store.error()}>
-              <div class="mb-4 rounded-lg bg-red-50 p-4 text-red-800 dark:bg-red-900/20 dark:text-red-200">
-                <p class="font-medium">Error:</p>
-                <p>{store.error()}</p>
-              </div>
-            </Show>
-
-            {/* Loading State */}
-            <Show when={store.isLoading()}>
-              <div class="py-12 text-center">
-                <p class="text-gray-600 dark:text-gray-400">
-                  Cargando proyectos...
-                </p>
-              </div>
-            </Show>
-
-            {/* Project List */}
-            <Show when={!store.isLoading()}>
-              <ProjectList
-                projects={store.projects()}
-                onEdit={handleEdit}
-                onDelete={handleDelete}
-                onOpenTerminal={handleOpenTerminal}
-                onProjectsChanged={() => {
-                  // Recargar la vista actual (grupos o subproyectos)
-                  if (store.viewMode() === 'groups') {
-                    store.loadRootProjects();
-                  } else if (store.currentGroup()) {
-                    store.loadSubprojects(store.currentGroup()!.id);
-                  }
-                }}
-                renderFilters={setFilterProps}
-                viewMode={store.viewMode()}
-                onViewGroup={(group) => store.navigateToGroup(group)}
-                searchActive={searchQuery().trim().length > 0}
-              />
-            </Show>
-          </div>
-        </div>
+          }
+        >
+          <Dashboard />
+        </Show>
       </main>
 
       {/* Modal Form */}

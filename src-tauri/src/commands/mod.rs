@@ -1,6 +1,24 @@
+use crate::models::project::{
+    CreateProjectDTO, CreateLinkDTO, Project, ProjectLink, UpdateProjectDTO, UpdateLinkDTO, ProjectWithChildren,
+    DashboardData
+};
 use crate::config::{AppConfig, ConfigManager, DetectedPrograms};
 use crate::db::Database;
-use crate::models::project::{CreateProjectDTO, CreateLinkDTO, Project, ProjectLink, UpdateProjectDTO, UpdateLinkDTO, ProjectWithChildren};
+
+#[tauri::command]
+pub async fn get_dashboard_data(db: State<'_, Database>) -> Result<DashboardData, String> {
+    println!("📊 [DASHBOARD] Obteniendo datos para el dashboard");
+    let recent_projects = db.get_recent_projects().map_err(|e| e.to_string())?;
+    let pending_todos = db.get_all_pending_todos().map_err(|e| e.to_string())?;
+    let recent_journal_entries = db.get_recent_journal_entries().map_err(|e| e.to_string())?;
+
+    Ok(DashboardData {
+        recent_projects,
+        pending_todos,
+        recent_journal_entries,
+    })
+}
+
 use crate::platform::{get_platform, ProgramDetector};
 use std::process::Command;
 use std::path::PathBuf;

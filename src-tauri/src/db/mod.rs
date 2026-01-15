@@ -1247,6 +1247,125 @@ impl Database {
         Ok(())
     }
 
+    // ==================== DASHBOARD METHODS ====================
+
+    pub fn get_recent_projects(&self) -> Result<Vec<Project>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT id, name, description, local_path, documentation_url, ai_documentation_url, drive_link, notes, image_data,
+                    created_at, updated_at, last_opened_at, opened_count, total_time_seconds,
+                    status, status_changed_at, is_pinned, pinned_order, display_order,
+                    parent_id, group_color, group_icon, is_group_expanded
+             FROM projects
+             WHERE last_opened_at IS NOT NULL
+             ORDER BY last_opened_at DESC
+             LIMIT 5"
+        )?;
+
+        let projects_iter = stmt.query_map([], |row| {
+            Ok(Project {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                description: row.get(2)?,
+                local_path: row.get(3)?,
+                documentation_url: row.get(4)?,
+                ai_documentation_url: row.get(5)?,
+                drive_link: row.get(6)?,
+                notes: row.get(7)?,
+                image_data: row.get(8)?,
+                links: None, // Links can be loaded separately if needed on dashboard
+                created_at: row.get(9)?,
+                updated_at: row.get(10)?,
+                last_opened_at: row.get(11)?,
+                opened_count: row.get(12)?,
+                total_time_seconds: row.get(13)?,
+                status: row.get(14)?,
+                status_changed_at: row.get(15)?,
+                is_pinned: row.get(16)?,
+                pinned_order: row.get(17)?,
+                display_order: row.get(18)?,
+                parent_id: row.get(19)?,
+                group_color: row.get(20)?,
+                group_icon: row.get(21)?,
+                is_group_expanded: row.get(22)?,
+            })
+        })?;
+
+        let mut projects = Vec::new();
+        for project in projects_iter {
+            projects.push(project?);
+        }
+        Ok(projects)
+    }
+
+    pub fn get_all_pending_todos(&self) -> Result<Vec<crate::models::project::DashboardTodo>> {
+        use crate::models::project::{DashboardTodo, ProjectTodo};
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT
+                pt.id, pt.project_id, pt.content, pt.is_completed, pt.created_at, pt.completed_at,
+                p.name as project_name
+             FROM project_todos pt
+             JOIN projects p ON pt.project_id = p.id
+             WHERE pt.is_completed = 0
+             ORDER BY pt.created_at DESC"
+        )?;
+
+        let todos_iter = stmt.query_map([], |row| {
+            Ok(DashboardTodo {
+                todo: ProjectTodo {
+                    id: row.get(0)?,
+                    project_id: row.get(1)?,
+                    content: row.get(2)?,
+                    is_completed: row.get(3)?,
+                    created_at: row.get(4)?,
+                    completed_at: row.get(5)?,
+                },
+                project_name: row.get(6)?,
+            })
+        })?;
+
+        let mut todos = Vec::new();
+        for todo in todos_iter {
+            todos.push(todo?);
+        }
+        Ok(todos)
+    }
+
+    pub fn get_recent_journal_entries(&self) -> Result<Vec<crate::models::project::DashboardJournalEntry>> {
+        use crate::models::project::{DashboardJournalEntry, JournalEntry};
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT
+                pj.id, pj.project_id, pj.content, pj.tags, pj.created_at, pj.updated_at,
+                p.name as project_name
+             FROM project_journal pj
+             JOIN projects p ON pj.project_id = p.id
+             ORDER BY pj.created_at DESC
+             LIMIT 5"
+        )?;
+
+        let entries_iter = stmt.query_map([], |row| {
+            Ok(DashboardJournalEntry {
+                entry: JournalEntry {
+                    id: row.get(0)?,
+                    project_id: row.get(1)?,
+                    content: row.get(2)?,
+                    tags: row.get(3)?,
+                    created_at: row.get(4)?,
+                    updated_at: row.get(5)?,
+                },
+                project_name: row.get(6)?,
+            })
+        })?;
+
+        let mut entries = Vec::new();
+        for entry in entries_iter {
+            entries.push(entry?);
+        }
+        Ok(entries)
+    }
+
     // ==================== MÉTODOS DE GRUPOS DE PROYECTOS (v0.4.0) ====================
 
     /// Obtener solo proyectos raíz (sin parent_id, grupos principales)

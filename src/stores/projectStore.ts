@@ -35,7 +35,14 @@ export function createProjectStore() {
     setError(null);
     try {
       await api.createProject(project);
-      await loadProjects();
+      // Recargar la vista actual para reflejar el nuevo proyecto
+      if (viewMode() === 'groups') {
+        await loadRootProjects();
+      } else if (currentGroup()) {
+        await loadSubprojects(currentGroup()!.id);
+      } else {
+        await loadRootProjects();
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error desconocido');
       throw err;
@@ -58,7 +65,15 @@ export function createProjectStore() {
       console.log(
         '✅ [STORE] API updateProject exitosa, recargando proyectos...'
       );
-      await loadProjects();
+      // Recargar la vista actual en lugar de todos los proyectos
+      if (viewMode() === 'groups') {
+        await loadRootProjects();
+      } else if (currentGroup()) {
+        await loadSubprojects(currentGroup()!.id);
+      } else {
+        // Fallback por si acaso
+        await loadRootProjects();
+      }
       console.log('✅ [STORE] Proyectos recargados exitosamente');
     } catch (err) {
       console.error('❌ [STORE] Error en updateProject:', err);
@@ -74,7 +89,14 @@ export function createProjectStore() {
     setError(null);
     try {
       await api.deleteProject(id);
-      await loadProjects();
+      // Recargar la vista actual para reflejar la eliminación
+      if (viewMode() === 'groups') {
+        await loadRootProjects();
+      } else if (currentGroup()) {
+        await loadSubprojects(currentGroup()!.id);
+      } else {
+        await loadRootProjects();
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error desconocido');
       throw err;

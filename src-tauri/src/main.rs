@@ -99,6 +99,8 @@ fn main() {
             commands::assign_project_to_group,
             // PDF Export (v0.4.1)
             commands::export_project_to_pdf,
+            // Dashboard (v0.5.0)
+            commands::get_dashboard_data,
         ])
         .run(tauri::generate_context!())
         .expect("Error al ejecutar la aplicación Tauri");

@@ -17,6 +17,7 @@ import type {
   UpdateTodoDTO,
 } from '../types/project';
 import type { AppConfig, DetectedPrograms } from '../types/config';
+import type { DashboardData } from '../types/dashboard';
 
 export async function createProject(
   project: CreateProjectDTO
@@ -405,4 +406,10 @@ export async function assignProjectToGroup(
 
 export async function exportProjectToPdf(projectId: number): Promise<string> {
   return await invoke('export_project_to_pdf', { projectId });
+}
+
+// ==================== FUNCIONES PARA DASHBOARD (v0.5.0) ====================
+
+export async function getDashboardData(): Promise<DashboardData> {
+  return await invoke('get_dashboard_data');
 }
