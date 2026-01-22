@@ -12,7 +12,7 @@ import About from './components/About';
 import ProjectFilters from './components/ProjectFilters';
 import type { ProjectFiltersProps } from './components/ProjectFilters';
 import TreeView from './components/TreeView';
-import Dashboard from './components/Dashboard'; // Importar el nuevo componente
+import Dashboard from './components/Dashboard';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { ShortcutsProvider, useShortcuts } from './contexts/ShortcutsContext';
 import type { Project } from './types/project';
@@ -29,7 +29,7 @@ const AppContent: Component = () => {
   const [showWelcome, setShowWelcome] = createSignal(false);
   const [showTreeView, setShowTreeView] = createSignal(false);
   const [showAbout, setShowAbout] = createSignal(false);
-  const [showDashboard, setShowDashboard] = createSignal(true); // Mostrar dashboard por defecto
+  const [showDashboard, setShowDashboard] = createSignal(true);
   const [editingProject, setEditingProject] = createSignal<Project | null>(
     null
   );
@@ -81,7 +81,6 @@ const AppContent: Component = () => {
 
     shortcuts.registerHandler('refresh', () => {
       console.log('🎯 [SHORTCUT] Recargar proyectos');
-      // Recargar vista actual (v0.4.0)
       if (store.viewMode() === 'groups') {
         store.loadRootProjects();
       } else if (store.currentGroup()) {
@@ -91,7 +90,6 @@ const AppContent: Component = () => {
 
     shortcuts.registerHandler('close_modal', () => {
       console.log('🎯 [SHORTCUT] Cerrar modal');
-      // Cerrar cualquier modal activo
       if (showForm()) {
         setShowForm(false);
         setEditingProject(null);
@@ -102,7 +100,6 @@ const AppContent: Component = () => {
       }
     });
 
-    // Después de registrar todos los handlers, activar los shortcuts globales
     console.log(
       '🚀 [SHORTCUTS] Todos los handlers registrados, activando shortcuts globales'
     );
@@ -116,7 +113,6 @@ const AppContent: Component = () => {
     if (query.trim()) {
       store.searchProjects(query);
     } else {
-      // Recargar vista actual según el modo (v0.4.0)
       if (store.viewMode() === 'groups') {
         store.loadRootProjects();
       } else if (store.currentGroup()) {
@@ -190,72 +186,189 @@ const AppContent: Component = () => {
   };
 
   return (
-    <div class="min-h-screen bg-gray-50 transition-colors duration-300 dark:bg-gray-900">
-      <Toaster position="top-right" />
+    <div class="min-h-screen bg-surface-50 transition-colors duration-300 dark:bg-surface-950">
+      <Toaster
+        position="top-right"
+        toastOptions={{
+          className:
+            '!bg-white dark:!bg-surface-800 !text-surface-900 dark:!text-surface-100 !shadow-lg !border !border-surface-200 dark:!border-surface-700 !rounded-xl',
+        }}
+      />
       <ThemeToggle />
 
-      {/* Header */}
-      <header class="border-b border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
-        <div class="px-3 py-2 sm:px-4 lg:px-5">
-          {/* Primera fila: Título y botones principales */}
-          <div class="flex items-center justify-between">
-            <h1 class="text-xl font-bold text-gray-900 dark:text-white sm:text-2xl">
-              Gestor de Proyectos
-            </h1>
-            <div class="flex gap-2">
+      {/* ═══════════════════════════════════════════════════════════════════════
+          HEADER - Developer Command Center Style
+          ═══════════════════════════════════════════════════════════════════════ */}
+      <header class="app-header">
+        <div class="px-4 py-3 sm:px-6">
+          {/* Primera fila: Logo/Título + Navegación principal */}
+          <div class="flex items-center justify-between gap-4">
+            {/* Logo y título */}
+            <div class="flex items-center gap-3">
+              <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-accent-500 to-emerald-500 text-lg shadow-glow-sm">
+                <span class="font-bold text-white">GP</span>
+              </div>
+              <div>
+                <h1 class="text-lg font-bold tracking-tight text-surface-900 dark:text-white">
+                  Gestor de Proyectos
+                </h1>
+                <p class="text-xs text-surface-500 dark:text-surface-400">
+                  Developer Command Center
+                </p>
+              </div>
+            </div>
+
+            {/* Navegación principal */}
+            <nav class="flex items-center gap-2">
               <button
                 onClick={() => setShowDashboard(!showDashboard())}
-                class="rounded-lg bg-purple-600 px-3 py-1.5 text-sm text-white hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 dark:bg-purple-500 dark:hover:bg-purple-600"
+                class={`btn-ghost group relative flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-all ${
+                  showDashboard()
+                    ? 'bg-accent-500/10 text-accent-600 dark:bg-accent-400/10 dark:text-accent-400'
+                    : ''
+                }`}
               >
-                📊 {showDashboard() ? 'Ver Proyectos' : 'Ver Dashboard'}
+                <svg
+                  class="h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"
+                  />
+                </svg>
+                <span class="hidden sm:inline">Dashboard</span>
               </button>
+
               <button
                 onClick={() => setShowTreeView(!showTreeView())}
-                class="rounded-lg bg-teal-600 px-3 py-1.5 text-sm text-white hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 dark:bg-teal-500 dark:hover:bg-teal-600"
+                class={`btn-ghost group relative flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-all ${
+                  showTreeView()
+                    ? 'bg-emerald-500/10 text-emerald-600 dark:bg-emerald-400/10 dark:text-emerald-400'
+                    : ''
+                }`}
               >
-                🌳 {showTreeView() ? 'Ocultar' : 'Árbol'}
+                <svg
+                  class="h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M4 6h16M4 10h16M4 14h16M4 18h16"
+                  />
+                </svg>
+                <span class="hidden sm:inline">Árbol</span>
               </button>
+
+              <div class="mx-2 h-6 w-px bg-surface-200 dark:bg-surface-700" />
+
               <button
                 onClick={() => setShowSettings(true)}
-                class="rounded-lg bg-gray-600 px-3 py-1.5 text-sm text-white hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 dark:bg-gray-500 dark:hover:bg-gray-600"
+                class="btn-icon"
+                title="Configuración (Ctrl+,)"
               >
-                ⚙️ Configuración
+                <svg
+                  class="h-5 w-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                  />
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                  />
+                </svg>
               </button>
+
               <button
                 onClick={() => setShowAbout(true)}
-                class="rounded-lg bg-indigo-600 px-3 py-1.5 text-sm text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:bg-indigo-500 dark:hover:bg-indigo-600"
+                class="btn-icon"
+                title="Acerca de (Ctrl+Shift+A)"
               >
-                📖 Acerca de
+                <svg
+                  class="h-5 w-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
               </button>
-              <button
-                onClick={handleNewProject}
-                class="rounded-lg bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:bg-blue-500 dark:hover:bg-blue-600"
-              >
-                + Nuevo Proyecto
+
+              <button onClick={handleNewProject} class="btn-primary ml-2">
+                <svg
+                  class="h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M12 4v16m8-8H4"
+                  />
+                </svg>
+                <span class="hidden sm:inline">Nuevo</span>
               </button>
-            </div>
+            </nav>
           </div>
 
-          {/* Segunda fila: Navegación + Búsqueda y Filtros */}
-          {/* Breadcrumb de navegación (v0.4.0) */}
+          {/* Segunda fila: Breadcrumb + Búsqueda y Filtros */}
           <Show
             when={store.viewMode() === 'subprojects' && store.currentGroup()}
           >
-            <div class="mt-2 flex items-center gap-2">
+            <div class="mt-3 flex items-center gap-2">
               <button
                 onClick={() => store.navigateBack()}
-                class="rounded-lg bg-gray-100 px-3 py-1 text-sm text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                class="inline-flex items-center gap-1.5 rounded-lg bg-surface-100 px-3 py-1.5 text-sm font-medium text-surface-700 transition-all hover:bg-surface-200 dark:bg-surface-800 dark:text-surface-300 dark:hover:bg-surface-700"
               >
-                ← Volver a Grupos
+                <svg
+                  class="h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M10 19l-7-7m0 0l7-7m-7 7h18"
+                  />
+                </svg>
+                Grupos
               </button>
-              <span class="text-sm text-gray-600 dark:text-gray-400">
-                / 📁 {store.currentGroup()?.name}
+              <span class="text-surface-400 dark:text-surface-600">/</span>
+              <span class="badge-accent">
+                <span class="mr-1">📁</span>
+                {store.currentGroup()?.name}
               </span>
             </div>
           </Show>
 
-          <div class="mt-2 flex flex-wrap items-center gap-2">
-            <div class="min-w-[200px] flex-1">
+          <div class="mt-3 flex flex-wrap items-center gap-3">
+            <div class="min-w-[280px] flex-1">
               <SearchBar onSearch={handleSearch} value={searchQuery()} />
             </div>
             <Show when={filterProps()}>
@@ -265,44 +378,68 @@ const AppContent: Component = () => {
         </div>
       </header>
 
-      {/* Main Content */}
-      <main>
+      {/* ═══════════════════════════════════════════════════════════════════════
+          MAIN CONTENT
+          ═══════════════════════════════════════════════════════════════════════ */}
+      <main class="min-h-[calc(100vh-140px)]">
         <Show
           when={showDashboard()}
           fallback={
-            <div class="px-2 py-4 sm:px-3 lg:px-4">
-              <div class="flex gap-4">
-                {/* TreeView Sidebar - Solo visible cuando showTreeView es true */}
+            <div class="p-4 sm:p-6">
+              <div class="flex gap-6">
+                {/* TreeView Sidebar */}
                 <Show when={showTreeView()}>
-                  <div class="w-80 flex-shrink-0">
-                    <TreeView
-                      onSelectProject={(project) => {
-                        // Si es un grupo, navegar a sus subproyectos
-                        if (!project.parent_id) {
-                          store.navigateToGroup(project);
-                        } else {
-                          // Si es un subproyecto, editarlo
-                          handleEdit(project);
-                        }
-                      }}
-                    />
-                  </div>
+                  <aside class="hidden w-72 flex-shrink-0 lg:block xl:w-80">
+                    <div class="sticky top-24">
+                      <TreeView
+                        onSelectProject={(project) => {
+                          if (!project.parent_id) {
+                            store.navigateToGroup(project);
+                          } else {
+                            handleEdit(project);
+                          }
+                        }}
+                      />
+                    </div>
+                  </aside>
                 </Show>
 
                 {/* Main Content Area */}
                 <div class="flex-1">
                   {/* Error Message */}
                   <Show when={store.error()}>
-                    <div class="mb-4 rounded-lg bg-red-50 p-4 text-red-800 dark:bg-red-900/20 dark:text-red-200">
-                      <p class="font-medium">Error:</p>
-                      <p>{store.error()}</p>
+                    <div class="mb-6 flex items-center gap-3 rounded-xl border border-rose-200 bg-rose-50 p-4 dark:border-rose-800 dark:bg-rose-900/20">
+                      <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-rose-100 dark:bg-rose-900/50">
+                        <svg
+                          class="h-5 w-5 text-rose-600 dark:text-rose-400"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                          />
+                        </svg>
+                      </div>
+                      <div>
+                        <p class="font-medium text-rose-800 dark:text-rose-200">
+                          Error
+                        </p>
+                        <p class="text-sm text-rose-600 dark:text-rose-300">
+                          {store.error()}
+                        </p>
+                      </div>
                     </div>
                   </Show>
 
                   {/* Loading State */}
                   <Show when={store.isLoading()}>
-                    <div class="py-12 text-center">
-                      <p class="text-gray-600 dark:text-gray-400">
+                    <div class="flex flex-col items-center justify-center py-16">
+                      <div class="spinner mb-4 h-8 w-8" />
+                      <p class="text-sm text-surface-500 dark:text-surface-400">
                         Cargando proyectos...
                       </p>
                     </div>
@@ -316,7 +453,6 @@ const AppContent: Component = () => {
                       onDelete={handleDelete}
                       onOpenTerminal={handleOpenTerminal}
                       onProjectsChanged={() => {
-                        // Recargar la vista actual (grupos o subproyectos)
                         if (store.viewMode() === 'groups') {
                           store.loadRootProjects();
                         } else if (store.currentGroup()) {
@@ -334,17 +470,50 @@ const AppContent: Component = () => {
             </div>
           }
         >
-          <Dashboard />
+          <Dashboard
+            onProjectClick={(project) => {
+              // Cerrar dashboard y navegar al proyecto
+              setShowDashboard(false);
+              // Buscar el proyecto por nombre para mostrarlo
+              setSearchQuery(project.name);
+              store.searchProjects(project.name);
+            }}
+          />
         </Show>
       </main>
 
+      {/* ═══════════════════════════════════════════════════════════════════════
+          MODALS
+          ═══════════════════════════════════════════════════════════════════════ */}
+
       {/* Modal Form */}
       <Show when={showForm()}>
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4 dark:bg-opacity-70">
-          <div class="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg bg-white p-6 shadow-xl dark:bg-gray-800">
-            <h2 class="mb-4 text-xl font-semibold text-gray-900 dark:text-white">
-              {editingProject() ? 'Editar Proyecto' : 'Nuevo Proyecto'}
-            </h2>
+        <div class="modal-overlay">
+          <div class="modal-content max-w-lg">
+            <div class="mb-6 flex items-center justify-between">
+              <h2 class="text-xl font-bold text-surface-900 dark:text-white">
+                {editingProject() ? 'Editar Proyecto' : 'Nuevo Proyecto'}
+              </h2>
+              <button
+                onClick={handleFormCancel}
+                class="btn-icon-sm"
+                aria-label="Cerrar"
+              >
+                <svg
+                  class="h-5 w-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
             <ProjectFormTabs
               project={editingProject() || undefined}
               onSubmit={handleFormSubmit}

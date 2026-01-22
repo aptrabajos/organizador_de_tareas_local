@@ -1,78 +1,440 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Variables de color para tema claro y oscuro */
-:root {
-  --bg-primary: #ffffff;
-  --bg-secondary: #f3f4f6;
-  --text-primary: #111827;
-  --text-secondary: #6b7280;
-  --border-color: #e5e7eb;
-}
+/* ═══════════════════════════════════════════════════════════════════════════
+   GESTOR DE PROYECTOS - Developer Command Center Theme
+   ═══════════════════════════════════════════════════════════════════════════ */
 
-.dark {
-  --bg-primary: #1f2937;
-  --bg-secondary: #111827;
-  --text-primary: #f9fafb;
-  --text-secondary: #9ca3af;
-  --border-color: #374151;
-}
-
-body {
-  margin: 0;
-  font-family:
-    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu',
-    'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  background-color: var(--bg-secondary);
-  color: var(--text-primary);
-  transition:
-    background-color 0.3s ease,
-    color 0.3s ease;
-}
-
-#root {
-  height: 100vh;
-  width: 100vw;
-}
-
-/* Estilos adicionales para transiciones suaves */
-* {
-  transition-property: background-color, border-color, color;
-  transition-duration: 0.3s;
-  transition-timing-function: ease;
-}
-
-/* Animación suave para actualización de proyectos */
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(-4px);
+@layer base {
+  :root {
+    /* Light Theme */
+    --color-bg-primary: 248 250 252;
+    --color-bg-secondary: 241 245 249;
+    --color-bg-tertiary: 255 255 255;
+    --color-text-primary: 15 23 42;
+    --color-text-secondary: 71 85 105;
+    --color-text-muted: 148 163 184;
+    --color-border: 226 232 240;
+    --color-border-subtle: 241 245 249;
+    --color-accent: 6 182 212;
+    --color-accent-muted: 6 182 212 / 0.1;
   }
-  to {
-    opacity: 1;
-    transform: translateY(0);
+
+  .dark {
+    /* Dark Theme - Primary */
+    --color-bg-primary: 2 6 23;
+    --color-bg-secondary: 15 23 42;
+    --color-bg-tertiary: 30 41 59;
+    --color-text-primary: 248 250 252;
+    --color-text-secondary: 203 213 225;
+    --color-text-muted: 100 116 139;
+    --color-border: 51 65 85;
+    --color-border-subtle: 30 41 59;
+    --color-accent: 34 211 238;
+    --color-accent-muted: 34 211 238 / 0.15;
+  }
+
+  html {
+    font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    @apply bg-surface-50 text-surface-900 dark:bg-surface-950 dark:text-surface-50;
+    background-image:
+      radial-gradient(at 40% 20%, rgba(6, 182, 212, 0.03) 0px, transparent 50%),
+      radial-gradient(at 80% 0%, rgba(16, 185, 129, 0.02) 0px, transparent 50%);
+  }
+
+  .dark body {
+    background-image:
+      radial-gradient(at 40% 20%, rgba(6, 182, 212, 0.08) 0px, transparent 50%),
+      radial-gradient(at 80% 0%, rgba(16, 185, 129, 0.05) 0px, transparent 50%),
+      radial-gradient(at 0% 80%, rgba(6, 182, 212, 0.03) 0px, transparent 50%);
+  }
+
+  #root {
+    min-height: 100vh;
+    width: 100%;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-surface-100 dark:bg-surface-900;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-surface-300 hover:bg-surface-400 dark:bg-surface-700 dark:hover:bg-surface-600;
+  }
+
+  /* Selection color */
+  ::selection {
+    @apply bg-accent-500/30 text-surface-900 dark:text-surface-50;
   }
 }
 
-@keyframes pulseGreen {
-  0%,
-  100% {
-    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4);
+@layer components {
+  /* ─────────────────────────────────────────────────────────────────────────
+     Glass Card Effect
+     ───────────────────────────────────────────────────────────────────────── */
+  .glass-card {
+    @apply relative overflow-hidden rounded-xl border border-surface-200/60 bg-white/80 backdrop-blur-sm transition-all duration-300 dark:border-surface-700/50 dark:bg-surface-800/80;
   }
-  50% {
-    box-shadow: 0 0 0 4px rgba(34, 197, 94, 0);
+
+  .glass-card::before {
+    content: '';
+    @apply pointer-events-none absolute inset-0 rounded-xl;
+    background: linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.1) 0%,
+      rgba(255, 255, 255, 0) 50%
+    );
+  }
+
+  .dark .glass-card::before {
+    background: linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.03) 0%,
+      rgba(255, 255, 255, 0) 50%
+    );
+  }
+
+  /* ─────────────────────────────────────────────────────────────────────────
+     Project Card Styles
+     ───────────────────────────────────────────────────────────────────────── */
+  .project-card {
+    @apply glass-card p-4 shadow-card hover:shadow-card-hover dark:shadow-card-dark dark:hover:shadow-card-dark-hover;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .project-card:hover {
+    @apply border-accent-400/30 dark:border-accent-500/30;
+    transform: translateY(-2px);
+  }
+
+  .project-card-updated {
+    animation: cardUpdate 0.6s ease-out;
+  }
+
+  @keyframes cardUpdate {
+    0% {
+      opacity: 0;
+      transform: translateY(-8px);
+    }
+    50% {
+      box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.3);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+      box-shadow: none;
+    }
+  }
+
+  /* ─────────────────────────────────────────────────────────────────────────
+     Button Styles
+     ───────────────────────────────────────────────────────────────────────── */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .btn-primary {
+    @apply btn bg-gradient-to-r from-accent-500 to-accent-600 text-white shadow-sm hover:from-accent-600 hover:to-accent-700 focus:ring-accent-500 active:scale-[0.98];
+  }
+
+  .btn-secondary {
+    @apply btn border border-surface-300 bg-white text-surface-700 hover:border-surface-400 hover:bg-surface-50 focus:ring-surface-300 dark:border-surface-600 dark:bg-surface-800 dark:text-surface-200 dark:hover:bg-surface-700;
+  }
+
+  .btn-ghost {
+    @apply btn text-surface-600 hover:bg-surface-100 hover:text-surface-900 dark:text-surface-400 dark:hover:bg-surface-800 dark:hover:text-surface-100;
+  }
+
+  .btn-danger {
+    @apply btn bg-rose-500 text-white hover:bg-rose-600 focus:ring-rose-500;
+  }
+
+  .btn-success {
+    @apply btn bg-emerald-500 text-white hover:bg-emerald-600 focus:ring-emerald-500;
+  }
+
+  .btn-icon {
+    @apply flex h-9 w-9 items-center justify-center rounded-lg p-0 text-surface-500 transition-all duration-200 hover:bg-surface-100 hover:text-surface-700 dark:text-surface-400 dark:hover:bg-surface-800 dark:hover:text-surface-200;
+  }
+
+  .btn-icon-sm {
+    @apply flex h-7 w-7 items-center justify-center rounded-md p-0 text-surface-500 transition-all duration-200 hover:bg-surface-100 hover:text-surface-700 dark:text-surface-400 dark:hover:bg-surface-700 dark:hover:text-surface-200;
+  }
+
+  /* ─────────────────────────────────────────────────────────────────────────
+     Action Button Pills (for project cards)
+     ───────────────────────────────────────────────────────────────────────── */
+  .action-pill {
+    @apply flex h-8 items-center justify-center rounded-lg px-3 text-xs font-medium transition-all duration-200 active:scale-95;
+  }
+
+  .action-pill-primary {
+    @apply action-pill bg-gradient-to-r from-accent-500 to-accent-600 text-white shadow-sm hover:shadow-glow-sm;
+  }
+
+  .action-pill-emerald {
+    @apply action-pill bg-emerald-500/10 text-emerald-600 ring-1 ring-emerald-500/20 hover:bg-emerald-500 hover:text-white hover:ring-0 dark:text-emerald-400 dark:hover:bg-emerald-500;
+  }
+
+  .action-pill-amber {
+    @apply action-pill bg-amber-500/10 text-amber-600 ring-1 ring-amber-500/20 hover:bg-amber-500 hover:text-white hover:ring-0 dark:text-amber-400 dark:hover:bg-amber-500;
+  }
+
+  .action-pill-rose {
+    @apply action-pill bg-rose-500/10 text-rose-600 ring-1 ring-rose-500/20 hover:bg-rose-500 hover:text-white hover:ring-0 dark:text-rose-400 dark:hover:bg-rose-500;
+  }
+
+  .action-pill-surface {
+    @apply action-pill bg-surface-100 text-surface-600 ring-1 ring-surface-200 hover:bg-surface-200 hover:text-surface-900 dark:bg-surface-800 dark:text-surface-300 dark:ring-surface-700 dark:hover:bg-surface-700 dark:hover:text-surface-100;
+  }
+
+  /* ─────────────────────────────────────────────────────────────────────────
+     Input Styles
+     ───────────────────────────────────────────────────────────────────────── */
+  .input {
+    @apply w-full rounded-lg border border-surface-300 bg-white px-4 py-2.5 text-surface-900 placeholder-surface-400 transition-all duration-200 focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-500/20 dark:border-surface-600 dark:bg-surface-800 dark:text-surface-100 dark:placeholder-surface-500 dark:focus:border-accent-400 dark:focus:ring-accent-400/20;
+  }
+
+  .input-with-icon {
+    @apply pl-10;
+  }
+
+  /* ─────────────────────────────────────────────────────────────────────────
+     Badge Styles
+     ───────────────────────────────────────────────────────────────────────── */
+  .badge {
+    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium;
+  }
+
+  .badge-accent {
+    @apply badge bg-accent-500/10 text-accent-600 ring-1 ring-inset ring-accent-500/20 dark:bg-accent-400/10 dark:text-accent-400 dark:ring-accent-400/20;
+  }
+
+  .badge-emerald {
+    @apply badge bg-emerald-500/10 text-emerald-600 ring-1 ring-inset ring-emerald-500/20 dark:bg-emerald-400/10 dark:text-emerald-400 dark:ring-emerald-400/20;
+  }
+
+  .badge-amber {
+    @apply badge bg-amber-500/10 text-amber-600 ring-1 ring-inset ring-amber-500/20 dark:bg-amber-400/10 dark:text-amber-400 dark:ring-amber-400/20;
+  }
+
+  .badge-rose {
+    @apply badge bg-rose-500/10 text-rose-600 ring-1 ring-inset ring-rose-500/20 dark:bg-rose-400/10 dark:text-rose-400 dark:ring-rose-400/20;
+  }
+
+  .badge-surface {
+    @apply badge bg-surface-100 text-surface-600 ring-1 ring-inset ring-surface-200 dark:bg-surface-800 dark:text-surface-400 dark:ring-surface-700;
+  }
+
+  /* ─────────────────────────────────────────────────────────────────────────
+     Status Indicator
+     ───────────────────────────────────────────────────────────────────────── */
+  .status-dot {
+    @apply relative flex h-2.5 w-2.5 items-center justify-center;
+  }
+
+  .status-dot::before {
+    content: '';
+    @apply absolute h-full w-full animate-ping rounded-full opacity-75;
+  }
+
+  .status-dot::after {
+    content: '';
+    @apply relative h-2 w-2 rounded-full;
+  }
+
+  .status-dot-active::before {
+    @apply bg-emerald-400;
+  }
+  .status-dot-active::after {
+    @apply bg-emerald-500;
+  }
+
+  .status-dot-paused::before {
+    @apply animate-none bg-amber-400;
+  }
+  .status-dot-paused::after {
+    @apply bg-amber-500;
+  }
+
+  .status-dot-completed::before {
+    @apply animate-none bg-accent-400;
+  }
+  .status-dot-completed::after {
+    @apply bg-accent-500;
+  }
+
+  .status-dot-archived::before {
+    @apply animate-none bg-surface-400;
+  }
+  .status-dot-archived::after {
+    @apply bg-surface-500;
+  }
+
+  /* ─────────────────────────────────────────────────────────────────────────
+     Modal Styles
+     ───────────────────────────────────────────────────────────────────────── */
+  .modal-overlay {
+    @apply fixed inset-0 z-50 flex items-center justify-center bg-surface-950/60 backdrop-blur-sm;
+    animation: fadeIn 0.2s ease-out;
+  }
+
+  .modal-content {
+    @apply relative max-h-[90vh] w-full overflow-y-auto rounded-2xl border border-surface-200 bg-white p-6 shadow-2xl dark:border-surface-700 dark:bg-surface-900;
+    animation: scaleIn 0.25s ease-out;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes scaleIn {
+    from {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  /* ─────────────────────────────────────────────────────────────────────────
+     Header Styles
+     ───────────────────────────────────────────────────────────────────────── */
+  .app-header {
+    @apply sticky top-0 z-40 border-b border-surface-200/80 bg-white/90 backdrop-blur-md dark:border-surface-800 dark:bg-surface-950/90;
+  }
+
+  /* ─────────────────────────────────────────────────────────────────────────
+     Sidebar Styles (TreeView)
+     ───────────────────────────────────────────────────────────────────────── */
+  .sidebar {
+    @apply h-full overflow-hidden rounded-xl border border-surface-200 bg-white shadow-sm dark:border-surface-800 dark:bg-surface-900;
+  }
+
+  .sidebar-item {
+    @apply flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm text-surface-600 transition-all duration-200 hover:bg-surface-100 hover:text-surface-900 dark:text-surface-400 dark:hover:bg-surface-800 dark:hover:text-surface-100;
+  }
+
+  .sidebar-item-active {
+    @apply bg-accent-500/10 text-accent-600 dark:bg-accent-400/10 dark:text-accent-400;
+  }
+
+  /* ─────────────────────────────────────────────────────────────────────────
+     Dashboard Card Styles
+     ───────────────────────────────────────────────────────────────────────── */
+  .dashboard-card {
+    @apply glass-card p-5;
+  }
+
+  .dashboard-card-header {
+    @apply mb-4 flex items-center gap-3 border-b border-surface-200/60 pb-4 dark:border-surface-700/60;
+  }
+
+  .dashboard-card-icon {
+    @apply flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br text-lg shadow-sm;
+  }
+
+  /* ─────────────────────────────────────────────────────────────────────────
+     Code/Path Display
+     ───────────────────────────────────────────────────────────────────────── */
+  .code-text {
+    @apply font-mono text-xs text-surface-500 dark:text-surface-400;
+  }
+
+  .path-display {
+    @apply truncate rounded-md bg-surface-100 px-2 py-1 font-mono text-xs text-surface-600 dark:bg-surface-800 dark:text-surface-400;
+  }
+
+  /* ─────────────────────────────────────────────────────────────────────────
+     Drag & Drop States
+     ───────────────────────────────────────────────────────────────────────── */
+  .drag-active {
+    @apply cursor-grabbing opacity-50 ring-2 ring-accent-500;
+  }
+
+  .drop-target {
+    @apply ring-2 ring-accent-400 ring-offset-2 ring-offset-surface-50 dark:ring-offset-surface-950;
+  }
+
+  /* ─────────────────────────────────────────────────────────────────────────
+     Tooltip Styles
+     ───────────────────────────────────────────────────────────────────────── */
+  .tooltip {
+    @apply pointer-events-none absolute z-50 rounded-lg bg-surface-900 px-2.5 py-1.5 text-xs font-medium text-white opacity-0 shadow-lg transition-opacity dark:bg-surface-700;
+  }
+
+  .has-tooltip:hover .tooltip {
+    @apply opacity-100;
+  }
+
+  /* ─────────────────────────────────────────────────────────────────────────
+     Markdown Prose Overrides
+     ───────────────────────────────────────────────────────────────────────── */
+  .prose-custom {
+    @apply prose prose-sm max-w-none text-surface-600 prose-headings:text-surface-900 prose-p:text-surface-600 prose-a:text-accent-600 prose-strong:text-surface-800 prose-code:rounded prose-code:bg-surface-100 prose-code:px-1 prose-code:text-accent-600 dark:text-surface-300 dark:prose-headings:text-surface-100 dark:prose-p:text-surface-300 dark:prose-a:text-accent-400 dark:prose-strong:text-surface-200 dark:prose-code:bg-surface-800 dark:prose-code:text-accent-400;
+  }
+
+  /* ─────────────────────────────────────────────────────────────────────────
+     Loading States
+     ───────────────────────────────────────────────────────────────────────── */
+  .skeleton {
+    @apply animate-pulse rounded-md bg-surface-200 dark:bg-surface-800;
+  }
+
+  .spinner {
+    @apply h-5 w-5 animate-spin rounded-full border-2 border-surface-300 border-t-accent-500 dark:border-surface-700 dark:border-t-accent-400;
   }
 }
 
-.project-card-updated {
-  animation:
-    fadeIn 0.4s ease-out,
-    pulseGreen 0.6s ease-out;
-}
+@layer utilities {
+  /* Gradient text */
+  .text-gradient {
+    @apply bg-gradient-to-r from-accent-400 to-emerald-400 bg-clip-text text-transparent;
+  }
 
-.smooth-transition {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  /* Hide scrollbar */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Thin scrollbar */
+  .scrollbar-thin {
+    scrollbar-width: thin;
+  }
+
+  /* Text balance */
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  /* Smooth transitions */
+  .transition-theme {
+    @apply transition-colors duration-300 ease-in-out;
+  }
 }
