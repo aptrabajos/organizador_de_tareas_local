@@ -413,3 +413,76 @@ export async function exportProjectToPdf(projectId: number): Promise<string> {
 export async function getDashboardData(): Promise<DashboardData> {
   return await invoke('get_dashboard_data');
 }
+
+// ==================== FUNCIONES PARA TIME TRACKING (v0.5.0) ====================
+
+import type {
+  TimeTrackingSession,
+  TimeStats,
+  TrackingStatusResponse,
+  GestorConfig,
+} from '../types/project';
+
+export async function initTracking(projectId: number): Promise<string> {
+  return await invoke('init_tracking', { projectId });
+}
+
+export async function getTrackingSessions(
+  projectId: number,
+  limit?: number
+): Promise<TimeTrackingSession[]> {
+  return await invoke('get_tracking_sessions', { projectId, limit });
+}
+
+export async function getTrackingStatus(): Promise<TrackingStatusResponse> {
+  return await invoke('get_tracking_status');
+}
+
+export async function startTracking(projectId: number): Promise<number> {
+  return await invoke('start_tracking', { projectId });
+}
+
+export async function stopTracking(
+  sessionId: number,
+  durationSeconds: number
+): Promise<void> {
+  await invoke('stop_tracking', { sessionId, durationSeconds });
+}
+
+export async function checkTrackingConfig(path: string): Promise<boolean> {
+  return await invoke('check_tracking_config', { path });
+}
+
+export async function findTrackingProject(
+  path: string
+): Promise<GestorConfig | null> {
+  return await invoke('find_tracking_project', { path });
+}
+
+export async function getTimeStats(projectId: number): Promise<TimeStats> {
+  return await invoke('get_time_stats', { projectId });
+}
+
+// ==================== WORK SESSION (v0.5.1) ====================
+
+export interface WorkSessionResponse {
+  session_id: number;
+  project_id: number;
+  project_name: string;
+  previous_session_stopped: boolean;
+  tracking_initialized: boolean;
+}
+
+export async function startWorkSession(
+  projectId: number
+): Promise<WorkSessionResponse> {
+  return await invoke('start_work_session', { projectId });
+}
+
+export async function stopWorkSession(): Promise<number | null> {
+  return await invoke('stop_work_session');
+}
+
+export async function getWorkSessionStatus(): Promise<TrackingStatusResponse> {
+  return await invoke('get_work_session_status');
+}

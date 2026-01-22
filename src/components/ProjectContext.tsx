@@ -13,6 +13,7 @@ import {
   getProjectLinks,
   getAttachments,
 } from '../services/api';
+import TimeTracker from './TimeTracker';
 
 interface ProjectContextProps {
   projectId: number;
@@ -152,6 +153,14 @@ export default function ProjectContext(props: ProjectContextProps) {
                     </span>
                   </div>
                 </Show>
+              </section>
+
+              {/* Time Tracking */}
+              <section>
+                <TimeTracker
+                  projectId={props.projectId}
+                  projectPath={project()?.local_path || ''}
+                />
               </section>
 
               {/* Diario Reciente */}

@@ -7,9 +7,11 @@ mod db;
 mod models;
 mod platform;
 mod pdf_export;
+mod tracking;
 
 use db::Database;
 use config::ConfigManager;
+use commands::ActiveSession;
 
 fn main() {
     // Crear directorio de datos de la app
@@ -23,6 +25,7 @@ fn main() {
 
     let db = Database::new(db_path).expect("Error al inicializar la base de datos");
     let config_manager = ConfigManager::new().expect("Error al inicializar la configuración");
+    let active_session = ActiveSession::default();
 
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
@@ -31,6 +34,7 @@ fn main() {
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .manage(db)
         .manage(config_manager)
+        .manage(active_session)
         .invoke_handler(tauri::generate_handler![
             commands::create_project,
             commands::get_all_projects,
@@ -101,6 +105,19 @@ fn main() {
             commands::export_project_to_pdf,
             // Dashboard (v0.5.0)
             commands::get_dashboard_data,
+            // Time Tracking (v0.5.0)
+            commands::init_tracking,
+            commands::get_tracking_sessions,
+            commands::get_tracking_status,
+            commands::start_tracking,
+            commands::stop_tracking,
+            commands::check_tracking_config,
+            commands::find_tracking_project,
+            commands::get_time_stats,
+            // Work Session (v0.5.1) - Tracking automático
+            commands::start_work_session,
+            commands::stop_work_session,
+            commands::get_work_session_status,
         ])
         .run(tauri::generate_context!())
         .expect("Error al ejecutar la aplicación Tauri");

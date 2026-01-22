@@ -4,6 +4,37 @@ use crate::models::project::{
 };
 use crate::config::{AppConfig, ConfigManager, DetectedPrograms};
 use crate::db::Database;
+use std::sync::Mutex;
+
+// ==================== ACTIVE SESSION STATE ====================
+
+/// Estado global de la sesión de tracking activa
+pub struct ActiveSessionState {
+    pub session_id: Option<i64>,
+    pub project_id: Option<i64>,
+    pub project_name: Option<String>,
+    pub started_at: Option<std::time::Instant>,
+}
+
+impl Default for ActiveSessionState {
+    fn default() -> Self {
+        Self {
+            session_id: None,
+            project_id: None,
+            project_name: None,
+            started_at: None,
+        }
+    }
+}
+
+/// Wrapper thread-safe para el estado de sesión activa
+pub struct ActiveSession(pub Mutex<ActiveSessionState>);
+
+impl Default for ActiveSession {
+    fn default() -> Self {
+        Self(Mutex::new(ActiveSessionState::default()))
+    }
+}
 
 #[tauri::command]
 pub async fn get_dashboard_data(db: State<'_, Database>) -> Result<DashboardData, String> {
@@ -1273,4 +1304,290 @@ pub async fn export_project_to_pdf(
     println!("✅ [PDF] PDF generado exitosamente");
 
     Ok(output_path.to_str().unwrap().to_string())
+}
+
+// ==================== TIME TRACKING COMMANDS ====================
+
+use crate::tracking::aggregator::TimeStats;
+use crate::tracking::config::{GestorConfig, init_gestor_config, has_tracking_config, find_gestor_config};
+
+/// Inicializar tracking en un proyecto (crear carpeta .gestor/)
+#[tauri::command]
+pub async fn init_tracking(
+    db: State<'_, Database>,
+    project_id: i64,
+) -> Result<String, String> {
+    println!("🕒 [TRACKING] Inicializando tracking para proyecto ID: {}", project_id);
+
+    // Obtener información del proyecto
+    let project = db.get_project(project_id)
+        .map_err(|e| format!("Error getting project: {}", e))?;
+
+    let project_path = std::path::Path::new(&project.local_path);
+
+    // Verificar que el directorio existe
+    if !project_path.exists() {
+        return Err(format!("El directorio del proyecto no existe: {}", project.local_path));
+    }
+
+    // Inicializar la carpeta .gestor/
+    let _config = init_gestor_config(project_path, project_id, project.name.clone())
+        .map_err(|e| format!("Error inicializando tracking: {}", e))?;
+
+    println!("✅ [TRACKING] Tracking inicializado para: {}", project.name);
+
+    Ok(format!("Tracking inicializado en {}", project.local_path))
+}
+
+/// Obtener sesiones de tracking de un proyecto
+#[tauri::command]
+pub async fn get_tracking_sessions(
+    db: State<'_, Database>,
+    project_id: i64,
+    limit: Option<i64>,
+) -> Result<Vec<crate::tracking::aggregator::TimeTrackingSession>, String> {
+    let limit = limit.unwrap_or(20);
+
+    db.get_tracking_sessions(project_id, limit)
+        .map_err(|e| format!("Error getting tracking sessions: {}", e))
+}
+
+/// Obtener estado actual de tracking (qué proyecto está siendo tracked)
+#[tauri::command]
+pub async fn get_tracking_status() -> Result<TrackingStatusResponse, String> {
+    // Por ahora retornamos un estado vacío
+    // Cuando el socket esté integrado, esto leerá del SessionManager
+    Ok(TrackingStatusResponse {
+        is_tracking: false,
+        project_id: None,
+        project_path: None,
+        elapsed_seconds: 0,
+    })
+}
+
+#[derive(serde::Serialize)]
+pub struct TrackingStatusResponse {
+    pub is_tracking: bool,
+    pub project_id: Option<i64>,
+    pub project_path: Option<String>,
+    pub elapsed_seconds: u64,
+}
+
+/// Iniciar tracking manualmente para un proyecto
+#[tauri::command]
+pub async fn start_tracking(
+    db: State<'_, Database>,
+    project_id: i64,
+) -> Result<i64, String> {
+    println!("▶️ [TRACKING] Iniciando tracking manual para proyecto ID: {}", project_id);
+
+    // Crear una nueva sesión de tracking
+    let session_id = db.create_tracking_session(project_id, "manual")
+        .map_err(|e| format!("Error starting tracking session: {}", e))?;
+
+    println!("✅ [TRACKING] Sesión {} iniciada", session_id);
+
+    Ok(session_id)
+}
+
+/// Detener tracking actual
+#[tauri::command]
+pub async fn stop_tracking(
+    db: State<'_, Database>,
+    session_id: i64,
+    duration_seconds: i64,
+) -> Result<(), String> {
+    println!("⏹️ [TRACKING] Deteniendo sesión {} con {} segundos", session_id, duration_seconds);
+
+    db.end_tracking_session(session_id, duration_seconds)
+        .map_err(|e| format!("Error stopping tracking session: {}", e))?;
+
+    println!("✅ [TRACKING] Sesión {} terminada", session_id);
+
+    Ok(())
+}
+
+/// Verificar si un path tiene configuración de tracking (.gestor/)
+#[tauri::command]
+pub async fn check_tracking_config(path: String) -> Result<bool, String> {
+    let path = std::path::Path::new(&path);
+    Ok(has_tracking_config(path))
+}
+
+/// Buscar carpeta .gestor/ hacia arriba desde un path
+#[tauri::command]
+pub async fn find_tracking_project(path: String) -> Result<Option<GestorConfig>, String> {
+    let start_path = std::path::Path::new(&path);
+
+    if let Some(project_path) = find_gestor_config(start_path) {
+        let config = GestorConfig::load(&project_path)
+            .map_err(|e| format!("Error loading tracking config: {}", e))?;
+        Ok(Some(config))
+    } else {
+        Ok(None)
+    }
+}
+
+/// Obtener estadísticas de tiempo para un proyecto
+#[tauri::command]
+pub async fn get_time_stats(
+    db: State<'_, Database>,
+    project_id: i64,
+) -> Result<TimeStats, String> {
+    db.get_time_stats(project_id)
+        .map_err(|e| format!("Error getting time stats: {}", e))
+}
+
+/// Respuesta del comando start_work_session
+#[derive(serde::Serialize)]
+pub struct WorkSessionResponse {
+    pub session_id: i64,
+    pub project_id: i64,
+    pub project_name: String,
+    pub previous_session_stopped: bool,
+    pub tracking_initialized: bool,
+}
+
+/// Iniciar sesión de trabajo - comando principal para "Trabajar"
+/// Este comando:
+/// 1. Para cualquier sesión activa anterior
+/// 2. Inicializa tracking si no existe (.gestor/)
+/// 3. Inicia nueva sesión de tiempo
+#[tauri::command]
+pub async fn start_work_session(
+    db: State<'_, Database>,
+    active_session: State<'_, ActiveSession>,
+    project_id: i64,
+) -> Result<WorkSessionResponse, String> {
+    println!("🚀 [WORK] Iniciando sesión de trabajo para proyecto ID: {}", project_id);
+
+    let mut previous_stopped = false;
+    let mut tracking_initialized = false;
+
+    // Obtener información del proyecto
+    let project = db.get_project(project_id)
+        .map_err(|e| format!("Error getting project: {}", e))?;
+
+    let project_path = std::path::Path::new(&project.local_path);
+
+    // 1. Verificar si hay una sesión activa y pararla
+    {
+        let mut session_state = active_session.0.lock()
+            .map_err(|_| "Error locking session state")?;
+
+        if let (Some(prev_session_id), Some(started_at)) = (session_state.session_id, session_state.started_at) {
+            // Calcular duración de la sesión anterior
+            let duration = started_at.elapsed().as_secs() as i64;
+
+            // Solo guardar si duró más de 10 segundos (evitar sesiones accidentales)
+            if duration > 10 {
+                println!("⏹️ [WORK] Parando sesión anterior {} ({}s)", prev_session_id, duration);
+                db.end_tracking_session(prev_session_id, duration)
+                    .map_err(|e| format!("Error stopping previous session: {}", e))?;
+                previous_stopped = true;
+            } else {
+                // Eliminar sesión muy corta
+                println!("🗑️ [WORK] Descartando sesión muy corta {} ({}s)", prev_session_id, duration);
+                // Marcar como 0 segundos para que no cuente
+                let _ = db.end_tracking_session(prev_session_id, 0);
+            }
+        }
+
+        // Limpiar estado
+        session_state.session_id = None;
+        session_state.project_id = None;
+        session_state.project_name = None;
+        session_state.started_at = None;
+    }
+
+    // 2. Verificar/inicializar tracking si no existe
+    if project_path.exists() && !has_tracking_config(project_path) {
+        println!("📁 [WORK] Inicializando tracking automáticamente para: {}", project.name);
+        let _config = init_gestor_config(project_path, project_id, project.name.clone())
+            .map_err(|e| format!("Error initializing tracking: {}", e))?;
+        tracking_initialized = true;
+    }
+
+    // 3. Crear nueva sesión de tracking
+    let session_id = db.create_tracking_session(project_id, "work_button")
+        .map_err(|e| format!("Error creating tracking session: {}", e))?;
+
+    // 4. Actualizar estado global
+    {
+        let mut session_state = active_session.0.lock()
+            .map_err(|_| "Error locking session state")?;
+
+        session_state.session_id = Some(session_id);
+        session_state.project_id = Some(project_id);
+        session_state.project_name = Some(project.name.clone());
+        session_state.started_at = Some(std::time::Instant::now());
+    }
+
+    println!("✅ [WORK] Sesión {} iniciada para: {}", session_id, project.name);
+
+    Ok(WorkSessionResponse {
+        session_id,
+        project_id,
+        project_name: project.name,
+        previous_session_stopped: previous_stopped,
+        tracking_initialized,
+    })
+}
+
+/// Parar la sesión de trabajo actual manualmente
+#[tauri::command]
+pub async fn stop_work_session(
+    db: State<'_, Database>,
+    active_session: State<'_, ActiveSession>,
+) -> Result<Option<i64>, String> {
+    println!("⏹️ [WORK] Parando sesión de trabajo actual");
+
+    let mut session_state = active_session.0.lock()
+        .map_err(|_| "Error locking session state")?;
+
+    if let (Some(session_id), Some(started_at)) = (session_state.session_id, session_state.started_at) {
+        let duration = started_at.elapsed().as_secs() as i64;
+
+        println!("⏹️ [WORK] Parando sesión {} con {} segundos", session_id, duration);
+
+        db.end_tracking_session(session_id, duration)
+            .map_err(|e| format!("Error stopping session: {}", e))?;
+
+        // Limpiar estado
+        session_state.session_id = None;
+        session_state.project_id = None;
+        session_state.project_name = None;
+        session_state.started_at = None;
+
+        Ok(Some(duration))
+    } else {
+        println!("ℹ️ [WORK] No hay sesión activa para parar");
+        Ok(None)
+    }
+}
+
+/// Obtener estado de la sesión de trabajo actual (mejorado)
+#[tauri::command]
+pub async fn get_work_session_status(
+    active_session: State<'_, ActiveSession>,
+) -> Result<TrackingStatusResponse, String> {
+    let session_state = active_session.0.lock()
+        .map_err(|_| "Error locking session state")?;
+
+    if let (Some(project_id), Some(started_at), Some(ref project_name)) =
+        (session_state.project_id, session_state.started_at, &session_state.project_name) {
+        Ok(TrackingStatusResponse {
+            is_tracking: true,
+            project_id: Some(project_id),
+            project_path: Some(project_name.clone()),
+            elapsed_seconds: started_at.elapsed().as_secs(),
+        })
+    } else {
+        Ok(TrackingStatusResponse {
+            is_tracking: false,
+            project_id: None,
+            project_path: None,
+            elapsed_seconds: 0,
+        })
+    }
 }

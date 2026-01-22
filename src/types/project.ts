@@ -167,3 +167,37 @@ export interface UpdateTodoDTO {
   content?: string;
   is_completed?: boolean;
 }
+
+// ==================== TIME TRACKING ====================
+
+export interface TimeTrackingSession {
+  id: number;
+  project_id: number;
+  started_at: string;
+  ended_at?: string;
+  duration_seconds?: number;
+  source: string;
+}
+
+export interface TimeStats {
+  total_seconds: number;
+  session_count: number;
+  avg_session_seconds: number;
+  longest_session_seconds: number;
+  today_seconds: number;
+  week_seconds: number;
+}
+
+export interface TrackingStatusResponse {
+  is_tracking: boolean;
+  project_id?: number;
+  project_path?: string;
+  elapsed_seconds: number;
+}
+
+export interface GestorConfig {
+  project_id: number;
+  project_name: string;
+  created_at: string;
+  tracking_enabled: boolean;
+}

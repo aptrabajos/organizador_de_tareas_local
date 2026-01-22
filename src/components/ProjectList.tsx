@@ -17,6 +17,7 @@ import ProjectJournal from './ProjectJournal';
 import TodoList from './TodoList';
 import ProjectContext from './ProjectContext';
 import GroupCard from './GroupCard';
+import TimeTracker from './TimeTracker';
 import {
   openUrl,
   createProjectBackup,
@@ -27,6 +28,7 @@ import {
   updateProjectOrder,
   countSubprojects,
   exportProjectToPdf,
+  startWorkSession,
 } from '../services/api';
 import { open } from '@tauri-apps/plugin-dialog';
 import { invoke } from '@tauri-apps/api/core';
@@ -160,7 +162,17 @@ const ProjectList: Component<ProjectListProps> = (props) => {
     try {
       // Registrar apertura del proyecto para analytics
       await trackProjectOpen(project.id);
-      console.log(`📊 Tracking registrado para proyecto: ${project.name}`);
+
+      // Iniciar sesión de trabajo (tracking automático de tiempo)
+      const session = await startWorkSession(project.id);
+      console.log(`🕒 Sesión de trabajo iniciada: ${session.project_name}`);
+
+      if (session.tracking_initialized) {
+        toast.success(`📁 Tracking activado para ${project.name}`, { duration: 2000 });
+      }
+      if (session.previous_session_stopped) {
+        toast('⏱️ Sesión anterior guardada', { duration: 1500, icon: '✓' });
+      }
 
       // Abrir terminal
       await props.onOpenTerminal(project);
@@ -533,19 +545,26 @@ const ProjectList: Component<ProjectListProps> = (props) => {
                                     </div>
                                   </Show>
                                 </div>
-                                <button
-                                  onClick={() => handleTogglePin(project)}
-                                  class="rounded-lg p-1.5 transition-all hover:bg-amber-50 hover:scale-110 dark:hover:bg-amber-900/30"
-                                  title={
-                                    project.is_pinned
-                                      ? 'Desmarcar como favorito'
-                                      : 'Marcar como favorito'
-                                  }
-                                >
-                                  <span class={`text-lg transition-transform ${project.is_pinned ? 'drop-shadow-sm' : 'opacity-50 grayscale'}`}>
-                                    {project.is_pinned ? '📌' : '📍'}
-                                  </span>
-                                </button>
+                                <div class="flex items-center gap-1">
+                                  <TimeTracker
+                                    projectId={project.id}
+                                    projectPath={project.local_path}
+                                    compact={true}
+                                  />
+                                  <button
+                                    onClick={() => handleTogglePin(project)}
+                                    class="rounded-lg p-1.5 transition-all hover:bg-amber-50 hover:scale-110 dark:hover:bg-amber-900/30"
+                                    title={
+                                      project.is_pinned
+                                        ? 'Desmarcar como favorito'
+                                        : 'Marcar como favorito'
+                                    }
+                                  >
+                                    <span class={`text-lg transition-transform ${project.is_pinned ? 'drop-shadow-sm' : 'opacity-50 grayscale'}`}>
+                                      {project.is_pinned ? '📌' : '📍'}
+                                    </span>
+                                  </button>
+                                </div>
                               </div>
 
                               {/* Project Info */}

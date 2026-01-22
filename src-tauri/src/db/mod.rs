@@ -184,6 +184,31 @@ impl Database {
             [],
         )?;
 
+        // Crear tabla de sesiones de time tracking
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS time_tracking_sessions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL,
+                started_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                ended_at DATETIME,
+                duration_seconds INTEGER,
+                source TEXT DEFAULT 'shell_hook',
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE
+            )",
+            [],
+        )?;
+
+        // Crear índices para time tracking
+        let _ = conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_sessions_project ON time_tracking_sessions(project_id)",
+            [],
+        );
+        let _ = conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_sessions_started ON time_tracking_sessions(started_at)",
+            [],
+        );
+
         Ok(Database {
             conn: Mutex::new(conn),
         })
@@ -1560,5 +1585,130 @@ impl Database {
         )?;
 
         Ok(())
+    }
+
+    // ==================== TIME TRACKING METHODS ====================
+
+    /// Crear una nueva sesión de tracking
+    pub fn create_tracking_session(&self, project_id: i64, source: &str) -> Result<i64> {
+        let conn = self.conn.lock().unwrap();
+
+        conn.execute(
+            "INSERT INTO time_tracking_sessions (project_id, started_at, source)
+             VALUES (?1, CURRENT_TIMESTAMP, ?2)",
+            params![project_id, source],
+        )?;
+
+        Ok(conn.last_insert_rowid())
+    }
+
+    /// Terminar una sesión de tracking
+    pub fn end_tracking_session(&self, session_id: i64, duration_seconds: i64) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+
+        conn.execute(
+            "UPDATE time_tracking_sessions
+             SET ended_at = CURRENT_TIMESTAMP, duration_seconds = ?1
+             WHERE id = ?2",
+            params![duration_seconds, session_id],
+        )?;
+
+        // También actualizar el tiempo total del proyecto
+        conn.execute(
+            "UPDATE projects
+             SET total_time_seconds = COALESCE(total_time_seconds, 0) + ?1
+             WHERE id = (SELECT project_id FROM time_tracking_sessions WHERE id = ?2)",
+            params![duration_seconds, session_id],
+        )?;
+
+        Ok(())
+    }
+
+    /// Obtener sesiones de tracking de un proyecto
+    pub fn get_tracking_sessions(&self, project_id: i64, limit: i64) -> Result<Vec<crate::tracking::aggregator::TimeTrackingSession>> {
+        use crate::tracking::aggregator::TimeTrackingSession;
+
+        let conn = self.conn.lock().unwrap();
+
+        let mut stmt = conn.prepare(
+            "SELECT id, project_id, started_at, ended_at, duration_seconds, source
+             FROM time_tracking_sessions
+             WHERE project_id = ?1
+             ORDER BY started_at DESC
+             LIMIT ?2"
+        )?;
+
+        let sessions = stmt.query_map(params![project_id, limit], |row| {
+            Ok(TimeTrackingSession {
+                id: row.get(0)?,
+                project_id: row.get(1)?,
+                started_at: row.get(2)?,
+                ended_at: row.get(3)?,
+                duration_seconds: row.get(4)?,
+                source: row.get(5)?,
+            })
+        })?
+        .collect::<Result<Vec<_>>>()?;
+
+        Ok(sessions)
+    }
+
+    /// Obtener estadísticas de tiempo para un proyecto
+    pub fn get_time_stats(&self, project_id: i64) -> Result<crate::tracking::aggregator::TimeStats> {
+        use crate::tracking::aggregator::TimeStats;
+
+        let conn = self.conn.lock().unwrap();
+
+        // Tiempo total y número de sesiones
+        let (total_seconds, session_count): (i64, i64) = conn.query_row(
+            "SELECT COALESCE(SUM(duration_seconds), 0), COUNT(*)
+             FROM time_tracking_sessions
+             WHERE project_id = ?1 AND duration_seconds IS NOT NULL",
+            params![project_id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        ).unwrap_or((0, 0));
+
+        // Promedio de duración
+        let avg_session_seconds = if session_count > 0 {
+            total_seconds / session_count
+        } else {
+            0
+        };
+
+        // Sesión más larga
+        let longest_session_seconds: i64 = conn.query_row(
+            "SELECT COALESCE(MAX(duration_seconds), 0)
+             FROM time_tracking_sessions
+             WHERE project_id = ?1",
+            params![project_id],
+            |row| row.get(0),
+        ).unwrap_or(0);
+
+        // Tiempo hoy
+        let today_seconds: i64 = conn.query_row(
+            "SELECT COALESCE(SUM(duration_seconds), 0)
+             FROM time_tracking_sessions
+             WHERE project_id = ?1 AND DATE(started_at) = DATE('now')",
+            params![project_id],
+            |row| row.get(0),
+        ).unwrap_or(0);
+
+        // Tiempo esta semana (últimos 7 días)
+        let week_seconds: i64 = conn.query_row(
+            "SELECT COALESCE(SUM(duration_seconds), 0)
+             FROM time_tracking_sessions
+             WHERE project_id = ?1 AND started_at >= DATE('now', '-7 days')",
+            params![project_id],
+            |row| row.get(0),
+        ).unwrap_or(0);
+
+        Ok(TimeStats {
+            total_seconds,
+            session_count,
+            avg_session_seconds,
+            longest_session_seconds,
+            today_seconds,
+            week_seconds,
+        })
     }
 }
