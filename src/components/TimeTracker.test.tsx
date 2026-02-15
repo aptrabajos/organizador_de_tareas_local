@@ -9,7 +9,11 @@ vi.mock('../services/api', () => ({
   initTracking: vi.fn(),
 }));
 
-import { getTimeStats, checkTrackingConfig, initTracking } from '../services/api';
+import {
+  getTimeStats,
+  checkTrackingConfig,
+  initTracking,
+} from '../services/api';
 
 describe('TimeTracker', () => {
   beforeEach(() => {
@@ -17,11 +21,11 @@ describe('TimeTracker', () => {
   });
 
   it('shows loading state initially', () => {
-    vi.mocked(checkTrackingConfig).mockImplementation(() => new Promise(() => {}));
+    vi.mocked(checkTrackingConfig).mockImplementation(
+      () => new Promise(() => {})
+    );
 
-    render(() => (
-      <TimeTracker projectId={1} projectPath="/test/path" />
-    ));
+    render(() => <TimeTracker projectId={1} projectPath="/test/path" />);
 
     expect(screen.getByText('Cargando...')).toBeTruthy();
   });
@@ -29,9 +33,7 @@ describe('TimeTracker', () => {
   it('shows setup button for untracked projects', async () => {
     vi.mocked(checkTrackingConfig).mockResolvedValue(false);
 
-    render(() => (
-      <TimeTracker projectId={1} projectPath="/test/path" />
-    ));
+    render(() => <TimeTracker projectId={1} projectPath="/test/path" />);
 
     // Esperar a que cargue
     await vi.waitFor(() => {
@@ -50,9 +52,7 @@ describe('TimeTracker', () => {
       week_seconds: 5400, // 1.5 horas
     });
 
-    render(() => (
-      <TimeTracker projectId={1} projectPath="/test/path" />
-    ));
+    render(() => <TimeTracker projectId={1} projectPath="/test/path" />);
 
     // Esperar a que cargue
     await vi.waitFor(() => {
@@ -74,9 +74,7 @@ describe('TimeTracker', () => {
       week_seconds: 3661,
     });
 
-    render(() => (
-      <TimeTracker projectId={1} projectPath="/test/path" />
-    ));
+    render(() => <TimeTracker projectId={1} projectPath="/test/path" />);
 
     await vi.waitFor(() => {
       // Puede haber múltiples elementos con el mismo texto
@@ -125,9 +123,7 @@ describe('TimeTracker', () => {
     vi.mocked(checkTrackingConfig).mockResolvedValue(false);
     vi.mocked(initTracking).mockResolvedValue('OK');
 
-    render(() => (
-      <TimeTracker projectId={1} projectPath="/test/path" />
-    ));
+    render(() => <TimeTracker projectId={1} projectPath="/test/path" />);
 
     await vi.waitFor(() => {
       expect(screen.getByText('Activar Time Tracking')).toBeTruthy();

@@ -389,15 +389,17 @@ export default function Settings(props: { onClose: () => void }) {
                       <option value="auto">
                         🔄 Auto - Detectar automáticamente
                       </option>
-                      <option value="linux">🐧 Linux - Herramientas Linux</option>
+                      <option value="linux">
+                        🐧 Linux - Herramientas Linux
+                      </option>
                       <option value="windows">
                         🪟 Windows - Herramientas Windows
                       </option>
                     </select>
                     <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
                       💡 Tip: Usa "Auto" para detección automática. Solo cambia
-                      manualmente si necesitas forzar herramientas específicas de
-                      un sistema operativo.
+                      manualmente si necesitas forzar herramientas específicas
+                      de un sistema operativo.
                     </p>
                   </div>
                 </div>

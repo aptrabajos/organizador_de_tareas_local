@@ -31,7 +31,6 @@ describe('ProjectContext', () => {
     name: 'Proyecto Test',
     description: 'Descripción del proyecto de prueba',
     local_path: '/home/user/proyecto-test',
-    tags: 'react,typescript,testing',
     status: 'activo',
     is_pinned: false,
     created_at: '2025-01-01T10:00:00Z',
@@ -44,12 +43,14 @@ describe('ProjectContext', () => {
       project_id: 1,
       content: 'Última entrada del diario',
       created_at: '2025-01-15T14:00:00Z',
+      updated_at: '2025-01-15T14:00:00Z',
     },
     {
       id: 2,
       project_id: 1,
       content: 'Segunda entrada',
       created_at: '2025-01-14T10:00:00Z',
+      updated_at: '2025-01-14T10:00:00Z',
     },
   ];
 
@@ -75,9 +76,9 @@ describe('ProjectContext', () => {
     {
       id: 1,
       project_id: 1,
-      link_type: 'github',
+      link_type: 'repository',
+      title: 'Repositorio principal',
       url: 'https://github.com/user/repo',
-      description: 'Repositorio principal',
       created_at: '2025-01-01T10:00:00Z',
     },
   ];
@@ -106,8 +107,6 @@ describe('ProjectContext', () => {
       expect(
         screen.getByText('Descripción del proyecto de prueba')
       ).toBeTruthy();
-      expect(screen.getByText(/react/)).toBeTruthy();
-      expect(screen.getByText(/typescript/)).toBeTruthy();
       expect(screen.getByText(/activo/i)).toBeTruthy();
     });
 
@@ -239,6 +238,7 @@ describe('ProjectContext', () => {
           project_id: 1,
           content: `Entrada ${i + 1}`,
           created_at: new Date(2025, 0, 15 - i).toISOString(),
+          updated_at: new Date(2025, 0, 15 - i).toISOString(),
         })
       );
 
@@ -257,21 +257,5 @@ describe('ProjectContext', () => {
       expect(screen.queryByText('Entrada 6')).toBeFalsy();
     });
 
-    it('should display tags as individual badges', async () => {
-      render(() => <ProjectContext projectId={1} onClose={mockOnClose} />);
-
-      await waitFor(() => {
-        expect(screen.getByText('Proyecto Test')).toBeTruthy();
-      });
-
-      // Verificar que cada tag esté en su propio badge
-      const reactBadge = screen.getByText('react');
-      const tsBadge = screen.getByText('typescript');
-      const testBadge = screen.getByText('testing');
-
-      expect(reactBadge).toBeTruthy();
-      expect(tsBadge).toBeTruthy();
-      expect(testBadge).toBeTruthy();
-    });
   });
 });

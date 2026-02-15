@@ -35,12 +35,7 @@ export default function ProjectContext(props: ProjectContextProps) {
   // Limitar entradas de diario a las 5 más recientes
   const recentJournalEntries = () => journalEntries().slice(0, 5);
 
-  // Dividir tags en array
-  const projectTags = () => {
-    const proj = project();
-    if (!proj?.tags) return [];
-    return proj.tags.split(',').map((tag) => tag.trim());
-  };
+  // Nota: Project no tiene campo tags (los tags son de JournalEntry)
 
   const loadData = async () => {
     try {
@@ -135,17 +130,6 @@ export default function ProjectContext(props: ProjectContextProps) {
                     {project()?.local_path}
                   </code>
                 </div>
-                <Show when={projectTags().length > 0}>
-                  <div class="flex flex-wrap gap-2">
-                    <For each={projectTags()}>
-                      {(tag) => (
-                        <span class="rounded-full bg-blue-100 px-3 py-1 text-sm text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                          {tag}
-                        </span>
-                      )}
-                    </For>
-                  </div>
-                </Show>
                 <Show when={project()?.status}>
                   <div class="mt-3">
                     <span class="inline-flex items-center rounded-full bg-green-100 px-3 py-1 text-sm font-medium text-green-800 dark:bg-green-900 dark:text-green-200">
@@ -244,7 +228,7 @@ export default function ProjectContext(props: ProjectContextProps) {
                             rel="noopener noreferrer"
                             class="text-sm font-medium text-blue-600 hover:underline dark:text-blue-400"
                           >
-                            {link.description || link.url}
+                            {link.title || link.url}
                           </a>
                           <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
                             {link.link_type}

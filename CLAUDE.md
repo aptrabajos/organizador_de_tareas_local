@@ -160,10 +160,25 @@ pub async fn get_project(db: State<'_, Database>, id: i64) -> Result<Project, St
 
 ---
 
+## Release
+
+```bash
+./scripts/release.sh patch              # 0.4.3 → 0.4.4 (bug fixes)
+./scripts/release.sh minor              # 0.4.3 → 0.5.0 (nuevas features)
+./scripts/release.sh major              # 0.4.3 → 1.0.0 (breaking changes)
+./scripts/release.sh patch --install    # + compila e instala binario
+./scripts/release.sh patch --dry-run    # muestra cambios sin aplicar
+```
+
+El script actualiza la versión en `package.json`, `Cargo.toml` y `tauri.conf.json`, genera entrada en CHANGELOG.md desde los commits, crea commit (`release: vX.Y.Z`) y tag (`vX.Y.Z`).
+
+---
+
 ## Git Conventions
 
 - **Commits en español**: `checkpoint: <descripción de la tarea>`
 - Ejemplo: `checkpoint: implementa exportación a PDF`
+- **Releases**: `release: v{VERSION}` (generado por `scripts/release.sh`)
 
 ---
 

@@ -1,7 +1,7 @@
 export interface ProjectLink {
   id: number;
   project_id: number;
-  type:
+  link_type:
     | 'repository'
     | 'documentation'
     | 'staging'

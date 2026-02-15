@@ -1,5 +1,9 @@
 import { Component, createResource, For, Show } from 'solid-js';
-import { getDashboardData, openTerminal, trackProjectOpen } from '../services/api';
+import {
+  getDashboardData,
+  openTerminal,
+  trackProjectOpen,
+} from '../services/api';
 import type { DashboardData } from '../types/dashboard';
 import type { Project } from '../types/project';
 import toast from 'solid-toast';
@@ -180,7 +184,10 @@ const Dashboard: Component<DashboardProps> = (props) => {
                         <p class="truncate font-medium text-surface-900 group-hover:text-accent-600 dark:text-surface-100 dark:group-hover:text-accent-400">
                           {project.name}
                         </p>
-                        <p class="mt-0.5 truncate text-xs text-surface-500 dark:text-surface-400" title={project.local_path}>
+                        <p
+                          class="mt-0.5 truncate text-xs text-surface-500 dark:text-surface-400"
+                          title={project.local_path}
+                        >
                           {formatRelativeTime(project.last_opened_at!)}
                         </p>
                       </div>
@@ -190,9 +197,24 @@ const Dashboard: Component<DashboardProps> = (props) => {
                           class="rounded-lg p-1.5 text-surface-500 transition-colors hover:bg-surface-200 hover:text-surface-700 dark:hover:bg-surface-700 dark:hover:text-surface-300"
                           title="Ver proyecto"
                         >
-                          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          <svg
+                            class="h-4 w-4"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path
+                              stroke-linecap="round"
+                              stroke-linejoin="round"
+                              stroke-width="2"
+                              d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                            />
+                            <path
+                              stroke-linecap="round"
+                              stroke-linejoin="round"
+                              stroke-width="2"
+                              d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                            />
                           </svg>
                         </button>
                         <button
@@ -200,8 +222,18 @@ const Dashboard: Component<DashboardProps> = (props) => {
                           class="rounded-lg bg-accent-500 p-1.5 text-white transition-colors hover:bg-accent-600"
                           title="Abrir terminal"
                         >
-                          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                          <svg
+                            class="h-4 w-4"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path
+                              stroke-linecap="round"
+                              stroke-linejoin="round"
+                              stroke-width="2"
+                              d="M13 10V3L4 14h7v7l9-11h-7z"
+                            />
                           </svg>
                         </button>
                       </div>
@@ -242,7 +274,7 @@ const Dashboard: Component<DashboardProps> = (props) => {
               </div>
             </div>
 
-            <ul class="max-h-80 space-y-2 overflow-y-auto scrollbar-thin">
+            <ul class="scrollbar-thin max-h-80 space-y-2 overflow-y-auto">
               <For
                 each={data()!.pending_todos}
                 fallback={

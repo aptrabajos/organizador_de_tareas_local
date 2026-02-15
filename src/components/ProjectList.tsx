@@ -168,7 +168,9 @@ const ProjectList: Component<ProjectListProps> = (props) => {
       console.log(`🕒 Sesión de trabajo iniciada: ${session.project_name}`);
 
       if (session.tracking_initialized) {
-        toast.success(`📁 Tracking activado para ${project.name}`, { duration: 2000 });
+        toast.success(`📁 Tracking activado para ${project.name}`, {
+          duration: 2000,
+        });
       }
       if (session.previous_session_stopped) {
         toast('⏱️ Sesión anterior guardada', { duration: 1500, icon: '✓' });
@@ -440,12 +442,26 @@ const ProjectList: Component<ProjectListProps> = (props) => {
       fallback={
         <div class="flex flex-col items-center justify-center py-16 text-center">
           <div class="mb-4 rounded-2xl bg-surface-100 p-6 dark:bg-surface-800">
-            <svg class="h-16 w-16 text-surface-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+            <svg
+              class="h-16 w-16 text-surface-400"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="1.5"
+                d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
+              />
             </svg>
           </div>
-          <p class="text-lg font-medium text-surface-600 dark:text-surface-300">No hay proyectos disponibles</p>
-          <p class="mt-2 text-sm text-surface-500 dark:text-surface-400">Crea tu primer proyecto para comenzar</p>
+          <p class="text-lg font-medium text-surface-600 dark:text-surface-300">
+            No hay proyectos disponibles
+          </p>
+          <p class="mt-2 text-sm text-surface-500 dark:text-surface-400">
+            Crea tu primer proyecto para comenzar
+          </p>
         </div>
       }
     >
@@ -454,12 +470,26 @@ const ProjectList: Component<ProjectListProps> = (props) => {
         fallback={
           <div class="flex flex-col items-center justify-center py-16 text-center">
             <div class="mb-4 rounded-2xl bg-surface-100 p-6 dark:bg-surface-800">
-              <svg class="h-16 w-16 text-surface-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              <svg
+                class="h-16 w-16 text-surface-400"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="1.5"
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                />
               </svg>
             </div>
-            <p class="text-lg font-medium text-surface-600 dark:text-surface-300">No hay proyectos que coincidan</p>
-            <p class="mt-2 text-sm text-surface-500 dark:text-surface-400">Intenta cambiar los filtros aplicados</p>
+            <p class="text-lg font-medium text-surface-600 dark:text-surface-300">
+              No hay proyectos que coincidan
+            </p>
+            <p class="mt-2 text-sm text-surface-500 dark:text-surface-400">
+              Intenta cambiar los filtros aplicados
+            </p>
           </div>
         }
       >
@@ -499,7 +529,8 @@ const ProjectList: Component<ProjectListProps> = (props) => {
                               ref={sortable.ref}
                               class="project-card group flex h-full min-h-[300px] flex-col"
                               classList={{
-                                'opacity-25 scale-105': sortable.isActiveDraggable,
+                                'opacity-25 scale-105':
+                                  sortable.isActiveDraggable,
                               }}
                               style={{
                                 transform: transform(),
@@ -517,7 +548,11 @@ const ProjectList: Component<ProjectListProps> = (props) => {
                                     class="cursor-grab rounded-md p-1.5 text-surface-400 transition-colors hover:bg-surface-100 hover:text-surface-600 active:cursor-grabbing dark:hover:bg-surface-700 dark:hover:text-surface-300"
                                     title="Arrastrar para reordenar"
                                   >
-                                    <svg class="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                                    <svg
+                                      class="h-4 w-4"
+                                      fill="currentColor"
+                                      viewBox="0 0 20 20"
+                                    >
                                       <path d="M7 2a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 2zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 8zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 14zm6-8a2 2 0 1 0-.001-4.001A2 2 0 0 0 13 6zm0 2a2 2 0 1 0 .001 4.001A2 2 0 0 0 13 8zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 13 14z" />
                                     </svg>
                                   </button>
@@ -534,13 +569,31 @@ const ProjectList: Component<ProjectListProps> = (props) => {
                                         class="appearance-none rounded-lg border border-surface-200 bg-surface-50 py-1 pl-2 pr-7 text-xs font-medium text-surface-700 transition-colors focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500 dark:border-surface-600 dark:bg-surface-700 dark:text-surface-200"
                                         onClick={(e) => e.stopPropagation()}
                                       >
-                                        <option value="activo">🟢 Activo</option>
-                                        <option value="pausado">🟡 Pausado</option>
-                                        <option value="completado">✅ Completado</option>
-                                        <option value="archivado">📦 Archivado</option>
+                                        <option value="activo">
+                                          🟢 Activo
+                                        </option>
+                                        <option value="pausado">
+                                          🟡 Pausado
+                                        </option>
+                                        <option value="completado">
+                                          ✅ Completado
+                                        </option>
+                                        <option value="archivado">
+                                          📦 Archivado
+                                        </option>
                                       </select>
-                                      <svg class="pointer-events-none absolute right-1.5 top-1/2 h-3 w-3 -translate-y-1/2 text-surface-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                                      <svg
+                                        class="pointer-events-none absolute right-1.5 top-1/2 h-3 w-3 -translate-y-1/2 text-surface-400"
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                        stroke="currentColor"
+                                      >
+                                        <path
+                                          stroke-linecap="round"
+                                          stroke-linejoin="round"
+                                          stroke-width="2"
+                                          d="M19 9l-7 7-7-7"
+                                        />
                                       </svg>
                                     </div>
                                   </Show>
@@ -553,14 +606,16 @@ const ProjectList: Component<ProjectListProps> = (props) => {
                                   />
                                   <button
                                     onClick={() => handleTogglePin(project)}
-                                    class="rounded-lg p-1.5 transition-all hover:bg-amber-50 hover:scale-110 dark:hover:bg-amber-900/30"
+                                    class="rounded-lg p-1.5 transition-all hover:scale-110 hover:bg-amber-50 dark:hover:bg-amber-900/30"
                                     title={
                                       project.is_pinned
                                         ? 'Desmarcar como favorito'
                                         : 'Marcar como favorito'
                                     }
                                   >
-                                    <span class={`text-lg transition-transform ${project.is_pinned ? 'drop-shadow-sm' : 'opacity-50 grayscale'}`}>
+                                    <span
+                                      class={`text-lg transition-transform ${project.is_pinned ? 'drop-shadow-sm' : 'opacity-50 grayscale'}`}
+                                    >
                                       {project.is_pinned ? '📌' : '📍'}
                                     </span>
                                   </button>
@@ -594,17 +649,44 @@ const ProjectList: Component<ProjectListProps> = (props) => {
                                         fallback={
                                           <Show when={isGroup()}>
                                             <span class="badge badge-accent">
-                                              <svg class="mr-1 h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                                              <svg
+                                                class="mr-1 h-3 w-3"
+                                                fill="none"
+                                                viewBox="0 0 24 24"
+                                                stroke="currentColor"
+                                              >
+                                                <path
+                                                  stroke-linecap="round"
+                                                  stroke-linejoin="round"
+                                                  stroke-width="2"
+                                                  d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
+                                                />
                                               </svg>
                                               Grupo
                                             </span>
                                           </Show>
                                         }
                                       >
-                                        <span class="badge" style={{ background: 'rgba(168, 85, 247, 0.15)', color: 'rgb(168, 85, 247)' }}>
-                                          <svg class="mr-1 h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                                        <span
+                                          class="badge"
+                                          style={{
+                                            background:
+                                              'rgba(168, 85, 247, 0.15)',
+                                            color: 'rgb(168, 85, 247)',
+                                          }}
+                                        >
+                                          <svg
+                                            class="mr-1 h-3 w-3"
+                                            fill="none"
+                                            viewBox="0 0 24 24"
+                                            stroke="currentColor"
+                                          >
+                                            <path
+                                              stroke-linecap="round"
+                                              stroke-linejoin="round"
+                                              stroke-width="2"
+                                              d="M13 5l7 7-7 7M5 5l7 7-7 7"
+                                            />
                                           </svg>
                                           Subproyecto
                                         </span>
@@ -617,10 +699,25 @@ const ProjectList: Component<ProjectListProps> = (props) => {
                               {/* Path & Git Info */}
                               <div class="mt-3 space-y-2 border-t border-surface-100 pt-3 dark:border-surface-700">
                                 <div class="flex items-center gap-2 rounded-lg bg-surface-50 px-2 py-1.5 font-mono text-xs text-surface-500 dark:bg-surface-800/50 dark:text-surface-400">
-                                  <svg class="h-3.5 w-3.5 flex-shrink-0 text-surface-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                                  <svg
+                                    class="h-3.5 w-3.5 flex-shrink-0 text-surface-400"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                  >
+                                    <path
+                                      stroke-linecap="round"
+                                      stroke-linejoin="round"
+                                      stroke-width="2"
+                                      d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
+                                    />
                                   </svg>
-                                  <span class="truncate" title={project.local_path}>{project.local_path}</span>
+                                  <span
+                                    class="truncate"
+                                    title={project.local_path}
+                                  >
+                                    {project.local_path}
+                                  </span>
                                 </div>
                                 <EnhancedGitInfo
                                   projectPath={project.local_path}
@@ -634,13 +731,23 @@ const ProjectList: Component<ProjectListProps> = (props) => {
                               <Show when={project.notes}>
                                 <div class="mt-3 rounded-lg border border-surface-100 bg-gradient-to-br from-surface-50 to-transparent p-2.5 dark:border-surface-700 dark:from-surface-800/50">
                                   <div class="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-surface-600 dark:text-surface-300">
-                                    <svg class="h-3.5 w-3.5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                    <svg
+                                      class="h-3.5 w-3.5 text-amber-500"
+                                      fill="none"
+                                      viewBox="0 0 24 24"
+                                      stroke="currentColor"
+                                    >
+                                      <path
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                        stroke-width="2"
+                                        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                                      />
                                     </svg>
                                     Notas
                                   </div>
                                   <div
-                                    class="prose prose-xs max-h-20 max-w-none overflow-y-auto break-words text-surface-600 scrollbar-thin dark:prose-invert dark:text-surface-300"
+                                    class="prose-xs scrollbar-thin prose max-h-20 max-w-none overflow-y-auto break-words text-surface-600 dark:prose-invert dark:text-surface-300"
                                     // eslint-disable-next-line solid/no-innerhtml
                                     innerHTML={renderMarkdown(project.notes!)}
                                   />
@@ -648,41 +755,86 @@ const ProjectList: Component<ProjectListProps> = (props) => {
                               </Show>
 
                               {/* Quick Links */}
-                              <Show when={project.documentation_url || project.ai_documentation_url || project.drive_link}>
+                              <Show
+                                when={
+                                  project.documentation_url ||
+                                  project.ai_documentation_url ||
+                                  project.drive_link
+                                }
+                              >
                                 <div class="mt-3 flex flex-wrap gap-1.5">
                                   <Show when={project.documentation_url}>
                                     <button
-                                      onClick={() => openUrl(project.documentation_url!)}
+                                      onClick={() =>
+                                        openUrl(project.documentation_url!)
+                                      }
                                       class="action-pill action-pill-accent"
                                       type="button"
                                     >
-                                      <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                                      <svg
+                                        class="h-3 w-3"
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                        stroke="currentColor"
+                                      >
+                                        <path
+                                          stroke-linecap="round"
+                                          stroke-linejoin="round"
+                                          stroke-width="2"
+                                          d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+                                        />
                                       </svg>
                                       Docs
                                     </button>
                                   </Show>
                                   <Show when={project.ai_documentation_url}>
                                     <button
-                                      onClick={() => openUrl(project.ai_documentation_url!)}
+                                      onClick={() =>
+                                        openUrl(project.ai_documentation_url!)
+                                      }
                                       class="action-pill"
-                                      style={{ background: 'rgba(168, 85, 247, 0.1)', color: 'rgb(168, 85, 247)' }}
+                                      style={{
+                                        background: 'rgba(168, 85, 247, 0.1)',
+                                        color: 'rgb(168, 85, 247)',
+                                      }}
                                       type="button"
                                     >
-                                      <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                      <svg
+                                        class="h-3 w-3"
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                        stroke="currentColor"
+                                      >
+                                        <path
+                                          stroke-linecap="round"
+                                          stroke-linejoin="round"
+                                          stroke-width="2"
+                                          d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                                        />
                                       </svg>
                                       AI Docs
                                     </button>
                                   </Show>
                                   <Show when={project.drive_link}>
                                     <button
-                                      onClick={() => openUrl(project.drive_link!)}
+                                      onClick={() =>
+                                        openUrl(project.drive_link!)
+                                      }
                                       class="action-pill action-pill-emerald"
                                       type="button"
                                     >
-                                      <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                      <svg
+                                        class="h-3 w-3"
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                        stroke="currentColor"
+                                      >
+                                        <path
+                                          stroke-linecap="round"
+                                          stroke-linejoin="round"
+                                          stroke-width="2"
+                                          d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                                        />
                                       </svg>
                                       Drive
                                     </button>
@@ -697,8 +849,18 @@ const ProjectList: Component<ProjectListProps> = (props) => {
                                   onClick={() => handleOpenTerminal(project)}
                                   class="btn-primary mb-2 w-full justify-center gap-2"
                                 >
-                                  <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                  <svg
+                                    class="h-4 w-4"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                  >
+                                    <path
+                                      stroke-linecap="round"
+                                      stroke-linejoin="round"
+                                      stroke-width="2"
+                                      d="M13 10V3L4 14h7v7l9-11h-7z"
+                                    />
                                   </svg>
                                   Trabajar
                                 </button>
@@ -708,44 +870,92 @@ const ProjectList: Component<ProjectListProps> = (props) => {
                                   {/* v0.4.0 - Botón para sacar proyecto del grupo */}
                                   <Show when={props.viewMode === 'subprojects'}>
                                     <button
-                                      onClick={() => handleRemoveFromGroup(project)}
+                                      onClick={() =>
+                                        handleRemoveFromGroup(project)
+                                      }
                                       class="btn-icon text-amber-600 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-900/30"
                                       aria-label="Sacar del grupo"
                                       title="Sacar este proyecto del grupo"
                                     >
-                                      <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
+                                      <svg
+                                        class="h-4 w-4"
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                        stroke="currentColor"
+                                      >
+                                        <path
+                                          stroke-linecap="round"
+                                          stroke-linejoin="round"
+                                          stroke-width="2"
+                                          d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"
+                                        />
                                       </svg>
                                     </button>
                                   </Show>
                                   <button
-                                    onClick={() => setContextProjectId(project.id)}
+                                    onClick={() =>
+                                      setContextProjectId(project.id)
+                                    }
                                     class="btn-icon text-accent-600 hover:bg-accent-50 dark:text-accent-400 dark:hover:bg-accent-900/30"
                                     aria-label="Contexto"
                                     title="Ver contexto del proyecto"
                                   >
-                                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                                    <svg
+                                      class="h-4 w-4"
+                                      fill="none"
+                                      viewBox="0 0 24 24"
+                                      stroke="currentColor"
+                                    >
+                                      <path
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                        stroke-width="2"
+                                        d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+                                      />
                                     </svg>
                                   </button>
                                   <button
-                                    onClick={() => setJournalProjectId(project.id)}
+                                    onClick={() =>
+                                      setJournalProjectId(project.id)
+                                    }
                                     class="btn-icon text-amber-600 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-900/30"
                                     aria-label="Diario"
                                     title="Diario del proyecto"
                                   >
-                                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                                    <svg
+                                      class="h-4 w-4"
+                                      fill="none"
+                                      viewBox="0 0 24 24"
+                                      stroke="currentColor"
+                                    >
+                                      <path
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                        stroke-width="2"
+                                        d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+                                      />
                                     </svg>
                                   </button>
                                   <button
-                                    onClick={() => setTodosProjectId(project.id)}
+                                    onClick={() =>
+                                      setTodosProjectId(project.id)
+                                    }
                                     class="btn-icon text-emerald-600 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-900/30"
                                     aria-label="TODOs"
                                     title="Lista de tareas"
                                   >
-                                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    <svg
+                                      class="h-4 w-4"
+                                      fill="none"
+                                      viewBox="0 0 24 24"
+                                      stroke="currentColor"
+                                    >
+                                      <path
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                        stroke-width="2"
+                                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                                      />
                                     </svg>
                                   </button>
                                   <button
@@ -754,8 +964,18 @@ const ProjectList: Component<ProjectListProps> = (props) => {
                                     aria-label="Exportar PDF"
                                     title="Exportar proyecto a PDF"
                                   >
-                                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                                    <svg
+                                      class="h-4 w-4"
+                                      fill="none"
+                                      viewBox="0 0 24 24"
+                                      stroke="currentColor"
+                                    >
+                                      <path
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                        stroke-width="2"
+                                        d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
+                                      />
                                     </svg>
                                   </button>
                                 </div>
@@ -768,8 +988,18 @@ const ProjectList: Component<ProjectListProps> = (props) => {
                                     aria-label="Crear backup"
                                     title="Crear backup - Elegir carpeta"
                                   >
-                                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                                    <svg
+                                      class="h-4 w-4"
+                                      fill="none"
+                                      viewBox="0 0 24 24"
+                                      stroke="currentColor"
+                                    >
+                                      <path
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                        stroke-width="2"
+                                        d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"
+                                      />
                                     </svg>
                                   </button>
                                   <button
@@ -778,8 +1008,18 @@ const ProjectList: Component<ProjectListProps> = (props) => {
                                     aria-label="Backup a disco"
                                     title="Backup directo a /mnt/sda1"
                                   >
-                                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                                    <svg
+                                      class="h-4 w-4"
+                                      fill="none"
+                                      viewBox="0 0 24 24"
+                                      stroke="currentColor"
+                                    >
+                                      <path
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                        stroke-width="2"
+                                        d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"
+                                      />
                                     </svg>
                                   </button>
                                   <button
@@ -788,8 +1028,18 @@ const ProjectList: Component<ProjectListProps> = (props) => {
                                     aria-label="Sincronizar"
                                     title="Sincronizar con rsync"
                                   >
-                                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                    <svg
+                                      class="h-4 w-4"
+                                      fill="none"
+                                      viewBox="0 0 24 24"
+                                      stroke="currentColor"
+                                    >
+                                      <path
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                        stroke-width="2"
+                                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                                      />
                                     </svg>
                                   </button>
                                   <button
@@ -798,8 +1048,18 @@ const ProjectList: Component<ProjectListProps> = (props) => {
                                     aria-label="Editar"
                                     title="Editar proyecto"
                                   >
-                                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                    <svg
+                                      class="h-4 w-4"
+                                      fill="none"
+                                      viewBox="0 0 24 24"
+                                      stroke="currentColor"
+                                    >
+                                      <path
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                        stroke-width="2"
+                                        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                                      />
                                     </svg>
                                   </button>
                                   <button
@@ -808,8 +1068,18 @@ const ProjectList: Component<ProjectListProps> = (props) => {
                                     aria-label="Eliminar"
                                     title="Eliminar proyecto"
                                   >
-                                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    <svg
+                                      class="h-4 w-4"
+                                      fill="none"
+                                      viewBox="0 0 24 24"
+                                      stroke="currentColor"
+                                    >
+                                      <path
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                        stroke-width="2"
+                                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                                      />
                                     </svg>
                                   </button>
                                 </div>
@@ -850,13 +1120,26 @@ const ProjectList: Component<ProjectListProps> = (props) => {
       {/* TODOs Modal */}
       <Show when={todosProjectId() !== null}>
         <div class="modal-overlay" onClick={() => setTodosProjectId(null)}>
-          <div class="modal-content max-w-2xl" onClick={(e) => e.stopPropagation()}>
+          <div
+            class="modal-content max-w-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
             {/* Header */}
             <div class="flex items-center justify-between border-b border-surface-200 p-5 dark:border-surface-700">
               <div class="flex items-center gap-3">
                 <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400">
-                  <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  <svg
+                    class="h-5 w-5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
                   </svg>
                 </div>
                 <h2 class="font-display text-xl font-semibold text-surface-900 dark:text-white">
@@ -867,14 +1150,24 @@ const ProjectList: Component<ProjectListProps> = (props) => {
                 onClick={() => setTodosProjectId(null)}
                 class="btn-icon text-surface-500 hover:bg-surface-100 dark:hover:bg-surface-700"
               >
-                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                <svg
+                  class="h-5 w-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M6 18L18 6M6 6l12 12"
+                  />
                 </svg>
               </button>
             </div>
 
             {/* Content */}
-            <div class="max-h-[70vh] overflow-y-auto p-5 scrollbar-thin">
+            <div class="scrollbar-thin max-h-[70vh] overflow-y-auto p-5">
               <TodoList projectId={todosProjectId()!} />
             </div>
           </div>

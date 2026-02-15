@@ -214,3 +214,112 @@ pub struct UpdateTodoDTO {
     pub content: Option<String>,
     pub is_completed: Option<bool>,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_project_serialization_roundtrip() {
+        let project = Project {
+            id: 1,
+            name: "Test".to_string(),
+            description: "Desc".to_string(),
+            local_path: "/tmp/test".to_string(),
+            documentation_url: Some("https://docs.example.com".to_string()),
+            ai_documentation_url: None,
+            drive_link: None,
+            notes: Some("Notes here".to_string()),
+            image_data: None,
+            links: Some(vec![ProjectLink {
+                id: 10,
+                project_id: 1,
+                link_type: "github".to_string(),
+                title: "Repo".to_string(),
+                url: "https://github.com/test".to_string(),
+                created_at: "2025-01-01".to_string(),
+            }]),
+            created_at: "2025-01-01".to_string(),
+            updated_at: "2025-01-02".to_string(),
+            last_opened_at: Some("2025-01-02".to_string()),
+            opened_count: Some(5),
+            total_time_seconds: Some(3600),
+            status: Some("activo".to_string()),
+            status_changed_at: None,
+            is_pinned: Some(true),
+            pinned_order: Some(1),
+            display_order: Some(0),
+            parent_id: None,
+            group_color: Some("#FF0000".to_string()),
+            group_icon: Some("rocket".to_string()),
+            is_group_expanded: Some(true),
+        };
+        let json = serde_json::to_string(&project).unwrap();
+        let deserialized: Project = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.id, 1);
+        assert_eq!(deserialized.name, "Test");
+        assert_eq!(deserialized.links.as_ref().unwrap().len(), 1);
+        assert_eq!(deserialized.group_color.as_deref(), Some("#FF0000"));
+    }
+
+    #[test]
+    fn test_dashboard_todo_flatten() {
+        let dt = DashboardTodo {
+            todo: ProjectTodo {
+                id: 1,
+                project_id: 2,
+                content: "Task".to_string(),
+                is_completed: false,
+                created_at: "2025-01-01".to_string(),
+                completed_at: None,
+            },
+            project_name: "My Project".to_string(),
+        };
+        let json = serde_json::to_string(&dt).unwrap();
+        // flatten means "id", "content" are at top level, not nested
+        let v: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(v["content"], "Task");
+        assert_eq!(v["project_name"], "My Project");
+        assert!(v.get("todo").is_none()); // flattened, no nested "todo" key
+    }
+
+    #[test]
+    fn test_dashboard_journal_entry_flatten() {
+        let dje = DashboardJournalEntry {
+            entry: JournalEntry {
+                id: 1,
+                project_id: 2,
+                content: "Entry content".to_string(),
+                tags: Some("[\"tag1\"]".to_string()),
+                created_at: "2025-01-01".to_string(),
+                updated_at: "2025-01-01".to_string(),
+            },
+            project_name: "Project X".to_string(),
+        };
+        let json = serde_json::to_string(&dje).unwrap();
+        let v: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(v["content"], "Entry content");
+        assert_eq!(v["project_name"], "Project X");
+        assert!(v.get("entry").is_none()); // flattened
+    }
+
+    #[test]
+    fn test_create_project_dto_deserialization() {
+        let json = r#"{
+            "name": "New Project",
+            "description": "Desc",
+            "local_path": "/tmp/new",
+            "documentation_url": null,
+            "ai_documentation_url": null,
+            "drive_link": null,
+            "notes": null,
+            "image_data": null,
+            "parent_id": null,
+            "group_color": null,
+            "group_icon": null
+        }"#;
+        let dto: CreateProjectDTO = serde_json::from_str(json).unwrap();
+        assert_eq!(dto.name, "New Project");
+        assert!(dto.parent_id.is_none());
+    }
+}

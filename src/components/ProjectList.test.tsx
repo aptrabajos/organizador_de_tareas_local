@@ -140,7 +140,7 @@ describe('ProjectList', () => {
     ));
 
     const docButtons = screen.getAllByRole('button', {
-      name: /documentación/i,
+      name: /docs/i,
     });
     expect(docButtons.length).toBeGreaterThan(0);
   });

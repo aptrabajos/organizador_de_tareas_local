@@ -81,16 +81,16 @@ describe('ProjectStore', () => {
       updated_at: '2024-01-02T00:00:00Z',
     });
 
-    vi.mocked(api.getAllProjects).mockResolvedValue([mockProject]);
+    vi.mocked(api.getRootProjects).mockResolvedValue([mockProject]);
 
     await createRoot(async (dispose) => {
       const store = createProjectStore();
-      await store.loadProjects();
 
       await store.createProject(newProjectDTO);
 
       expect(api.createProject).toHaveBeenCalledWith(newProjectDTO);
-      expect(api.getAllProjects).toHaveBeenCalledTimes(2);
+      // After create, store reloads via getRootProjects (groups mode)
+      expect(api.getRootProjects).toHaveBeenCalled();
 
       dispose();
     });
@@ -101,16 +101,16 @@ describe('ProjectStore', () => {
     const updatedProject = { ...mockProject, ...updates };
 
     vi.mocked(api.updateProject).mockResolvedValue(updatedProject);
-    vi.mocked(api.getAllProjects).mockResolvedValue([mockProject]);
+    vi.mocked(api.getRootProjects).mockResolvedValue([updatedProject]);
 
     await createRoot(async (dispose) => {
       const store = createProjectStore();
-      await store.loadProjects();
 
       await store.updateProject(1, updates);
 
       expect(api.updateProject).toHaveBeenCalledWith(1, updates);
-      expect(api.getAllProjects).toHaveBeenCalledTimes(2);
+      // After update, store reloads via getRootProjects (groups mode)
+      expect(api.getRootProjects).toHaveBeenCalled();
 
       dispose();
     });
@@ -118,16 +118,16 @@ describe('ProjectStore', () => {
 
   it('should delete a project', async () => {
     vi.mocked(api.deleteProject).mockResolvedValue();
-    vi.mocked(api.getAllProjects).mockResolvedValue([mockProject]);
+    vi.mocked(api.getRootProjects).mockResolvedValue([]);
 
     await createRoot(async (dispose) => {
       const store = createProjectStore();
-      await store.loadProjects();
 
       await store.deleteProject(1);
 
       expect(api.deleteProject).toHaveBeenCalledWith(1);
-      expect(api.getAllProjects).toHaveBeenCalledTimes(2);
+      // After delete, store reloads via getRootProjects (groups mode)
+      expect(api.getRootProjects).toHaveBeenCalled();
 
       dispose();
     });
@@ -160,6 +160,164 @@ describe('ProjectStore', () => {
       expect(api.openTerminal).toHaveBeenCalledWith('/home/user/test');
 
       dispose();
+    });
+  });
+
+  // ==================== GRUPOS (v0.4.0) ====================
+
+  describe('Groups', () => {
+    it('should load root projects and set viewMode to groups', async () => {
+      const mockRootProjects = [mockProject];
+      vi.mocked(api.getRootProjects).mockResolvedValue(mockRootProjects);
+
+      await createRoot(async (dispose) => {
+        const store = createProjectStore();
+
+        await store.loadRootProjects();
+
+        expect(api.getRootProjects).toHaveBeenCalled();
+        expect(store.projects()).toEqual(mockRootProjects);
+        expect(store.viewMode()).toBe('groups');
+        expect(store.currentGroup()).toBeNull();
+
+        dispose();
+      });
+    });
+
+    it('should navigate to group and load subprojects', async () => {
+      const groupProject: Project = { ...mockProject, id: 10, name: 'Group A' };
+      const mockSubprojects = [
+        { ...mockProject, id: 20, name: 'Sub 1', parent_id: 10 },
+        { ...mockProject, id: 21, name: 'Sub 2', parent_id: 10 },
+      ];
+      vi.mocked(api.getSubprojects).mockResolvedValue(mockSubprojects);
+
+      await createRoot(async (dispose) => {
+        const store = createProjectStore();
+
+        await store.navigateToGroup(groupProject);
+
+        expect(store.currentGroup()).toEqual(groupProject);
+        expect(store.viewMode()).toBe('subprojects');
+        expect(api.getSubprojects).toHaveBeenCalledWith(10);
+        expect(store.projects()).toEqual(mockSubprojects);
+
+        dispose();
+      });
+    });
+
+    it('should navigate back to root groups', async () => {
+      const mockRootProjects = [mockProject];
+      vi.mocked(api.getRootProjects).mockResolvedValue(mockRootProjects);
+
+      await createRoot(async (dispose) => {
+        const store = createProjectStore();
+
+        await store.navigateBack();
+
+        expect(store.currentGroup()).toBeNull();
+        expect(store.viewMode()).toBe('groups');
+        expect(api.getRootProjects).toHaveBeenCalled();
+        expect(store.projects()).toEqual(mockRootProjects);
+
+        dispose();
+      });
+    });
+
+    it('should load subprojects for a parent', async () => {
+      const mockSubprojects = [
+        { ...mockProject, id: 20, name: 'Sub 1', parent_id: 5 },
+      ];
+      vi.mocked(api.getSubprojects).mockResolvedValue(mockSubprojects);
+
+      await createRoot(async (dispose) => {
+        const store = createProjectStore();
+
+        await store.loadSubprojects(5);
+
+        expect(api.getSubprojects).toHaveBeenCalledWith(5);
+        expect(store.projects()).toEqual(mockSubprojects);
+
+        dispose();
+      });
+    });
+
+    it('should set error when loadSubprojects fails', async () => {
+      vi.mocked(api.getSubprojects).mockRejectedValue(new Error('DB error'));
+
+      await createRoot(async (dispose) => {
+        const store = createProjectStore();
+
+        await store.loadSubprojects(5);
+
+        expect(store.error()).toBe('DB error');
+        expect(store.projects()).toEqual([]);
+
+        dispose();
+      });
+    });
+
+    it('should reload subprojects after creating project in subprojects mode', async () => {
+      const groupProject: Project = { ...mockProject, id: 10, name: 'Group A' };
+      const mockSubprojects = [
+        { ...mockProject, id: 20, name: 'Sub 1', parent_id: 10 },
+      ];
+
+      vi.mocked(api.getSubprojects).mockResolvedValue(mockSubprojects);
+      vi.mocked(api.createProject).mockResolvedValue({
+        ...mockProject,
+        id: 30,
+      });
+
+      await createRoot(async (dispose) => {
+        const store = createProjectStore();
+
+        // Navigate to group first
+        await store.navigateToGroup(groupProject);
+        vi.clearAllMocks();
+
+        // Mock for the reload after create
+        vi.mocked(api.getSubprojects).mockResolvedValue(mockSubprojects);
+        vi.mocked(api.createProject).mockResolvedValue({
+          ...mockProject,
+          id: 30,
+        });
+
+        await store.createProject({
+          name: 'New Sub',
+          description: 'Desc',
+          local_path: '/new',
+        });
+
+        expect(api.createProject).toHaveBeenCalled();
+        expect(api.getSubprojects).toHaveBeenCalledWith(10);
+
+        dispose();
+      });
+    });
+
+    it('should reload root projects after deleting project in groups mode', async () => {
+      const mockRootProjects = [mockProject];
+      vi.mocked(api.getRootProjects).mockResolvedValue(mockRootProjects);
+      vi.mocked(api.deleteProject).mockResolvedValue();
+
+      await createRoot(async (dispose) => {
+        const store = createProjectStore();
+
+        // Load root projects first (sets viewMode to 'groups')
+        await store.loadRootProjects();
+        vi.clearAllMocks();
+
+        vi.mocked(api.getRootProjects).mockResolvedValue([]);
+        vi.mocked(api.deleteProject).mockResolvedValue();
+
+        await store.deleteProject(1);
+
+        expect(api.deleteProject).toHaveBeenCalledWith(1);
+        expect(api.getRootProjects).toHaveBeenCalled();
+
+        dispose();
+      });
     });
   });
 });

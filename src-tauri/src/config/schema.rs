@@ -193,6 +193,50 @@ impl Default for ProgramConfig {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_app_config_default_roundtrip() {
+        let config = AppConfig::default();
+        let json = serde_json::to_string(&config).unwrap();
+        let deserialized: AppConfig = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.version, config.version);
+        assert_eq!(deserialized.ui.language, "es");
+        assert!(deserialized.ui.confirm_delete);
+    }
+
+    #[test]
+    fn test_program_mode_serde_rename() {
+        let auto_json = serde_json::to_string(&ProgramMode::Auto).unwrap();
+        assert_eq!(auto_json, "\"auto\"");
+        let custom_json = serde_json::to_string(&ProgramMode::Custom).unwrap();
+        assert_eq!(custom_json, "\"custom\"");
+        let default_json = serde_json::to_string(&ProgramMode::Default).unwrap();
+        assert_eq!(default_json, "\"default\"");
+        let script_json = serde_json::to_string(&ProgramMode::Script).unwrap();
+        assert_eq!(script_json, "\"script\"");
+        // Roundtrip
+        let parsed: ProgramMode = serde_json::from_str("\"auto\"").unwrap();
+        assert_eq!(parsed, ProgramMode::Auto);
+    }
+
+    #[test]
+    fn test_shortcuts_config_default_keys() {
+        let config = ShortcutsConfig::default();
+        assert!(config.enabled);
+        let keys: Vec<&String> = config.shortcuts.keys().collect();
+        assert_eq!(config.shortcuts.len(), 6);
+        assert!(config.shortcuts.contains_key("new_project"));
+        assert!(config.shortcuts.contains_key("search"));
+        assert!(config.shortcuts.contains_key("settings"));
+        assert!(config.shortcuts.contains_key("about"));
+        assert!(config.shortcuts.contains_key("refresh"));
+        assert!(config.shortcuts.contains_key("close_modal"));
+    }
+}
+
 /// Configuración de atajos de teclado
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ShortcutsConfig {

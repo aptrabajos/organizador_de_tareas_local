@@ -51,7 +51,12 @@ const SearchBar: Component<SearchBarProps> = (props) => {
           aria-label="Limpiar búsqueda"
           class="absolute inset-y-0 right-0 flex items-center pr-3 text-surface-400 transition-colors hover:text-surface-600 dark:text-surface-500 dark:hover:text-surface-300"
         >
-          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg
+            class="h-4 w-4"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
             <path
               stroke-linecap="round"
               stroke-linejoin="round"

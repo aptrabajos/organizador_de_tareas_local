@@ -76,7 +76,12 @@ const ProjectFilters: Component<ProjectFiltersProps> = (props) => {
           }}
           class="flex items-center gap-1.5 rounded-lg border border-surface-200 bg-white px-2.5 py-1.5 text-xs font-medium text-surface-600 transition-colors hover:bg-surface-50 hover:text-surface-800 dark:border-surface-600 dark:bg-surface-800 dark:text-surface-300 dark:hover:bg-surface-700"
         >
-          <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg
+            class="h-3.5 w-3.5"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
             <path
               stroke-linecap="round"
               stroke-linejoin="round"

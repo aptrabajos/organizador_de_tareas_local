@@ -1,10 +1,12 @@
-import { Component } from 'solid-js';
+import { Component, createResource } from 'solid-js';
+import { getVersion } from '@tauri-apps/api/app';
 
 interface AboutProps {
   onClose: () => void;
 }
 
 const About: Component<AboutProps> = (props) => {
+  const [version] = createResource(() => getVersion().catch(() => '?.?.?'));
   return (
     <div class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4 dark:bg-opacity-70">
       <div class="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-white p-6 shadow-xl dark:bg-gray-800">
@@ -29,7 +31,7 @@ const About: Component<AboutProps> = (props) => {
               Gestor de Proyectos
             </h3>
             <p class="text-sm text-gray-600 dark:text-gray-400">
-              Versión: <span class="font-mono font-semibold">0.4.3</span>
+              Versión: <span class="font-mono font-semibold">{version() ?? '...'}</span>
             </p>
             <p class="mt-2 text-gray-700 dark:text-gray-300">
               Gestor de proyectos multiplataforma con código optimizado y 100%

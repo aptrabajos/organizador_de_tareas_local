@@ -66,6 +66,7 @@ describe('ProjectForm', () => {
         drive_link: undefined,
         notes: undefined,
         image_data: undefined,
+        parent_id: null,
       });
     });
   });
@@ -180,6 +181,7 @@ describe('ProjectForm', () => {
         drive_link: 'https://drive.com',
         notes: undefined,
         image_data: undefined,
+        parent_id: null,
       });
     });
   });

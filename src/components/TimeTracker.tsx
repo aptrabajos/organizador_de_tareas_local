@@ -1,6 +1,10 @@
 import { Component, createSignal, createEffect, Show } from 'solid-js';
 import type { TimeStats } from '../types/project';
-import { getTimeStats, checkTrackingConfig, initTracking } from '../services/api';
+import {
+  getTimeStats,
+  checkTrackingConfig,
+  initTracking,
+} from '../services/api';
 
 interface TimeTrackerProps {
   projectId: number;
@@ -42,7 +46,12 @@ const CompactView: Component<{
             class="flex items-center space-x-1 rounded bg-gray-100 px-2 py-1 text-xs text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-gray-600"
             title="Activar time tracking"
           >
-            <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg
+              class="h-3 w-3"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
               <path
                 stroke-linecap="round"
                 stroke-linejoin="round"
@@ -180,7 +189,9 @@ const FullView: Component<{
           <Show when={props.stats}>
             <div class="grid grid-cols-2 gap-3">
               <div class="rounded-lg bg-gray-50 p-3 dark:bg-gray-700/50">
-                <div class="text-xs text-gray-500 dark:text-gray-400">Total</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400">
+                  Total
+                </div>
                 <div class="text-lg font-semibold text-gray-900 dark:text-white">
                   {formatTimeHuman(props.stats!.total_seconds)}
                 </div>
@@ -192,13 +203,17 @@ const FullView: Component<{
                 </div>
               </div>
               <div class="rounded-lg bg-gray-50 p-3 dark:bg-gray-700/50">
-                <div class="text-xs text-gray-500 dark:text-gray-400">Esta semana</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400">
+                  Esta semana
+                </div>
                 <div class="text-lg font-semibold text-gray-900 dark:text-white">
                   {formatTimeHuman(props.stats!.week_seconds)}
                 </div>
               </div>
               <div class="rounded-lg bg-gray-50 p-3 dark:bg-gray-700/50">
-                <div class="text-xs text-gray-500 dark:text-gray-400">Sesiones</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400">
+                  Sesiones
+                </div>
                 <div class="text-lg font-semibold text-gray-900 dark:text-white">
                   {props.stats!.session_count}
                 </div>
@@ -232,7 +247,11 @@ const FullView: Component<{
                 <div class="text-xs text-blue-700 dark:text-blue-300">
                   <p class="font-medium">Shell Hook configurado</p>
                   <p class="mt-1 opacity-80">
-                    Agrega <code class="rounded bg-blue-100 px-1 dark:bg-blue-900">source gestor-track.sh</code> a tu .bashrc/.zshrc para tracking automatico.
+                    Agrega{' '}
+                    <code class="rounded bg-blue-100 px-1 dark:bg-blue-900">
+                      source gestor-track.sh
+                    </code>{' '}
+                    a tu .bashrc/.zshrc para tracking automatico.
                   </p>
                 </div>
               </div>

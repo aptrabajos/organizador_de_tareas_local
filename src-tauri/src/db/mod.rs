@@ -170,6 +170,12 @@ impl Database {
             [],
         );
 
+        // Migración: agregar updated_at a project_links
+        let _ = conn.execute(
+            "ALTER TABLE project_links ADD COLUMN updated_at DATETIME",
+            [],
+        );
+
         // Crear tabla de TODOs por proyecto
         conn.execute(
             "CREATE TABLE IF NOT EXISTS project_todos (
@@ -1710,5 +1716,864 @@ impl Database {
             today_seconds,
             week_seconds,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::project::*;
+    use std::path::PathBuf;
+
+    fn test_db() -> Database {
+        Database::new(PathBuf::from(":memory:")).expect("Failed to create in-memory database")
+    }
+
+    fn test_project_dto() -> CreateProjectDTO {
+        CreateProjectDTO {
+            name: "Test Project".to_string(),
+            description: "A test project".to_string(),
+            local_path: "/tmp/test".to_string(),
+            documentation_url: None,
+            ai_documentation_url: None,
+            drive_link: None,
+            notes: None,
+            image_data: None,
+            parent_id: None,
+            group_color: None,
+            group_icon: None,
+        }
+    }
+
+    // ==================== Paso 1: Inicialización y CRUD de Proyectos ====================
+
+    #[test]
+    fn test_database_initialization() {
+        let db = test_db();
+        let conn = db.conn.lock().unwrap();
+        let mut stmt = conn
+            .prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
+            .unwrap();
+        let tables: Vec<String> = stmt
+            .query_map([], |row| row.get(0))
+            .unwrap()
+            .filter_map(|r| r.ok())
+            .collect();
+        assert!(tables.contains(&"projects".to_string()));
+        assert!(tables.contains(&"project_links".to_string()));
+        assert!(tables.contains(&"project_journal".to_string()));
+        assert!(tables.contains(&"project_todos".to_string()));
+        assert!(tables.contains(&"project_activity".to_string()));
+        assert!(tables.contains(&"project_attachments".to_string()));
+        assert!(tables.contains(&"time_tracking_sessions".to_string()));
+    }
+
+    #[test]
+    fn test_create_project() {
+        let db = test_db();
+        let project = db.create_project(test_project_dto()).unwrap();
+        assert!(project.id > 0);
+        assert_eq!(project.name, "Test Project");
+        assert_eq!(project.status.as_deref(), Some("activo"));
+    }
+
+    #[test]
+    fn test_create_project_with_all_fields() {
+        let db = test_db();
+        let dto = CreateProjectDTO {
+            name: "Full Project".to_string(),
+            description: "Full desc".to_string(),
+            local_path: "/tmp/full".to_string(),
+            documentation_url: Some("https://docs.example.com".to_string()),
+            ai_documentation_url: Some("https://ai.example.com".to_string()),
+            drive_link: Some("https://drive.google.com/xxx".to_string()),
+            notes: Some("Some notes".to_string()),
+            image_data: None,
+            parent_id: None,
+            group_color: Some("#FF0000".to_string()),
+            group_icon: Some("rocket".to_string()),
+        };
+        let project = db.create_project(dto).unwrap();
+        assert_eq!(project.documentation_url.as_deref(), Some("https://docs.example.com"));
+        assert_eq!(project.drive_link.as_deref(), Some("https://drive.google.com/xxx"));
+        assert_eq!(project.notes.as_deref(), Some("Some notes"));
+        assert_eq!(project.group_color.as_deref(), Some("#FF0000"));
+        assert_eq!(project.group_icon.as_deref(), Some("rocket"));
+    }
+
+    #[test]
+    fn test_get_project() {
+        let db = test_db();
+        let created = db.create_project(test_project_dto()).unwrap();
+        let fetched = db.get_project(created.id).unwrap();
+        assert_eq!(fetched.name, "Test Project");
+        assert!(fetched.links.is_some());
+        assert_eq!(fetched.links.unwrap().len(), 0);
+    }
+
+    #[test]
+    fn test_get_project_not_found() {
+        let db = test_db();
+        let result = db.get_project(9999);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_get_all_projects_empty() {
+        let db = test_db();
+        let projects = db.get_all_projects().unwrap();
+        assert!(projects.is_empty());
+    }
+
+    #[test]
+    fn test_get_all_projects_returns_all() {
+        let db = test_db();
+        for i in 0..3 {
+            let mut dto = test_project_dto();
+            dto.name = format!("Project {}", i);
+            db.create_project(dto).unwrap();
+        }
+        let projects = db.get_all_projects().unwrap();
+        assert_eq!(projects.len(), 3);
+    }
+
+    #[test]
+    fn test_update_project_name() {
+        let db = test_db();
+        let created = db.create_project(test_project_dto()).unwrap();
+        let updated = db
+            .update_project(
+                created.id,
+                UpdateProjectDTO {
+                    name: Some("Renamed".to_string()),
+                    description: None,
+                    local_path: None,
+                    documentation_url: None,
+                    ai_documentation_url: None,
+                    drive_link: None,
+                    notes: None,
+                    image_data: None,
+                    parent_id: None,
+                    group_color: None,
+                    group_icon: None,
+                },
+            )
+            .unwrap();
+        assert_eq!(updated.name, "Renamed");
+        assert_eq!(updated.description, "A test project");
+    }
+
+    #[test]
+    fn test_update_project_multiple_fields() {
+        let db = test_db();
+        let created = db.create_project(test_project_dto()).unwrap();
+        let updated = db
+            .update_project(
+                created.id,
+                UpdateProjectDTO {
+                    name: Some("New Name".to_string()),
+                    description: Some("New desc".to_string()),
+                    local_path: None,
+                    documentation_url: None,
+                    ai_documentation_url: None,
+                    drive_link: None,
+                    notes: Some("New notes".to_string()),
+                    image_data: None,
+                    parent_id: None,
+                    group_color: None,
+                    group_icon: None,
+                },
+            )
+            .unwrap();
+        assert_eq!(updated.name, "New Name");
+        assert_eq!(updated.description, "New desc");
+        assert_eq!(updated.notes.as_deref(), Some("New notes"));
+    }
+
+    #[test]
+    fn test_delete_project() {
+        let db = test_db();
+        let created = db.create_project(test_project_dto()).unwrap();
+        db.delete_project(created.id).unwrap();
+        assert!(db.get_project(created.id).is_err());
+    }
+
+    #[test]
+    fn test_search_projects_by_name() {
+        let db = test_db();
+        let mut dto = test_project_dto();
+        dto.name = "Alpha Beta".to_string();
+        db.create_project(dto).unwrap();
+        let mut dto2 = test_project_dto();
+        dto2.name = "Gamma".to_string();
+        db.create_project(dto2).unwrap();
+        let results = db.search_projects("Alpha").unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].name, "Alpha Beta");
+    }
+
+    #[test]
+    fn test_search_projects_by_notes() {
+        let db = test_db();
+        let mut dto = test_project_dto();
+        dto.notes = Some("keyword_unique_xyz".to_string());
+        db.create_project(dto).unwrap();
+        let results = db.search_projects("keyword_unique_xyz").unwrap();
+        assert_eq!(results.len(), 1);
+    }
+
+    // ==================== Paso 2: CRUD de Links ====================
+
+    #[test]
+    fn test_create_link() {
+        let db = test_db();
+        let project = db.create_project(test_project_dto()).unwrap();
+        let link = db
+            .create_link(CreateLinkDTO {
+                project_id: project.id,
+                link_type: "github".to_string(),
+                title: "Repo".to_string(),
+                url: "https://github.com/test".to_string(),
+            })
+            .unwrap();
+        assert!(link.id > 0);
+        assert_eq!(link.project_id, project.id);
+        assert_eq!(link.link_type, "github");
+        assert_eq!(link.title, "Repo");
+        assert_eq!(link.url, "https://github.com/test");
+    }
+
+    #[test]
+    fn test_get_project_links() {
+        let db = test_db();
+        let project = db.create_project(test_project_dto()).unwrap();
+        db.create_link(CreateLinkDTO {
+            project_id: project.id,
+            link_type: "docs".to_string(),
+            title: "Docs".to_string(),
+            url: "https://docs.example.com".to_string(),
+        })
+        .unwrap();
+        db.create_link(CreateLinkDTO {
+            project_id: project.id,
+            link_type: "github".to_string(),
+            title: "Repo".to_string(),
+            url: "https://github.com/test".to_string(),
+        })
+        .unwrap();
+        let links = db.get_project_links(project.id).unwrap();
+        assert_eq!(links.len(), 2);
+    }
+
+    #[test]
+    fn test_get_project_links_empty() {
+        let db = test_db();
+        let project = db.create_project(test_project_dto()).unwrap();
+        let links = db.get_project_links(project.id).unwrap();
+        assert!(links.is_empty());
+    }
+
+    #[test]
+    fn test_update_link() {
+        let db = test_db();
+        let project = db.create_project(test_project_dto()).unwrap();
+        let link = db
+            .create_link(CreateLinkDTO {
+                project_id: project.id,
+                link_type: "github".to_string(),
+                title: "Old Title".to_string(),
+                url: "https://github.com/old".to_string(),
+            })
+            .unwrap();
+        let updated = db
+            .update_link(
+                link.id,
+                UpdateLinkDTO {
+                    link_type: None,
+                    title: Some("New Title".to_string()),
+                    url: None,
+                },
+            )
+            .unwrap();
+        assert_eq!(updated.title, "New Title");
+        assert_eq!(updated.url, "https://github.com/old");
+    }
+
+    #[test]
+    fn test_update_link_empty_fails() {
+        let db = test_db();
+        let project = db.create_project(test_project_dto()).unwrap();
+        let link = db
+            .create_link(CreateLinkDTO {
+                project_id: project.id,
+                link_type: "github".to_string(),
+                title: "Title".to_string(),
+                url: "https://github.com/test".to_string(),
+            })
+            .unwrap();
+        let result = db.update_link(
+            link.id,
+            UpdateLinkDTO {
+                link_type: None,
+                title: None,
+                url: None,
+            },
+        );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_delete_link() {
+        let db = test_db();
+        let project = db.create_project(test_project_dto()).unwrap();
+        let link = db
+            .create_link(CreateLinkDTO {
+                project_id: project.id,
+                link_type: "github".to_string(),
+                title: "Title".to_string(),
+                url: "https://github.com/test".to_string(),
+            })
+            .unwrap();
+        db.delete_link(link.id).unwrap();
+        let links = db.get_project_links(project.id).unwrap();
+        assert!(links.is_empty());
+    }
+
+    #[test]
+    fn test_links_included_in_get_all_projects() {
+        let db = test_db();
+        let project = db.create_project(test_project_dto()).unwrap();
+        db.create_link(CreateLinkDTO {
+            project_id: project.id,
+            link_type: "github".to_string(),
+            title: "Repo".to_string(),
+            url: "https://github.com/test".to_string(),
+        })
+        .unwrap();
+        let projects = db.get_all_projects().unwrap();
+        assert_eq!(projects.len(), 1);
+        let links = projects[0].links.as_ref().unwrap();
+        assert_eq!(links.len(), 1);
+    }
+
+    // ==================== Paso 3: Journal, Todos, Attachments ====================
+
+    // --- Journal ---
+
+    #[test]
+    fn test_create_journal_entry() {
+        let db = test_db();
+        let project = db.create_project(test_project_dto()).unwrap();
+        let entry = db
+            .create_journal_entry(CreateJournalEntryDTO {
+                project_id: project.id,
+                content: "First entry".to_string(),
+                tags: Some("[\"bug\",\"tip\"]".to_string()),
+            })
+            .unwrap();
+        assert!(entry.id > 0);
+        assert_eq!(entry.content, "First entry");
+        assert_eq!(entry.tags.as_deref(), Some("[\"bug\",\"tip\"]"));
+    }
+
+    #[test]
+    fn test_get_journal_entries() {
+        let db = test_db();
+        let project = db.create_project(test_project_dto()).unwrap();
+        db.create_journal_entry(CreateJournalEntryDTO {
+            project_id: project.id,
+            content: "Entry 1".to_string(),
+            tags: None,
+        })
+        .unwrap();
+        db.create_journal_entry(CreateJournalEntryDTO {
+            project_id: project.id,
+            content: "Entry 2".to_string(),
+            tags: None,
+        })
+        .unwrap();
+        let entries = db.get_journal_entries(project.id).unwrap();
+        assert_eq!(entries.len(), 2);
+        // Both entries present (order may vary when created in same second)
+        let contents: Vec<&str> = entries.iter().map(|e| e.content.as_str()).collect();
+        assert!(contents.contains(&"Entry 1"));
+        assert!(contents.contains(&"Entry 2"));
+    }
+
+    #[test]
+    fn test_update_journal_entry() {
+        let db = test_db();
+        let project = db.create_project(test_project_dto()).unwrap();
+        let entry = db
+            .create_journal_entry(CreateJournalEntryDTO {
+                project_id: project.id,
+                content: "Original".to_string(),
+                tags: None,
+            })
+            .unwrap();
+        let updated = db
+            .update_journal_entry(
+                entry.id,
+                UpdateJournalEntryDTO {
+                    content: Some("Updated".to_string()),
+                    tags: None,
+                },
+            )
+            .unwrap();
+        assert_eq!(updated.content, "Updated");
+    }
+
+    #[test]
+    fn test_delete_journal_entry() {
+        let db = test_db();
+        let project = db.create_project(test_project_dto()).unwrap();
+        let entry = db
+            .create_journal_entry(CreateJournalEntryDTO {
+                project_id: project.id,
+                content: "To delete".to_string(),
+                tags: None,
+            })
+            .unwrap();
+        db.delete_journal_entry(entry.id).unwrap();
+        let entries = db.get_journal_entries(project.id).unwrap();
+        assert!(entries.is_empty());
+    }
+
+    // --- Todos ---
+
+    #[test]
+    fn test_create_todo() {
+        let db = test_db();
+        let project = db.create_project(test_project_dto()).unwrap();
+        let todo = db
+            .create_todo(CreateTodoDTO {
+                project_id: project.id,
+                content: "Do something".to_string(),
+            })
+            .unwrap();
+        assert!(todo.id > 0);
+        assert!(!todo.is_completed);
+        assert!(todo.completed_at.is_none());
+    }
+
+    #[test]
+    fn test_complete_todo() {
+        let db = test_db();
+        let project = db.create_project(test_project_dto()).unwrap();
+        let todo = db
+            .create_todo(CreateTodoDTO {
+                project_id: project.id,
+                content: "Task".to_string(),
+            })
+            .unwrap();
+        let completed = db
+            .update_todo(
+                todo.id,
+                UpdateTodoDTO {
+                    content: None,
+                    is_completed: Some(true),
+                },
+            )
+            .unwrap();
+        assert!(completed.is_completed);
+        assert!(completed.completed_at.is_some());
+    }
+
+    #[test]
+    fn test_uncomplete_todo() {
+        let db = test_db();
+        let project = db.create_project(test_project_dto()).unwrap();
+        let todo = db
+            .create_todo(CreateTodoDTO {
+                project_id: project.id,
+                content: "Task".to_string(),
+            })
+            .unwrap();
+        db.update_todo(
+            todo.id,
+            UpdateTodoDTO {
+                content: None,
+                is_completed: Some(true),
+            },
+        )
+        .unwrap();
+        let uncompleted = db
+            .update_todo(
+                todo.id,
+                UpdateTodoDTO {
+                    content: None,
+                    is_completed: Some(false),
+                },
+            )
+            .unwrap();
+        assert!(!uncompleted.is_completed);
+        assert!(uncompleted.completed_at.is_none());
+    }
+
+    #[test]
+    fn test_get_project_todos_ordering() {
+        let db = test_db();
+        let project = db.create_project(test_project_dto()).unwrap();
+        let t1 = db
+            .create_todo(CreateTodoDTO {
+                project_id: project.id,
+                content: "Task A".to_string(),
+            })
+            .unwrap();
+        db.create_todo(CreateTodoDTO {
+            project_id: project.id,
+            content: "Task B".to_string(),
+        })
+        .unwrap();
+        // Complete Task A
+        db.update_todo(
+            t1.id,
+            UpdateTodoDTO {
+                content: None,
+                is_completed: Some(true),
+            },
+        )
+        .unwrap();
+        let todos = db.get_project_todos(project.id).unwrap();
+        assert_eq!(todos.len(), 2);
+        // Incomplete first
+        assert!(!todos[0].is_completed);
+        assert!(todos[1].is_completed);
+    }
+
+    #[test]
+    fn test_delete_todo() {
+        let db = test_db();
+        let project = db.create_project(test_project_dto()).unwrap();
+        let todo = db
+            .create_todo(CreateTodoDTO {
+                project_id: project.id,
+                content: "To delete".to_string(),
+            })
+            .unwrap();
+        db.delete_todo(todo.id).unwrap();
+        let todos = db.get_project_todos(project.id).unwrap();
+        assert!(todos.is_empty());
+    }
+
+    // --- Attachments ---
+
+    #[test]
+    fn test_add_attachment() {
+        let db = test_db();
+        let project = db.create_project(test_project_dto()).unwrap();
+        let att = db
+            .add_attachment(CreateAttachmentDTO {
+                project_id: project.id,
+                filename: "test.txt".to_string(),
+                file_data: "aGVsbG8=".to_string(),
+                file_size: 5,
+                mime_type: "text/plain".to_string(),
+            })
+            .unwrap();
+        assert!(att.id > 0);
+        assert_eq!(att.filename, "test.txt");
+        assert_eq!(att.file_size, 5);
+    }
+
+    #[test]
+    fn test_attachment_size_limit() {
+        let db = test_db();
+        let project = db.create_project(test_project_dto()).unwrap();
+        let result = db.add_attachment(CreateAttachmentDTO {
+            project_id: project.id,
+            filename: "big.bin".to_string(),
+            file_data: "data".to_string(),
+            file_size: 6 * 1024 * 1024, // 6MB > 5MB limit
+            mime_type: "application/octet-stream".to_string(),
+        });
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_get_attachments() {
+        let db = test_db();
+        let project = db.create_project(test_project_dto()).unwrap();
+        db.add_attachment(CreateAttachmentDTO {
+            project_id: project.id,
+            filename: "a.txt".to_string(),
+            file_data: "YQ==".to_string(),
+            file_size: 1,
+            mime_type: "text/plain".to_string(),
+        })
+        .unwrap();
+        db.add_attachment(CreateAttachmentDTO {
+            project_id: project.id,
+            filename: "b.txt".to_string(),
+            file_data: "Yg==".to_string(),
+            file_size: 1,
+            mime_type: "text/plain".to_string(),
+        })
+        .unwrap();
+        let attachments = db.get_attachments(project.id).unwrap();
+        assert_eq!(attachments.len(), 2);
+    }
+
+    #[test]
+    fn test_delete_attachment() {
+        let db = test_db();
+        let project = db.create_project(test_project_dto()).unwrap();
+        let att = db
+            .add_attachment(CreateAttachmentDTO {
+                project_id: project.id,
+                filename: "del.txt".to_string(),
+                file_data: "ZA==".to_string(),
+                file_size: 1,
+                mime_type: "text/plain".to_string(),
+            })
+            .unwrap();
+        db.delete_attachment(att.id).unwrap();
+        let attachments = db.get_attachments(project.id).unwrap();
+        assert!(attachments.is_empty());
+    }
+
+    #[test]
+    fn test_attachment_at_exact_limit() {
+        let db = test_db();
+        let project = db.create_project(test_project_dto()).unwrap();
+        let result = db.add_attachment(CreateAttachmentDTO {
+            project_id: project.id,
+            filename: "exact.bin".to_string(),
+            file_data: "data".to_string(),
+            file_size: 5 * 1024 * 1024, // Exactly 5MB
+            mime_type: "application/octet-stream".to_string(),
+        });
+        assert!(result.is_ok());
+    }
+
+    // ==================== Paso 4: Analytics, Status, Groups, Dashboard, Time Tracking ====================
+
+    // --- Analytics ---
+
+    #[test]
+    fn test_track_project_open() {
+        let db = test_db();
+        let project = db.create_project(test_project_dto()).unwrap();
+        db.track_project_open(project.id).unwrap();
+        let fetched = db.get_project(project.id).unwrap();
+        assert!(fetched.last_opened_at.is_some());
+        assert_eq!(fetched.opened_count, Some(1));
+        // Open again
+        db.track_project_open(project.id).unwrap();
+        let fetched2 = db.get_project(project.id).unwrap();
+        assert_eq!(fetched2.opened_count, Some(2));
+    }
+
+    #[test]
+    fn test_add_project_time() {
+        let db = test_db();
+        let project = db.create_project(test_project_dto()).unwrap();
+        db.add_project_time(project.id, 60).unwrap();
+        db.add_project_time(project.id, 120).unwrap();
+        let fetched = db.get_project(project.id).unwrap();
+        assert_eq!(fetched.total_time_seconds, Some(180));
+    }
+
+    #[test]
+    fn test_get_project_stats() {
+        let db = test_db();
+        let p = db.create_project(test_project_dto()).unwrap();
+        db.track_project_open(p.id).unwrap();
+        let stats = db.get_project_stats().unwrap();
+        assert_eq!(stats.total_projects, 1);
+        assert!(!stats.recent_activities.is_empty());
+    }
+
+    // --- Status/Pin ---
+
+    #[test]
+    fn test_update_project_status() {
+        let db = test_db();
+        let p = db.create_project(test_project_dto()).unwrap();
+        db.update_project_status(p.id, "pausado".to_string()).unwrap();
+        let fetched = db.get_project(p.id).unwrap();
+        assert_eq!(fetched.status.as_deref(), Some("pausado"));
+    }
+
+    #[test]
+    fn test_toggle_pin_project() {
+        let db = test_db();
+        let p = db.create_project(test_project_dto()).unwrap();
+        let pinned = db.toggle_pin_project(p.id).unwrap();
+        assert!(pinned);
+        let unpinned = db.toggle_pin_project(p.id).unwrap();
+        assert!(!unpinned);
+    }
+
+    #[test]
+    fn test_pin_assigns_incrementing_order() {
+        let db = test_db();
+        let p1 = db.create_project(test_project_dto()).unwrap();
+        let mut dto2 = test_project_dto();
+        dto2.name = "Project 2".to_string();
+        let p2 = db.create_project(dto2).unwrap();
+        db.toggle_pin_project(p1.id).unwrap();
+        db.toggle_pin_project(p2.id).unwrap();
+        let f1 = db.get_project(p1.id).unwrap();
+        let f2 = db.get_project(p2.id).unwrap();
+        assert_eq!(f1.pinned_order, Some(1));
+        assert_eq!(f2.pinned_order, Some(2));
+    }
+
+    #[test]
+    fn test_reorder_pinned_projects() {
+        let db = test_db();
+        let mut ids = vec![];
+        for i in 0..3 {
+            let mut dto = test_project_dto();
+            dto.name = format!("P{}", i);
+            let p = db.create_project(dto).unwrap();
+            db.toggle_pin_project(p.id).unwrap();
+            ids.push(p.id);
+        }
+        // Reorder: [3, 1, 2]
+        db.reorder_pinned_projects(vec![ids[2], ids[0], ids[1]]).unwrap();
+        let f0 = db.get_project(ids[2]).unwrap();
+        let f1 = db.get_project(ids[0]).unwrap();
+        let f2 = db.get_project(ids[1]).unwrap();
+        assert_eq!(f0.pinned_order, Some(1));
+        assert_eq!(f1.pinned_order, Some(2));
+        assert_eq!(f2.pinned_order, Some(3));
+    }
+
+    // --- Groups ---
+
+    #[test]
+    fn test_get_root_projects() {
+        let db = test_db();
+        let parent = db.create_project(test_project_dto()).unwrap();
+        let mut child_dto = test_project_dto();
+        child_dto.name = "Child".to_string();
+        child_dto.parent_id = Some(parent.id);
+        db.create_project(child_dto).unwrap();
+        let roots = db.get_root_projects().unwrap();
+        assert_eq!(roots.len(), 1);
+        assert_eq!(roots[0].name, "Test Project");
+    }
+
+    #[test]
+    fn test_get_subprojects() {
+        let db = test_db();
+        let parent = db.create_project(test_project_dto()).unwrap();
+        for i in 0..2 {
+            let mut dto = test_project_dto();
+            dto.name = format!("Child {}", i);
+            dto.parent_id = Some(parent.id);
+            db.create_project(dto).unwrap();
+        }
+        let children = db.get_subprojects(parent.id).unwrap();
+        assert_eq!(children.len(), 2);
+    }
+
+    #[test]
+    fn test_get_project_with_children() {
+        let db = test_db();
+        let parent = db.create_project(test_project_dto()).unwrap();
+        let mut dto = test_project_dto();
+        dto.name = "Child 1".to_string();
+        dto.parent_id = Some(parent.id);
+        db.create_project(dto).unwrap();
+        let result = db.get_project_with_children(parent.id).unwrap();
+        assert_eq!(result.subproject_count, 1);
+        assert_eq!(result.children.len(), 1);
+    }
+
+    #[test]
+    fn test_assign_project_to_group() {
+        let db = test_db();
+        let group = db.create_project(test_project_dto()).unwrap();
+        let mut child_dto = test_project_dto();
+        child_dto.name = "Standalone".to_string();
+        let child = db.create_project(child_dto).unwrap();
+        // Move into group
+        db.assign_project_to_group(child.id, Some(group.id)).unwrap();
+        let subs = db.get_subprojects(group.id).unwrap();
+        assert_eq!(subs.len(), 1);
+        // Move back to root
+        db.assign_project_to_group(child.id, None).unwrap();
+        let subs2 = db.get_subprojects(group.id).unwrap();
+        assert!(subs2.is_empty());
+    }
+
+    // --- Dashboard ---
+
+    #[test]
+    fn test_get_recent_projects() {
+        let db = test_db();
+        let p = db.create_project(test_project_dto()).unwrap();
+        // Before tracking, no recent projects
+        let recent = db.get_recent_projects().unwrap();
+        assert!(recent.is_empty());
+        // Track open
+        db.track_project_open(p.id).unwrap();
+        let recent2 = db.get_recent_projects().unwrap();
+        assert_eq!(recent2.len(), 1);
+        assert_eq!(recent2[0].name, "Test Project");
+    }
+
+    #[test]
+    fn test_get_all_pending_todos() {
+        let db = test_db();
+        let p = db.create_project(test_project_dto()).unwrap();
+        db.create_todo(CreateTodoDTO {
+            project_id: p.id,
+            content: "Pending task".to_string(),
+        })
+        .unwrap();
+        let completed = db
+            .create_todo(CreateTodoDTO {
+                project_id: p.id,
+                content: "Done task".to_string(),
+            })
+            .unwrap();
+        db.update_todo(
+            completed.id,
+            UpdateTodoDTO {
+                content: None,
+                is_completed: Some(true),
+            },
+        )
+        .unwrap();
+        let pending = db.get_all_pending_todos().unwrap();
+        assert_eq!(pending.len(), 1);
+        assert_eq!(pending[0].todo.content, "Pending task");
+        assert_eq!(pending[0].project_name, "Test Project");
+    }
+
+    // --- Time Tracking DB ---
+
+    #[test]
+    fn test_create_and_end_tracking_session() {
+        let db = test_db();
+        let p = db.create_project(test_project_dto()).unwrap();
+        let session_id = db.create_tracking_session(p.id, "test").unwrap();
+        assert!(session_id > 0);
+        db.end_tracking_session(session_id, 300).unwrap();
+        let sessions = db.get_tracking_sessions(p.id, 10).unwrap();
+        assert_eq!(sessions.len(), 1);
+        assert_eq!(sessions[0].duration_seconds, Some(300));
+        // Verify total_time updated on project
+        let fetched = db.get_project(p.id).unwrap();
+        assert_eq!(fetched.total_time_seconds, Some(300));
+    }
+
+    #[test]
+    fn test_get_time_stats() {
+        let db = test_db();
+        let p = db.create_project(test_project_dto()).unwrap();
+        let s1 = db.create_tracking_session(p.id, "test").unwrap();
+        db.end_tracking_session(s1, 600).unwrap();
+        let s2 = db.create_tracking_session(p.id, "test").unwrap();
+        db.end_tracking_session(s2, 300).unwrap();
+        let stats = db.get_time_stats(p.id).unwrap();
+        assert_eq!(stats.total_seconds, 900);
+        assert_eq!(stats.session_count, 2);
+        assert_eq!(stats.avg_session_seconds, 450);
+        assert_eq!(stats.longest_session_seconds, 600);
     }
 }
