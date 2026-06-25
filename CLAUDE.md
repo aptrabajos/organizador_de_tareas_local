@@ -108,8 +108,19 @@ src-tauri/src/
 │   ├── linux.rs            # Implementación Linux
 │   ├── windows.rs          # Implementación Windows
 │   └── detection.rs        # Detección de programas instalados
+├── tracking/               # Sistema de time tracking automático
+│   ├── mod.rs              # API pública del módulo de tracking
+│   ├── config.rs           # Configuración del tracking
+│   ├── session.rs          # Modelo de sesión de trabajo (start/stop)
+│   ├── socket.rs           # IPC vía socket para tracking en background
+│   └── aggregator.rs       # Agregación de tiempo por proyecto
 └── pdf_export/mod.rs       # Generación de PDFs (printpdf)
 ```
+
+**Time tracking:** El módulo `tracking/` registra el tiempo de trabajo por proyecto de
+forma automática. Usa un socket para comunicar el estado de la sesión y un agregador
+que consolida los tiempos. Se inyecta como `State<'_, ActiveSession>` en los comandos
+(`start_work_session`, `stop_work_session`, `get_work_session_status`, etc.).
 
 **Patrón de comandos Tauri:**
 
@@ -120,6 +131,16 @@ pub async fn get_project(db: State<'_, Database>, id: i64) -> Result<Project, St
     db.get_project(id).map_err(|e| e.to_string())
 }
 ```
+
+**Volumen y dominios:** Hay ~77 comandos registrados en `main.rs` vía
+`tauri::generate_handler![]`, agrupados por dominio: CRUD de proyectos, links,
+attachments, journal, todos, grupos jerárquicos, dashboard, config, time tracking
+y operaciones de sistema (abrir terminal/editor/explorador).
+
+**Integración Git:** El backend expone una familia de comandos Git que operan sobre
+el directorio del proyecto: `get_git_branch`, `get_git_status`, `get_recent_commits`,
+`git_add`, `git_commit`, `git_push`, `git_pull`. Los tipos asociados viven en
+`src/types/git.ts`.
 
 ### Base de Datos SQLite
 
