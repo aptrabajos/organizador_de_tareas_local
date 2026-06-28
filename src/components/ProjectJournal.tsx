@@ -48,7 +48,7 @@ export default function ProjectJournal(props: ProjectJournalProps) {
     if (!content) return;
 
     try {
-      const tags = newTags().trim() || undefined;
+      const tags = newTags().trim();
       await createJournalEntry({
         project_id: props.projectId,
         content,
@@ -73,10 +73,14 @@ export default function ProjectJournal(props: ProjectJournalProps) {
     const id = editingId();
     if (id === null) return;
 
+    // content es requerido (NOT NULL): no permitir guardar vacío
+    if (!editContent().trim()) return;
+
     try {
       await updateJournalEntry(id, {
-        content: editContent().trim() || undefined,
-        tags: editTags().trim() || undefined,
+        // tags se manda como string real (vacío incluido) para poder limpiarlo
+        content: editContent().trim(),
+        tags: editTags().trim(),
       });
       setEditingId(null);
       await loadEntries();

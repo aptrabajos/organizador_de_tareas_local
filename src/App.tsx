@@ -162,7 +162,19 @@ const AppContent: Component = () => {
     try {
       if (editingProject()) {
         console.log('🔧 [APP] Llamando a store.updateProject...');
-        await store.updateProject(editingProject()!.id, data);
+        const editing = editingProject()!;
+        const id = editing.id;
+        // parent_id necesita NULL real para poder DESAGRUPAR: se rutea por
+        // assignToGroup (Option<i64>-aware), no por update_project (que saltea None).
+        const { parent_id, ...rest } = data;
+        await store.updateProject(id, rest);
+        // Solo re-rutear el grupo si realmente cambió: evita un UPDATE no-op y una
+        // segunda recarga de vista (parpadeo) en cada edición.
+        const newParent = parent_id ?? null;
+        const oldParent = editing.parent_id ?? null;
+        if (newParent !== oldParent) {
+          await store.assignToGroup(id, newParent);
+        }
         console.log('✅ [APP] store.updateProject exitoso');
       } else {
         console.log('🔧 [APP] Llamando a store.createProject...');

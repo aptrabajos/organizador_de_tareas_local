@@ -57,15 +57,17 @@ describe('ProjectForm', () => {
     await user.click(screen.getByRole('button', { name: /guardar/i }));
 
     await waitFor(() => {
+      // Los campos opcionales vacíos se envían como '' (no undefined): así el backend
+      // recibe Some("") y puede vaciarlos. El backend normaliza ''->NULL.
       expect(onSubmit).toHaveBeenCalledWith({
         name: 'New Project',
         description: 'New Description',
         local_path: '/home/user/new',
-        documentation_url: undefined,
-        ai_documentation_url: undefined,
-        drive_link: undefined,
-        notes: undefined,
-        image_data: undefined,
+        documentation_url: '',
+        ai_documentation_url: '',
+        drive_link: '',
+        notes: '',
+        image_data: '',
         parent_id: null,
       });
     });
@@ -172,15 +174,16 @@ describe('ProjectForm', () => {
     await user.click(screen.getByRole('button', { name: /guardar/i }));
 
     await waitFor(() => {
+      // Campos completados conservan su valor; los vacíos se envían como '' (no undefined)
       expect(onSubmit).toHaveBeenCalledWith({
         name: 'Name',
         description: 'Description',
         local_path: '/path',
         documentation_url: 'https://docs.com',
-        ai_documentation_url: undefined,
+        ai_documentation_url: '',
         drive_link: 'https://drive.com',
-        notes: undefined,
-        image_data: undefined,
+        notes: '',
+        image_data: '',
         parent_id: null,
       });
     });

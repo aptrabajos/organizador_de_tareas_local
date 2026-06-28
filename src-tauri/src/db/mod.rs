@@ -220,6 +220,16 @@ impl Database {
         })
     }
 
+    /// Normaliza un texto opcional para columnas nullable: vacío (tras trim) -> NULL.
+    /// Mantiene la DB consistente (NULL en vez de cadena vacía) y permite vaciar campos.
+    fn empty_to_null(s: String) -> Option<String> {
+        if s.trim().is_empty() {
+            None
+        } else {
+            Some(s)
+        }
+    }
+
     pub fn create_project(&self, project: CreateProjectDTO) -> Result<Project> {
         let conn = self.conn.lock().unwrap();
 
@@ -230,14 +240,14 @@ impl Database {
                 project.name,
                 project.description,
                 project.local_path,
-                project.documentation_url,
-                project.ai_documentation_url,
-                project.drive_link,
-                project.notes,
-                project.image_data,
+                project.documentation_url.and_then(Self::empty_to_null),
+                project.ai_documentation_url.and_then(Self::empty_to_null),
+                project.drive_link.and_then(Self::empty_to_null),
+                project.notes.and_then(Self::empty_to_null),
+                project.image_data.and_then(Self::empty_to_null),
                 project.parent_id,
-                project.group_color,
-                project.group_icon
+                project.group_color.and_then(Self::empty_to_null),
+                project.group_icon.and_then(Self::empty_to_null)
             ],
         )?;
 
@@ -466,38 +476,40 @@ impl Database {
             query_parts.push("local_path = ?");
             params.push(Box::new(local_path));
         }
+        // Columnas nullable: vacío -> NULL (permite vaciar el campo y mantiene la DB consistente)
         if let Some(documentation_url) = updates.documentation_url {
             query_parts.push("documentation_url = ?");
-            params.push(Box::new(documentation_url));
+            params.push(Box::new(Self::empty_to_null(documentation_url)));
         }
         if let Some(ai_documentation_url) = updates.ai_documentation_url {
             query_parts.push("ai_documentation_url = ?");
-            params.push(Box::new(ai_documentation_url));
+            params.push(Box::new(Self::empty_to_null(ai_documentation_url)));
         }
         if let Some(drive_link) = updates.drive_link {
             query_parts.push("drive_link = ?");
-            params.push(Box::new(drive_link));
+            params.push(Box::new(Self::empty_to_null(drive_link)));
         }
         if let Some(notes) = updates.notes {
             query_parts.push("notes = ?");
-            params.push(Box::new(notes));
+            params.push(Box::new(Self::empty_to_null(notes)));
         }
         if let Some(image_data) = updates.image_data {
             query_parts.push("image_data = ?");
-            params.push(Box::new(image_data));
+            params.push(Box::new(Self::empty_to_null(image_data)));
         }
-        // Group fields (v0.4.0)
+        // Group fields (v0.4.0). parent_id es i64 y necesita NULL real (WHERE parent_id IS NULL):
+        // se rutea por assign_project_to_group desde el frontend, no por aquí.
         if let Some(parent_id) = updates.parent_id {
             query_parts.push("parent_id = ?");
             params.push(Box::new(parent_id));
         }
         if let Some(group_color) = updates.group_color {
             query_parts.push("group_color = ?");
-            params.push(Box::new(group_color));
+            params.push(Box::new(Self::empty_to_null(group_color)));
         }
         if let Some(group_icon) = updates.group_icon {
             query_parts.push("group_icon = ?");
-            params.push(Box::new(group_icon));
+            params.push(Box::new(Self::empty_to_null(group_icon)));
         }
 
         query_parts.push("updated_at = CURRENT_TIMESTAMP");
@@ -964,7 +976,7 @@ impl Database {
         conn.execute(
             "INSERT INTO project_journal (project_id, content, tags)
              VALUES (?1, ?2, ?3)",
-            params![entry.project_id, entry.content, entry.tags],
+            params![entry.project_id, entry.content, entry.tags.and_then(Self::empty_to_null)],
         )?;
 
         let id = conn.last_insert_rowid();
@@ -1027,7 +1039,7 @@ impl Database {
 
         if let Some(tags) = updates.tags {
             set_clauses.push("tags = ?");
-            params.push(Box::new(tags));
+            params.push(Box::new(Self::empty_to_null(tags)));
         }
 
         if set_clauses.is_empty() {
@@ -1888,6 +1900,62 @@ mod tests {
         assert_eq!(updated.name, "New Name");
         assert_eq!(updated.description, "New desc");
         assert_eq!(updated.notes.as_deref(), Some("New notes"));
+    }
+
+    #[test]
+    fn test_update_project_clears_optional_field_to_null() {
+        // Regresión: antes era IMPOSIBLE vaciar un campo opcional. El frontend mandaba
+        // `|| undefined` (omitido) y el backend saltaba el campo. Ahora el frontend manda
+        // "" (Some("")) y empty_to_null lo normaliza a NULL.
+        let db = test_db();
+        let created = db
+            .create_project(CreateProjectDTO {
+                documentation_url: Some("https://docs.viejo.com".to_string()),
+                notes: Some("notas viejas".to_string()),
+                ..test_project_dto()
+            })
+            .unwrap();
+        assert_eq!(
+            created.documentation_url.as_deref(),
+            Some("https://docs.viejo.com")
+        );
+
+        // El usuario borra el campo en la UI -> llega Some("")
+        let updated = db
+            .update_project(
+                created.id,
+                UpdateProjectDTO {
+                    name: None,
+                    description: None,
+                    local_path: None,
+                    documentation_url: Some("".to_string()),
+                    ai_documentation_url: None,
+                    drive_link: None,
+                    notes: Some("   ".to_string()), // solo espacios también limpia
+                    image_data: None,
+                    parent_id: None,
+                    group_color: None,
+                    group_icon: None,
+                },
+            )
+            .unwrap();
+
+        // El campo quedó vaciado a NULL (None), no a cadena vacía
+        assert_eq!(updated.documentation_url, None);
+        assert_eq!(updated.notes, None);
+    }
+
+    #[test]
+    fn test_create_project_normalizes_empty_to_null() {
+        let db = test_db();
+        let created = db
+            .create_project(CreateProjectDTO {
+                documentation_url: Some("".to_string()),
+                ..test_project_dto()
+            })
+            .unwrap();
+        // Crear con "" guarda NULL, no "" -> DB consistente con update
+        assert_eq!(created.documentation_url, None);
     }
 
     #[test]

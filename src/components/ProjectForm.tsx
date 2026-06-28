@@ -158,12 +158,14 @@ const ProjectForm: Component<ProjectFormProps> = (props) => {
       name: name().trim(),
       description: description().trim(),
       local_path: localPath().trim(),
-      documentation_url: documentationUrl().trim() || undefined,
-      ai_documentation_url: aiDocumentationUrl().trim() || undefined,
-      drive_link: driveLink().trim() || undefined,
-      notes: notes().trim() || undefined,
-      image_data: imageData() || undefined,
-      parent_id: parentId(), // v0.4.0 - ID del grupo padre
+      // Enviar el string real (vacío incluido): así el backend recibe Some("") y puede
+      // VACIAR el campo. Con `|| undefined` el campo se omitía y nunca se podía limpiar.
+      documentation_url: documentationUrl().trim(),
+      ai_documentation_url: aiDocumentationUrl().trim(),
+      drive_link: driveLink().trim(),
+      notes: notes().trim(),
+      image_data: imageData() || '',
+      parent_id: parentId(), // v0.4.0 - ID del grupo padre (ruteado por assignToGroup en edición)
     };
 
     console.log('✅ [FRONTEND] Enviando datos:', formData);
