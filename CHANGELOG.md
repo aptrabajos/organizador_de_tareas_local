@@ -2,6 +2,13 @@
 
 Historial detallado de cambios del proyecto Gestor de Proyectos.
 
+## 2026-06-27 - v0.4.5
+
+**Correcciones:**
+
+- centraliza estado de búsqueda en el store y corrige navegación de vistas
+---
+
 ## 2026-06-27 - v0.4.4
 
 **Nuevas caracteristicas:**
