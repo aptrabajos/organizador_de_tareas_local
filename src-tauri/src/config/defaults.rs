@@ -24,6 +24,7 @@ impl Default for BackupConfig {
             auto_backup_interval: 7, // 7 días
             cleanup_old_backups: false,
             retention_days: 30,
+            last_backup: None,
         }
     }
 }

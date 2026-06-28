@@ -5,6 +5,8 @@ import type {
   DetectedProgram,
   ProgramMode,
   ProgramConfig,
+  BackupResult,
+  BackupEntry,
 } from '../types/config';
 import {
   getConfig,
@@ -12,7 +14,10 @@ import {
   resetConfig,
   detectPrograms,
   selectBackupFolder,
+  backupDatabase,
+  listBackups,
 } from '../services/api';
+import { getErrorMessage } from '../utils/errors';
 
 type Tab = 'programs' | 'backup' | 'ui' | 'shortcuts' | 'advanced';
 
@@ -26,11 +31,63 @@ export default function Settings(props: { onClose: () => void }) {
   const [error, setError] = createSignal<string | null>(null);
   const [successMessage, setSuccessMessage] = createSignal<string | null>(null);
 
+  // Estado del backup manual de la base de datos
+  const [isBackingUp, setIsBackingUp] = createSignal(false);
+  const [lastBackupResult, setLastBackupResult] =
+    createSignal<BackupResult | null>(null);
+  const [backupList, setBackupList] = createSignal<BackupEntry[]>([]);
+
   // Cargar configuración y programas detectados
   onMount(async () => {
     await loadConfig();
     await loadDetectedPrograms();
+    await loadBackupList();
   });
+
+  // Formatea bytes a un tamaño legible (KB/MB)
+  const formatBytes = (bytes: number): string => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+  };
+
+  const loadBackupList = async () => {
+    try {
+      const list = await listBackups();
+      setBackupList(list);
+    } catch (err) {
+      // No bloquea la pantalla: solo se loguea
+      console.error('Error al listar backups:', getErrorMessage(err));
+    }
+  };
+
+  const handleBackupNow = async () => {
+    setIsBackingUp(true);
+    setError(null);
+    setSuccessMessage(null);
+    setLastBackupResult(null);
+    try {
+      // Sincronizar SOLO la config de backup (carpeta/retención) al backend antes del
+      // backup, SIN pisar cambios sin guardar de otros tabs: partimos de la config
+      // PERSISTIDA y mergeamos únicamente `backup`. run_backup lee la persistida.
+      const cfg = config();
+      if (cfg) {
+        const persisted = await getConfig();
+        await updateConfig({ ...persisted, backup: cfg.backup });
+      }
+      const result = await backupDatabase();
+      setLastBackupResult(result);
+      setSuccessMessage('✅ Backup creado correctamente');
+      window.setTimeout(() => setSuccessMessage(null), 3000);
+      // Refrescar config (last_backup) y la lista de backups
+      await loadConfig();
+      await loadBackupList();
+    } catch (err) {
+      setError(`Error al crear el backup: ${getErrorMessage(err)}`);
+    } finally {
+      setIsBackingUp(false);
+    }
+  };
 
   const loadConfig = async () => {
     setIsLoading(true);
@@ -431,8 +488,113 @@ export default function Settings(props: { onClose: () => void }) {
             <Show when={activeTab() === 'backup'}>
               <div class="space-y-6">
                 <p class="mb-4 text-gray-600 dark:text-gray-400">
-                  Configuración de backups automáticos de proyectos.
+                  Backup de la base de datos y configuración de backups.
                 </p>
+
+                {/* Backup manual de la base de datos */}
+                <div class="space-y-4 rounded-lg bg-gray-50 p-4 dark:bg-gray-800">
+                  <div>
+                    <h3 class="mb-2 text-lg font-semibold text-gray-900 dark:text-white">
+                      💾 Backup de la Base de Datos
+                    </h3>
+                    <p class="mb-3 text-sm text-gray-600 dark:text-gray-400">
+                      Crea una copia consistente y verificada de tu base de
+                      datos en la carpeta de backups.
+                    </p>
+
+                    <div class="flex flex-wrap items-center gap-3">
+                      <button
+                        type="button"
+                        disabled={isBackingUp()}
+                        class="inline-flex items-center gap-2 rounded-md bg-green-600 px-4 py-2 text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-green-500 dark:hover:bg-green-600"
+                        onClick={handleBackupNow}
+                      >
+                        <Show
+                          when={isBackingUp()}
+                          fallback={<span>💾 Backup ahora</span>}
+                        >
+                          <span class="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                          <span>Creando backup...</span>
+                        </Show>
+                      </button>
+
+                      <Show when={config()?.backup.last_backup}>
+                        <span class="text-sm text-gray-600 dark:text-gray-400">
+                          Último backup:{' '}
+                          <span class="font-medium text-gray-900 dark:text-white">
+                            {config()?.backup.last_backup}
+                          </span>
+                        </span>
+                      </Show>
+                    </div>
+
+                    {/* Resultado del último backup creado en esta sesión */}
+                    <Show when={lastBackupResult()}>
+                      {(result) => (
+                        <div class="mt-4 rounded-md border border-green-200 bg-green-50 p-3 text-sm dark:border-green-800 dark:bg-green-900/20">
+                          <p class="break-all text-gray-700 dark:text-gray-300">
+                            <span class="font-medium">Archivo:</span>{' '}
+                            {result().file_path}
+                          </p>
+                          <p class="text-gray-700 dark:text-gray-300">
+                            <span class="font-medium">Tamaño:</span>{' '}
+                            {formatBytes(result().size_bytes)}
+                          </p>
+                          <p class="text-gray-700 dark:text-gray-300">
+                            <span class="font-medium">Integridad:</span>{' '}
+                            <span
+                              class={
+                                result().integrity_ok
+                                  ? 'font-semibold text-green-600 dark:text-green-400'
+                                  : 'font-semibold text-red-600 dark:text-red-400'
+                              }
+                            >
+                              {result().integrity_ok ? 'OK' : 'FALLÓ'}
+                            </span>
+                          </p>
+                          <p class="text-gray-700 dark:text-gray-300">
+                            <span class="font-medium">Proyectos:</span>{' '}
+                            {result().project_count}
+                          </p>
+                        </div>
+                      )}
+                    </Show>
+                  </div>
+
+                  {/* Lista de backups existentes */}
+                  <div>
+                    <h4 class="mb-2 text-sm font-semibold text-gray-900 dark:text-white">
+                      Backups disponibles ({backupList().length})
+                    </h4>
+                    <Show
+                      when={backupList().length > 0}
+                      fallback={
+                        <p class="text-sm text-gray-500 dark:text-gray-400">
+                          No hay backups todavía.
+                        </p>
+                      }
+                    >
+                      <ul class="max-h-48 space-y-1 overflow-y-auto">
+                        <For each={backupList()}>
+                          {(entry) => (
+                            <li class="flex items-center justify-between rounded-md bg-white px-3 py-2 text-sm dark:bg-gray-700">
+                              <span
+                                class="truncate font-mono text-gray-700 dark:text-gray-300"
+                                title={entry.file_path}
+                              >
+                                {entry.filename}
+                              </span>
+                              <span class="ml-3 shrink-0 text-gray-500 dark:text-gray-400">
+                                {formatBytes(entry.size_bytes)} ·{' '}
+                                {entry.created_at}
+                              </span>
+                            </li>
+                          )}
+                        </For>
+                      </ul>
+                    </Show>
+                  </div>
+                </div>
 
                 {/* Carpeta destino de backups */}
                 <div class="space-y-4 rounded-lg bg-gray-50 p-4 dark:bg-gray-800">
@@ -462,15 +624,20 @@ export default function Settings(props: { onClose: () => void }) {
                             if (selectedPath) {
                               const cfg = config();
                               if (cfg) {
-                                setConfig({
+                                const newCfg = {
                                   ...cfg,
                                   backup: {
                                     ...cfg.backup,
                                     default_path: selectedPath,
                                   },
-                                });
+                                };
+                                setConfig(newCfg);
+                                // Persistir YA al backend: el backup lee la config del
+                                // backend, NO este signal. Sin guardar acá, el backup iría
+                                // a la carpeta vieja mientras la UI muestra la nueva.
+                                await updateConfig(newCfg);
                                 setSuccessMessage(
-                                  `Carpeta seleccionada: ${selectedPath}`
+                                  `Carpeta de backup guardada: ${selectedPath}`
                                 );
                                 window.setTimeout(
                                   () => setSuccessMessage(null),
@@ -479,7 +646,9 @@ export default function Settings(props: { onClose: () => void }) {
                               }
                             }
                           } catch (err) {
-                            setError(`Error al seleccionar carpeta: ${err}`);
+                            setError(
+                              `Error al seleccionar carpeta: ${getErrorMessage(err)}`
+                            );
                           }
                         }}
                       >
@@ -493,30 +662,23 @@ export default function Settings(props: { onClose: () => void }) {
                 <div class="space-y-4 rounded-lg bg-gray-50 p-4 dark:bg-gray-800">
                   <div class="flex items-center justify-between">
                     <div>
-                      <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+                      <h3 class="flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-white">
                         Backup Automático
+                        <span class="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/40 dark:text-amber-400">
+                          Próximamente
+                        </span>
                       </h3>
                       <p class="text-sm text-gray-600 dark:text-gray-400">
-                        Crear backups automáticos de tus proyectos
+                        El backup programado llega en una próxima versión. Por
+                        ahora usá “Backup ahora”.
                       </p>
                     </div>
-                    <label class="relative inline-flex cursor-pointer items-center">
+                    <label class="relative inline-flex cursor-not-allowed items-center opacity-50">
                       <input
                         type="checkbox"
                         class="peer sr-only"
-                        checked={config()?.backup.auto_backup_enabled || false}
-                        onChange={(e) => {
-                          const cfg = config();
-                          if (cfg) {
-                            setConfig({
-                              ...cfg,
-                              backup: {
-                                ...cfg.backup,
-                                auto_backup_enabled: e.currentTarget.checked,
-                              },
-                            });
-                          }
-                        }}
+                        disabled
+                        checked={false}
                       />
                       <div class="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:start-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-blue-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:border-gray-600 dark:bg-gray-700 dark:peer-focus:ring-blue-800 rtl:peer-checked:after:-translate-x-full" />
                     </label>
@@ -604,11 +766,14 @@ export default function Settings(props: { onClose: () => void }) {
                         onInput={(e) => {
                           const cfg = config();
                           if (cfg) {
+                            // Guarda de NaN: input vacío → NaN rompería la
+                            // deserialización a u32 en el backend y fallaría el guardado.
+                            const n = parseInt(e.currentTarget.value, 10);
                             setConfig({
                               ...cfg,
                               backup: {
                                 ...cfg.backup,
-                                retention_days: parseInt(e.currentTarget.value),
+                                retention_days: Number.isNaN(n) ? 30 : n,
                               },
                             });
                           }

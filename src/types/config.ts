@@ -30,6 +30,24 @@ export interface BackupConfig {
   auto_backup_interval: number;
   cleanup_old_backups: boolean;
   retention_days: number;
+  last_backup?: string;
+}
+
+// Resultado de un backup recién creado (matchea backup::BackupResult en Rust)
+export interface BackupResult {
+  file_path: string;
+  size_bytes: number;
+  created_at: string;
+  integrity_ok: boolean;
+  project_count: number;
+}
+
+// Entrada de la lista de backups existentes (matchea backup::BackupEntry en Rust)
+export interface BackupEntry {
+  file_path: string;
+  filename: string;
+  size_bytes: number;
+  created_at: string;
 }
 
 // Configuración de UI

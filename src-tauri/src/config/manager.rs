@@ -132,11 +132,14 @@ impl ConfigManager {
 
     /// Validar configuración
     fn validate_config(&self, config: &AppConfig) -> Result<(), String> {
-        // Validar que los paths personalizados existan
+        // Ruta de terminal personalizada: si no existe, NO se bloquea el guardado.
+        // Bloquear todo el update_config por este campo rompía guardar cosas no
+        // relacionadas (ej. la carpeta de backup). El error real se maneja al abrir
+        // la terminal; acá solo se advierte.
         if config.platform.terminal.mode == ProgramMode::Custom {
             if let Some(ref path) = config.platform.terminal.custom_path {
                 if !PathBuf::from(path).exists() {
-                    return Err(format!("Ruta de terminal no existe: {}", path));
+                    eprintln!("⚠️ [CONFIG] Ruta de terminal personalizada no existe: {}", path);
                 }
             }
         }

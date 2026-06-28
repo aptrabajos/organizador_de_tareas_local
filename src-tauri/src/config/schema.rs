@@ -84,6 +84,9 @@ pub struct BackupConfig {
     pub cleanup_old_backups: bool,
     /// Días de retención de backups antiguos
     pub retention_days: u32,
+    /// Timestamp del último backup realizado (formato ISO local, ej. "2026-06-27 14:30:05")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_backup: Option<String>,
 }
 
 /// Configuración de interfaz de usuario

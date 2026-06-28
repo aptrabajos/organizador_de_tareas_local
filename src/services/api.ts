@@ -16,7 +16,12 @@ import type {
   CreateTodoDTO,
   UpdateTodoDTO,
 } from '../types/project';
-import type { AppConfig, DetectedPrograms } from '../types/config';
+import type {
+  AppConfig,
+  DetectedPrograms,
+  BackupResult,
+  BackupEntry,
+} from '../types/config';
 import type { DashboardData } from '../types/dashboard';
 
 export async function createProject(
@@ -331,6 +336,16 @@ export async function openTextEditor(path: string): Promise<void> {
 
 export async function selectBackupFolder(): Promise<string | null> {
   return await invoke('select_backup_folder');
+}
+
+// ==================== BACKUP DE LA BASE DE DATOS ====================
+
+export async function backupDatabase(): Promise<BackupResult> {
+  return await invoke('backup_database');
+}
+
+export async function listBackups(): Promise<BackupEntry[]> {
+  return await invoke('list_backups');
 }
 
 // ==================== DIÁLOGOS NATIVOS ====================

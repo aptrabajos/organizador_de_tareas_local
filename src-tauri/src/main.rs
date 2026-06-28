@@ -1,6 +1,7 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod backup;
 mod commands;
 mod config;
 mod db;
@@ -118,6 +119,9 @@ fn main() {
             commands::start_work_session,
             commands::stop_work_session,
             commands::get_work_session_status,
+            // Backup de la base de datos
+            commands::backup_database,
+            commands::list_backups,
         ])
         .run(tauri::generate_context!())
         .expect("Error al ejecutar la aplicación Tauri");

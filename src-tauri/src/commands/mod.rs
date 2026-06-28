@@ -56,6 +56,26 @@ use std::path::PathBuf;
 use tauri::State;
 use chrono::Local;
 
+// ==================== BACKUP DE LA BASE DE DATOS ====================
+
+/// Crea un backup manual de la base de datos, lo verifica y aplica retención.
+#[tauri::command]
+pub async fn backup_database(
+    db: State<'_, Database>,
+    config: State<'_, ConfigManager>,
+) -> Result<crate::backup::BackupResult, String> {
+    println!("💾 [BACKUP] Iniciando backup manual de la base de datos");
+    crate::backup::run_backup(&db, &config)
+}
+
+/// Lista los backups existentes en el directorio destino.
+#[tauri::command]
+pub async fn list_backups(
+    config: State<'_, ConfigManager>,
+) -> Result<Vec<crate::backup::BackupEntry>, String> {
+    crate::backup::list_backups(&config)
+}
+
 #[tauri::command]
 pub async fn create_project(
     db: State<'_, Database>,
