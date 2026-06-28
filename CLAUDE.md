@@ -203,6 +203,19 @@ El script actualiza la versión en `package.json`, `Cargo.toml` y `tauri.conf.js
 
 ---
 
+## Memoria Persistente (Engram)
+
+- **Nombre canónico del proyecto: `gestor_proyecto`** (coincide con el directorio).
+  Pasar SIEMPRE `project: "gestor_proyecto"` explícito en `mem_save` / `mem_search` /
+  `mem_session_summary`.
+- El proyecto se llamaba antes "organizador de tareas local". El historial de engram
+  previo al 2026-06-27 vive bajo `organizador_de_tareas_local`; para recuperarlo hay
+  que buscar con ese nombre explícito.
+- Engram (esta versión) no tiene merge de proyectos, por eso la consistencia se
+  garantiza pasando el nombre a mano.
+
+---
+
 ## Quality Checklist
 
 Antes de completar una tarea:
