@@ -24,6 +24,8 @@ const AppContent: Component = () => {
   const store = createProjectStore();
   const shortcuts = useShortcuts();
   const [searchQuery, setSearchQuery] = createSignal('');
+  // Modo búsqueda global: hay texto → la app muestra resultados, no la vista normal
+  const isSearchActive = () => searchQuery().trim().length > 0;
   const [showForm, setShowForm] = createSignal(false);
   const [showSettings, setShowSettings] = createSignal(false);
   const [showWelcome, setShowWelcome] = createSignal(false);
@@ -383,7 +385,7 @@ const AppContent: Component = () => {
           ═══════════════════════════════════════════════════════════════════════ */}
       <main class="min-h-[calc(100vh-140px)]">
         <Show
-          when={showDashboard()}
+          when={showDashboard() && !isSearchActive()}
           fallback={
             <div class="p-4 sm:p-6">
               <div class="flex gap-6">
@@ -394,6 +396,7 @@ const AppContent: Component = () => {
                       <TreeView
                         onSelectProject={(project) => {
                           if (!project.parent_id) {
+                            setSearchQuery('');
                             store.navigateToGroup(project);
                           } else {
                             handleEdit(project);
@@ -461,8 +464,11 @@ const AppContent: Component = () => {
                       }}
                       renderFilters={setFilterProps}
                       viewMode={store.viewMode()}
-                      onViewGroup={(group) => store.navigateToGroup(group)}
-                      searchActive={searchQuery().trim().length > 0}
+                      onViewGroup={(group) => {
+                        setSearchQuery('');
+                        store.navigateToGroup(group);
+                      }}
+                      searchActive={isSearchActive()}
                     />
                   </Show>
                 </div>

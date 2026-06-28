@@ -510,8 +510,7 @@ const ProjectList: Component<ProjectListProps> = (props) => {
                     <Show
                       when={
                         isGroup() &&
-                        props.viewMode === 'groups' &&
-                        !props.searchActive
+                        (props.viewMode === 'groups' || props.searchActive)
                       }
                       fallback={
                         // Render regular ProjectCard con drag & drop
