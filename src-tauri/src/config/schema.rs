@@ -3,6 +3,7 @@ use std::collections::HashMap;
 
 /// Configuración completa de la aplicación
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(default)] // forward-compat: campos faltantes en config.json viejo usan Default en vez de fallar
 pub struct AppConfig {
     /// Versión del schema de configuración
     pub version: String,
@@ -20,6 +21,7 @@ pub struct AppConfig {
 
 /// Configuración de plataforma (programas y comportamientos del OS)
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[serde(default)] // forward-compat: tolera campos faltantes
 pub struct PlatformConfig {
     /// Sistema operativo a utilizar (Auto detecta automáticamente)
     #[serde(default)]
@@ -38,6 +40,7 @@ pub struct PlatformConfig {
 
 /// Configuración de un programa específico
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(default)] // forward-compat: tolera campos faltantes
 pub struct ProgramConfig {
     /// Modo de ejecución del programa
     pub mode: ProgramMode,
@@ -68,6 +71,7 @@ pub enum ProgramMode {
 
 /// Configuración de backups
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(default)] // forward-compat: tolera campos faltantes
 pub struct BackupConfig {
     /// Ruta predeterminada para guardar backups
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -84,6 +88,7 @@ pub struct BackupConfig {
 
 /// Configuración de interfaz de usuario
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(default)] // forward-compat: tolera campos faltantes
 pub struct UiConfig {
     /// Tema de la aplicación
     pub theme: ThemeMode,
@@ -109,6 +114,7 @@ pub enum ThemeMode {
 
 /// Configuración avanzada
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(default)] // forward-compat: tolera campos faltantes
 pub struct AdvancedConfig {
     /// Nivel de logging
     pub log_level: LogLevel,
@@ -208,6 +214,52 @@ mod tests {
     }
 
     #[test]
+    fn test_forward_compat_old_config_missing_fields() {
+        // Simula un config.json viejo (v0.2.0) SIN el campo `shortcuts` (añadido en 0.3.0)
+        // y con `ui` parcial (sin show_welcome). Antes del fix esto rompía la
+        // deserialización -> Err -> panic en el arranque. Con #[serde(default)] debe
+        // cargar y rellenar los campos faltantes con sus defaults.
+        let old_json = r#"{
+            "version": "0.2.0",
+            "platform": {
+                "terminal": { "mode": "auto" },
+                "browser": { "mode": "auto" },
+                "file_manager": { "mode": "auto" },
+                "text_editor": { "mode": "auto" },
+                "environment": {}
+            },
+            "backup": {
+                "auto_backup_enabled": false,
+                "auto_backup_interval": 7,
+                "cleanup_old_backups": false,
+                "retention_days": 30
+            },
+            "ui": {
+                "theme": "auto",
+                "language": "es",
+                "confirm_delete": true
+            },
+            "advanced": {
+                "log_level": "info",
+                "enable_analytics": true,
+                "enable_auto_update": true
+            }
+        }"#;
+
+        let config: AppConfig =
+            serde_json::from_str(old_json).expect("config viejo debe deserializar sin fallar");
+
+        // El campo ausente `shortcuts` se rellena con el default (6 atajos)
+        assert!(config.shortcuts.enabled);
+        assert_eq!(config.shortcuts.shortcuts.len(), 6);
+        // El campo nested ausente `ui.show_welcome` toma el default (true)
+        assert!(config.ui.show_welcome);
+        // Los valores presentes se respetan
+        assert_eq!(config.version, "0.2.0");
+        assert_eq!(config.ui.language, "es");
+    }
+
+    #[test]
     fn test_program_mode_serde_rename() {
         let auto_json = serde_json::to_string(&ProgramMode::Auto).unwrap();
         assert_eq!(auto_json, "\"auto\"");
@@ -239,6 +291,7 @@ mod tests {
 
 /// Configuración de atajos de teclado
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(default)] // forward-compat: tolera campos faltantes
 pub struct ShortcutsConfig {
     /// Habilitar atajos de teclado globales
     pub enabled: bool,
