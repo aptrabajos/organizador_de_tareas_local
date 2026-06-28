@@ -2,6 +2,13 @@
 
 Historial detallado de cambios del proyecto Gestor de Proyectos.
 
+## 2026-06-28 - v0.4.6
+
+**Nuevas caracteristicas:**
+
+- backup real de la base de datos (VACUUM INTO + verificación + retención)
+---
+
 ## 2026-06-27 - v0.4.5
 
 **Correcciones:**
