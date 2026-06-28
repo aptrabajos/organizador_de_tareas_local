@@ -2,6 +2,25 @@
 
 Historial detallado de cambios del proyecto Gestor de Proyectos.
 
+## 2026-06-27 - v0.4.4
+
+**Nuevas caracteristicas:**
+
+- sistema de versionado SemVer automático y versión dinámica en UI
+
+**Correcciones:**
+
+- validar ciclos en jerarquía de proyectos (barrera autoritativa backend)
+- permitir vaciar campos opcionales y desagrupar proyectos (NULL uniforme)
+- config forward-compatible con serde(default) para no romper al actualizar
+
+**Otros cambios:**
+
+- documenta nombre canónico de engram (gestor_proyecto)
+- corrige búsqueda global del finder en todas las vistas
+- documenta módulo tracking y comandos git en CLAUDE.md
+---
+
 ---
 
 ## 2025-11-05 - v0.4.3 - Componente About y Eliminacion de Analytics
