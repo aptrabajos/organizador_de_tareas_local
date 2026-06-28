@@ -24,9 +24,11 @@ import { getConfig } from './services/api';
 const AppContent: Component = () => {
   const store = createProjectStore();
   const shortcuts = useShortcuts();
-  const [searchQuery, setSearchQuery] = createSignal('');
-  // Modo búsqueda global: hay texto → la app muestra resultados, no la vista normal
-  const isSearchActive = () => searchQuery().trim().length > 0;
+  // Entrar a un grupo: salir del Dashboard (el store sale de la búsqueda por sí solo).
+  const enterGroup = (group: Project) => {
+    setShowDashboard(false);
+    store.navigateToGroup(group);
+  };
   const [showForm, setShowForm] = createSignal(false);
   const [showSettings, setShowSettings] = createSignal(false);
   const [showWelcome, setShowWelcome] = createSignal(false);
@@ -112,16 +114,8 @@ const AppContent: Component = () => {
   });
 
   const handleSearch = (query: string) => {
-    setSearchQuery(query);
-    if (query.trim()) {
-      store.searchProjects(query);
-    } else {
-      if (store.viewMode() === 'groups') {
-        store.loadRootProjects();
-      } else if (store.currentGroup()) {
-        store.loadSubprojects(store.currentGroup()!.id);
-      }
-    }
+    // El store es el dueño de la query y recarga respetándola (fuente única)
+    store.search(query);
   };
 
   const handleNewProject = () => {
@@ -233,9 +227,18 @@ const AppContent: Component = () => {
             {/* Navegación principal */}
             <nav class="flex items-center gap-2">
               <button
-                onClick={() => setShowDashboard(!showDashboard())}
+                onClick={() => {
+                  if (store.isSearchActive()) {
+                    // Con búsqueda activa el botón sale de la búsqueda y muestra el
+                    // Dashboard (efecto visible inmediato, sin estado fantasma).
+                    store.search('');
+                    setShowDashboard(true);
+                  } else {
+                    setShowDashboard(!showDashboard());
+                  }
+                }}
                 class={`btn-ghost group relative flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-all ${
-                  showDashboard()
+                  showDashboard() && !store.isSearchActive()
                     ? 'bg-accent-500/10 text-accent-600 dark:bg-accent-400/10 dark:text-accent-400'
                     : ''
                 }`}
@@ -349,7 +352,11 @@ const AppContent: Component = () => {
 
           {/* Segunda fila: Breadcrumb + Búsqueda y Filtros */}
           <Show
-            when={store.viewMode() === 'subprojects' && store.currentGroup()}
+            when={
+              store.viewMode() === 'subprojects' &&
+              store.currentGroup() &&
+              !showDashboard()
+            }
           >
             <div class="mt-3 flex items-center gap-2">
               <button
@@ -381,7 +388,7 @@ const AppContent: Component = () => {
 
           <div class="mt-3 flex flex-wrap items-center gap-3">
             <div class="min-w-[280px] flex-1">
-              <SearchBar onSearch={handleSearch} value={searchQuery()} />
+              <SearchBar onSearch={handleSearch} value={store.searchQuery()} />
             </div>
             <Show when={filterProps()}>
               <ProjectFilters {...filterProps()!} />
@@ -395,7 +402,7 @@ const AppContent: Component = () => {
           ═══════════════════════════════════════════════════════════════════════ */}
       <main class="min-h-[calc(100vh-140px)]">
         <Show
-          when={showDashboard() && !isSearchActive()}
+          when={showDashboard() && !store.isSearchActive()}
           fallback={
             <div class="p-4 sm:p-6">
               <div class="flex gap-6">
@@ -406,8 +413,7 @@ const AppContent: Component = () => {
                       <TreeView
                         onSelectProject={(project) => {
                           if (!project.parent_id) {
-                            setSearchQuery('');
-                            store.navigateToGroup(project);
+                            enterGroup(project);
                           } else {
                             handleEdit(project);
                           }
@@ -474,11 +480,8 @@ const AppContent: Component = () => {
                       }}
                       renderFilters={setFilterProps}
                       viewMode={store.viewMode()}
-                      onViewGroup={(group) => {
-                        setSearchQuery('');
-                        store.navigateToGroup(group);
-                      }}
-                      searchActive={isSearchActive()}
+                      onViewGroup={(group) => enterGroup(group)}
+                      searchActive={store.isSearchActive()}
                     />
                   </Show>
                 </div>
@@ -488,11 +491,9 @@ const AppContent: Component = () => {
         >
           <Dashboard
             onProjectClick={(project) => {
-              // Cerrar dashboard y navegar al proyecto
-              setShowDashboard(false);
-              // Buscar el proyecto por nombre para mostrarlo
-              setSearchQuery(project.name);
-              store.searchProjects(project.name);
+              // La búsqueda es un overlay: NO apagamos el Dashboard, así limpiar la
+              // búsqueda vuelve al Dashboard igual que al tipear en el SearchBar (consistente).
+              store.search(project.name);
             }}
           />
         </Show>

@@ -18,6 +18,31 @@ export function createProjectStore() {
     'groups'
   );
 
+  // Búsqueda centralizada en el store: TODA recarga la respeta vía reloadCurrentView,
+  // así el SearchBar y la lista nunca se desincronizan (navegar, pin, CRUD, etc.).
+  const [searchQuery, setSearchQuery] = createSignal('');
+  const isSearchActive = () => searchQuery().trim().length > 0;
+
+  // Fuente ÚNICA de verdad de "qué proyectos mostrar": si hay búsqueda activa muestra
+  // resultados; si no, la vista actual (grupos raíz o subproyectos del grupo).
+  async function reloadCurrentView() {
+    if (isSearchActive()) {
+      await searchProjects(searchQuery());
+    } else if (viewMode() === 'groups') {
+      await loadRootProjects();
+    } else if (currentGroup()) {
+      await loadSubprojects(currentGroup()!.id);
+    } else {
+      await loadRootProjects();
+    }
+  }
+
+  // Setear la query y recargar en un solo paso (lo usa el SearchBar).
+  async function search(query: string) {
+    setSearchQuery(query);
+    await reloadCurrentView();
+  }
+
   async function loadProjects() {
     setIsLoading(true);
     setError(null);
@@ -36,14 +61,8 @@ export function createProjectStore() {
     setError(null);
     try {
       await api.createProject(project);
-      // Recargar la vista actual para reflejar el nuevo proyecto
-      if (viewMode() === 'groups') {
-        await loadRootProjects();
-      } else if (currentGroup()) {
-        await loadSubprojects(currentGroup()!.id);
-      } else {
-        await loadRootProjects();
-      }
+      // Recargar respetando la búsqueda/vista activa (fuente única)
+      await reloadCurrentView();
     } catch (err) {
       setError(getErrorMessage(err));
       throw err;
@@ -66,15 +85,8 @@ export function createProjectStore() {
       console.log(
         '✅ [STORE] API updateProject exitosa, recargando proyectos...'
       );
-      // Recargar la vista actual en lugar de todos los proyectos
-      if (viewMode() === 'groups') {
-        await loadRootProjects();
-      } else if (currentGroup()) {
-        await loadSubprojects(currentGroup()!.id);
-      } else {
-        // Fallback por si acaso
-        await loadRootProjects();
-      }
+      // Recargar respetando la búsqueda/vista activa (fuente única)
+      await reloadCurrentView();
       console.log('✅ [STORE] Proyectos recargados exitosamente');
     } catch (err) {
       console.error('❌ [STORE] Error en updateProject:', err);
@@ -90,14 +102,8 @@ export function createProjectStore() {
     setError(null);
     try {
       await api.deleteProject(id);
-      // Recargar la vista actual para reflejar la eliminación
-      if (viewMode() === 'groups') {
-        await loadRootProjects();
-      } else if (currentGroup()) {
-        await loadSubprojects(currentGroup()!.id);
-      } else {
-        await loadRootProjects();
-      }
+      // Recargar respetando la búsqueda/vista activa (fuente única)
+      await reloadCurrentView();
     } catch (err) {
       setError(getErrorMessage(err));
       throw err;
@@ -159,12 +165,14 @@ export function createProjectStore() {
   }
 
   async function navigateToGroup(group: Project) {
+    setSearchQuery(''); // navegar a un grupo siempre sale de la búsqueda
     setCurrentGroup(group);
     setViewMode('subprojects');
     await loadSubprojects(group.id);
   }
 
   async function navigateBack() {
+    setSearchQuery(''); // volver a la raíz también sale de la búsqueda
     setCurrentGroup(null);
     setViewMode('groups');
     await loadRootProjects();
@@ -175,12 +183,8 @@ export function createProjectStore() {
     setError(null);
     try {
       await api.assignProjectToGroup(childId, parentId);
-      // Recargar la vista actual
-      if (viewMode() === 'groups') {
-        await loadRootProjects();
-      } else if (currentGroup()) {
-        await loadSubprojects(currentGroup()!.id);
-      }
+      // Recargar respetando la búsqueda/vista activa (fuente única)
+      await reloadCurrentView();
     } catch (err) {
       setError(getErrorMessage(err));
       throw err;
@@ -198,6 +202,12 @@ export function createProjectStore() {
     updateProject,
     deleteProject,
     searchProjects,
+    // Búsqueda centralizada (v0.4.5)
+    searchQuery,
+    setSearchQuery,
+    isSearchActive,
+    search,
+    reloadCurrentView,
     openTerminal,
     // Grupos (v0.4.0)
     currentGroup,

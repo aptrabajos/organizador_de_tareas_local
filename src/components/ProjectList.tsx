@@ -868,8 +868,15 @@ const ProjectList: Component<ProjectListProps> = (props) => {
 
                                 {/* Secondary Actions Grid */}
                                 <div class="grid grid-cols-5 gap-1">
-                                  {/* v0.4.0 - Botón para sacar proyecto del grupo */}
-                                  <Show when={props.viewMode === 'subprojects'}>
+                                  {/* v0.4.0 - Botón para sacar proyecto del grupo.
+                                      Oculto durante búsqueda: los resultados son globales
+                                      y "sacar del grupo" mutaría datos de otro contexto. */}
+                                  <Show
+                                    when={
+                                      props.viewMode === 'subprojects' &&
+                                      !props.searchActive
+                                    }
+                                  >
                                     <button
                                       onClick={() =>
                                         handleRemoveFromGroup(project)
