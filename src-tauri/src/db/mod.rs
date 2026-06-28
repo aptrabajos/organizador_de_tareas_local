@@ -497,12 +497,9 @@ impl Database {
             query_parts.push("image_data = ?");
             params.push(Box::new(Self::empty_to_null(image_data)));
         }
-        // Group fields (v0.4.0). parent_id es i64 y necesita NULL real (WHERE parent_id IS NULL):
-        // se rutea por assign_project_to_group desde el frontend, no por aquí.
-        if let Some(parent_id) = updates.parent_id {
-            query_parts.push("parent_id = ?");
-            params.push(Box::new(parent_id));
-        }
+        // Group fields (v0.4.0). parent_id NO se toca aquí a propósito: TODO cambio de grupo
+        // pasa por assign_project_to_group, la ÚNICA barrera validada contra ciclos. Si
+        // updates.parent_id llega con valor, se ignora (ruta cerrada).
         if let Some(group_color) = updates.group_color {
             query_parts.push("group_color = ?");
             params.push(Box::new(Self::empty_to_null(group_color)));
@@ -1593,14 +1590,83 @@ impl Database {
         Ok(count)
     }
 
-    /// Asignar proyecto a un grupo (o quitarlo del grupo actual)
-    pub fn assign_project_to_group(&self, child_id: i64, new_parent_id: Option<i64>) -> Result<()> {
+    /// Recorre la cadena de ancestros de `start` (subiendo por parent_id) y devuelve
+    /// true si encuentra `needle`. Recibe la conexión YA bloqueada: NO re-bloquea el
+    /// Mutex (no es reentrante -> deadlock). `max_depth` evita un loop infinito si la
+    /// DB ya tuviera un ciclo por datos corruptos previos.
+    fn ancestor_chain_contains(
+        conn: &Connection,
+        start: i64,
+        needle: i64,
+        max_depth: usize,
+    ) -> std::result::Result<bool, String> {
+        let mut current = start;
+        let mut depth = 0;
+        loop {
+            if current == needle {
+                return Ok(true);
+            }
+            let next: Option<i64> = match conn.query_row(
+                "SELECT parent_id FROM projects WHERE id = ?1",
+                params![current],
+                |row| row.get::<_, Option<i64>>(0),
+            ) {
+                Ok(parent) => parent,
+                Err(rusqlite::Error::QueryReturnedNoRows) => return Ok(false),
+                Err(e) => return Err(e.to_string()),
+            };
+            match next {
+                None => return Ok(false),
+                Some(n) => current = n,
+            }
+            depth += 1;
+            if depth > max_depth {
+                return Err("Estructura de grupos inconsistente detectada.".to_string());
+            }
+        }
+    }
+
+    /// Asignar proyecto a un grupo (o quitarlo del grupo actual).
+    /// Barrera AUTORITATIVA contra ciclos: rechaza self-parent, padre inexistente, y
+    /// cualquier asignación que cerraría un ciclo en la jerarquía. El frontend filtra
+    /// por UX, pero esta es la garantía real (no confiar en el cliente).
+    pub fn assign_project_to_group(
+        &self,
+        child_id: i64,
+        new_parent_id: Option<i64>,
+    ) -> std::result::Result<(), String> {
         let conn = self.conn.lock().unwrap();
+
+        if let Some(parent_id) = new_parent_id {
+            // 1) Un proyecto no puede ser su propio grupo padre
+            if parent_id == child_id {
+                return Err("No podés asignar un proyecto como su propio grupo padre.".to_string());
+            }
+            // 2) El grupo padre debe existir (no hay FOREIGN KEY que lo garantice)
+            let exists: i64 = conn
+                .query_row(
+                    "SELECT COUNT(*) FROM projects WHERE id = ?1",
+                    params![parent_id],
+                    |row| row.get(0),
+                )
+                .map_err(|e| e.to_string())?;
+            if exists == 0 {
+                return Err("El grupo padre seleccionado no existe.".to_string());
+            }
+            // 3) No crear un ciclo: child no debe ser ancestro del nuevo padre
+            if Self::ancestor_chain_contains(&conn, parent_id, child_id, 1000)? {
+                return Err(
+                    "No podés mover este grupo dentro de uno de sus subproyectos (crearía un ciclo)."
+                        .to_string(),
+                );
+            }
+        }
 
         conn.execute(
             "UPDATE projects SET parent_id = ?1 WHERE id = ?2",
             params![new_parent_id, child_id],
-        )?;
+        )
+        .map_err(|e| e.to_string())?;
 
         Ok(())
     }
@@ -2566,6 +2632,75 @@ mod tests {
         db.assign_project_to_group(child.id, None).unwrap();
         let subs2 = db.get_subprojects(group.id).unwrap();
         assert!(subs2.is_empty());
+    }
+
+    #[test]
+    fn test_assign_rejects_self_parent() {
+        let db = test_db();
+        let p = db.create_project(test_project_dto()).unwrap();
+        let err = db.assign_project_to_group(p.id, Some(p.id)).unwrap_err();
+        assert!(err.contains("propio grupo padre"), "msg inesperado: {}", err);
+        // No se escribió: sigue siendo raíz
+        assert_eq!(db.get_project(p.id).unwrap().parent_id, None);
+    }
+
+    #[test]
+    fn test_assign_rejects_nonexistent_parent() {
+        let db = test_db();
+        let p = db.create_project(test_project_dto()).unwrap();
+        let err = db.assign_project_to_group(p.id, Some(99999)).unwrap_err();
+        assert!(err.contains("no existe"), "msg inesperado: {}", err);
+    }
+
+    #[test]
+    fn test_assign_rejects_cycle() {
+        // a -> b (b es hijo de a). Intentar a.parent = b cerraría un ciclo.
+        let db = test_db();
+        let a = db.create_project(test_project_dto()).unwrap();
+        let mut b_dto = test_project_dto();
+        b_dto.name = "B".to_string();
+        let b = db.create_project(b_dto).unwrap();
+        db.assign_project_to_group(b.id, Some(a.id)).unwrap(); // b hijo de a (válido)
+
+        // Ahora mover a dentro de b debe rechazarse (a es ancestro de b)
+        let err = db.assign_project_to_group(a.id, Some(b.id)).unwrap_err();
+        assert!(err.contains("ciclo"), "msg inesperado: {}", err);
+        // a sigue siendo raíz, no se corrompió la jerarquía
+        assert_eq!(db.get_project(a.id).unwrap().parent_id, None);
+    }
+
+    #[test]
+    fn test_update_project_does_not_change_parent_id() {
+        // Regresión: parent_id ya NO viaja por update_project (ruta cerrada).
+        let db = test_db();
+        let group = db.create_project(test_project_dto()).unwrap();
+        let mut child_dto = test_project_dto();
+        child_dto.name = "Child".to_string();
+        let child = db.create_project(child_dto).unwrap();
+        db.assign_project_to_group(child.id, Some(group.id)).unwrap();
+
+        // Intentar cambiar parent_id por update_project debe ser IGNORADO
+        db.update_project(
+            child.id,
+            UpdateProjectDTO {
+                name: Some("Renamed".to_string()),
+                description: None,
+                local_path: None,
+                documentation_url: None,
+                ai_documentation_url: None,
+                drive_link: None,
+                notes: None,
+                image_data: None,
+                parent_id: None, // aunque fuera Some, update_project lo ignora
+                group_color: None,
+                group_icon: None,
+            },
+        )
+        .unwrap();
+
+        // El grupo se mantiene (lo gobierna assign_project_to_group, no update)
+        assert_eq!(db.get_project(child.id).unwrap().parent_id, Some(group.id));
+        assert_eq!(db.get_project(child.id).unwrap().name, "Renamed");
     }
 
     // --- Dashboard ---

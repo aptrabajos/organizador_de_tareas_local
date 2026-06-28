@@ -1,4 +1,5 @@
 import { createSignal } from 'solid-js';
+import { getErrorMessage } from '../utils/errors';
 import type {
   Project,
   CreateProjectDTO,
@@ -44,7 +45,7 @@ export function createProjectStore() {
         await loadRootProjects();
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error desconocido');
+      setError(getErrorMessage(err));
       throw err;
     } finally {
       setIsLoading(false);
@@ -98,7 +99,7 @@ export function createProjectStore() {
         await loadRootProjects();
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error desconocido');
+      setError(getErrorMessage(err));
       throw err;
     } finally {
       setIsLoading(false);
@@ -181,7 +182,7 @@ export function createProjectStore() {
         await loadSubprojects(currentGroup()!.id);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error desconocido');
+      setError(getErrorMessage(err));
       throw err;
     } finally {
       setIsLoading(false);

@@ -62,7 +62,12 @@ const ProjectForm: Component<ProjectFormProps> = (props) => {
   onMount(async () => {
     try {
       const groups = await getRootProjects();
-      setAvailableGroups(groups);
+      // Excluir el propio proyecto de los grupos padre disponibles para evitar el
+      // self-parent desde la UI. El backend igual lo rechaza (barrera autoritativa).
+      const selfId = props.project?.id;
+      setAvailableGroups(
+        selfId != null ? groups.filter((g) => g.id !== selfId) : groups
+      );
     } catch (err) {
       console.error('Error cargando grupos:', err);
     }

@@ -1,5 +1,6 @@
 import { Component, For, Show, createSignal, createEffect } from 'solid-js';
 import toast from 'solid-toast';
+import { getErrorMessage } from '../utils/errors';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import {
@@ -245,7 +246,8 @@ const ProjectList: Component<ProjectListProps> = (props) => {
       }
     } catch (error) {
       console.error('Error al asignar proyecto a grupo:', error);
-      toast.error('Error al asignar proyecto al grupo');
+      // Surfacea el mensaje del backend (ej. validación de ciclo en español)
+      toast.error(getErrorMessage(error));
       throw error;
     }
   };

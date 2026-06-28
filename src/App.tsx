@@ -1,4 +1,5 @@
 import { Component, createSignal, onMount, Show } from 'solid-js';
+import { getErrorMessage } from './utils/errors';
 import { Toaster } from 'solid-toast';
 import { createProjectStore } from './stores/projectStore';
 import SearchBar from './components/SearchBar';
@@ -187,10 +188,7 @@ const AppContent: Component = () => {
       console.log('✅ [APP] Formulario cerrado exitosamente');
     } catch (err) {
       console.error('❌ [APP] Error en handleFormSubmit:', err);
-      alert(
-        'Error al guardar el proyecto: ' +
-          (err instanceof Error ? err.message : 'Error desconocido')
-      );
+      alert('Error al guardar el proyecto: ' + getErrorMessage(err));
     }
   };
 

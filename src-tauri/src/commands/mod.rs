@@ -1266,8 +1266,9 @@ pub async fn assign_project_to_group(
     parent_id: Option<i64>,
 ) -> Result<(), String> {
     println!("📁 [GROUPS] Asignando proyecto {} al grupo {:?}", child_id, parent_id);
+    // El método DB ya devuelve un mensaje en español accionable (self/ciclo/inexistente);
+    // se propaga directo para no enmascararlo con un prefijo genérico.
     db.assign_project_to_group(child_id, parent_id)
-        .map_err(|e| format!("Error assigning project to group: {}", e))
 }
 
 /// Exportar proyecto a PDF
