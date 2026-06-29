@@ -15,6 +15,7 @@ import type {
   ProjectTodo,
   CreateTodoDTO,
   UpdateTodoDTO,
+  TrashItem,
 } from '../types/project';
 import type {
   AppConfig,
@@ -47,6 +48,22 @@ export async function updateProject(
 
 export async function deleteProject(id: number): Promise<void> {
   await invoke('delete_project', { id });
+}
+
+export async function restoreProject(id: number): Promise<void> {
+  await invoke('restore_project', { id });
+}
+
+export async function listTrash(): Promise<TrashItem[]> {
+  return await invoke('list_trash');
+}
+
+export async function purgeProject(id: number): Promise<void> {
+  await invoke('purge_project', { id });
+}
+
+export async function emptyTrash(): Promise<void> {
+  await invoke('empty_trash');
 }
 
 export async function searchProjects(query: string): Promise<Project[]> {

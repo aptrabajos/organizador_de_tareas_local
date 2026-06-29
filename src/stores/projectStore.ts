@@ -112,6 +112,50 @@ export function createProjectStore() {
     }
   }
 
+  async function restoreProject(id: number) {
+    setIsLoading(true);
+    setError(null);
+    try {
+      await api.restoreProject(id);
+      // Recargar respetando la búsqueda/vista activa (fuente única)
+      await reloadCurrentView();
+    } catch (err) {
+      setError(getErrorMessage(err));
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  async function purgeProject(id: number) {
+    setIsLoading(true);
+    setError(null);
+    try {
+      await api.purgeProject(id);
+      // Borrado definitivo: la vista activa no cambia, pero refrescamos por consistencia
+      await reloadCurrentView();
+    } catch (err) {
+      setError(getErrorMessage(err));
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  async function emptyTrash() {
+    setIsLoading(true);
+    setError(null);
+    try {
+      await api.emptyTrash();
+      await reloadCurrentView();
+    } catch (err) {
+      setError(getErrorMessage(err));
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
   async function searchProjects(query: string) {
     setIsLoading(true);
     setError(null);
@@ -201,6 +245,9 @@ export function createProjectStore() {
     createProject,
     updateProject,
     deleteProject,
+    restoreProject,
+    purgeProject,
+    emptyTrash,
     searchProjects,
     // Búsqueda centralizada (v0.4.5)
     searchQuery,

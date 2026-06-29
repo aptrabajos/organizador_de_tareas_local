@@ -36,6 +36,9 @@ export interface Project {
   status_changed_at?: string;
   is_pinned?: boolean;
   pinned_order?: number;
+  // Papelera (soft-delete). NULL/ausente = activo, timestamp = en papelera.
+  // Por la "regla de oro" del diseño no viaja en el SELECT de las vistas activas.
+  deleted_at?: string | null;
   // Group/Hierarchy fields (v0.4.0)
   parent_id?: number | null;
   group_color?: string;
@@ -67,6 +70,14 @@ export interface ProjectStats {
 export interface ProjectWithChildren {
   project: Project;
   children: Project[];
+  subproject_count: number;
+}
+
+/** Item de la papelera (lo devuelve list_trash). Lleva la fecha de borrado REAL. */
+export interface TrashItem {
+  id: number;
+  name: string;
+  deleted_at: string;
   subproject_count: number;
 }
 

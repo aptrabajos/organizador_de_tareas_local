@@ -131,6 +131,30 @@ pub async fn delete_project(db: State<'_, Database>, id: i64) -> Result<(), Stri
 }
 
 #[tauri::command]
+pub async fn restore_project(db: State<'_, Database>, id: i64) -> Result<(), String> {
+    db.restore_project(id)
+        .map_err(|e| format!("Error restoring project: {}", e))
+}
+
+#[tauri::command]
+pub async fn list_trash(db: State<'_, Database>) -> Result<Vec<crate::db::TrashItem>, String> {
+    db.list_trash()
+        .map_err(|e| format!("Error listing trash: {}", e))
+}
+
+#[tauri::command]
+pub async fn purge_project(db: State<'_, Database>, id: i64) -> Result<(), String> {
+    db.purge_project(id)
+        .map_err(|e| format!("Error purging project: {}", e))
+}
+
+#[tauri::command]
+pub async fn empty_trash(db: State<'_, Database>) -> Result<(), String> {
+    db.empty_trash()
+        .map_err(|e| format!("Error emptying trash: {}", e))
+}
+
+#[tauri::command]
 pub async fn search_projects(db: State<'_, Database>, query: String) -> Result<Vec<Project>, String> {
     db.search_projects(&query)
         .map_err(|e| format!("Error searching projects: {}", e))

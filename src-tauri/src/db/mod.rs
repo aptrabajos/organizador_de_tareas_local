@@ -4,6 +4,16 @@ use std::sync::Mutex;
 
 use crate::models::project::{CreateProjectDTO, CreateLinkDTO, Project, ProjectLink, UpdateProjectDTO, UpdateLinkDTO, ProjectAttachment, CreateAttachmentDTO, JournalEntry, CreateJournalEntryDTO, UpdateJournalEntryDTO, ProjectTodo, CreateTodoDTO, UpdateTodoDTO, ProjectWithChildren};
 
+/// Item de la papelera. Struct dedicado (no toca el modelo Project) que SÍ lleva la
+/// fecha de borrado real y el conteo de subproyectos también en papelera.
+#[derive(serde::Serialize)]
+pub struct TrashItem {
+    pub id: i64,
+    pub name: String,
+    pub deleted_at: String,
+    pub subproject_count: i64,
+}
+
 pub struct Database {
     conn: Mutex<Connection>,
 }
@@ -170,6 +180,13 @@ impl Database {
             [],
         );
 
+        // Papelera: soft-delete. NULL = activo, timestamp = en papelera.
+        let _ = conn.execute("ALTER TABLE projects ADD COLUMN deleted_at TEXT", []);
+        let _ = conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_projects_deleted_at ON projects(deleted_at) WHERE deleted_at IS NOT NULL",
+            [],
+        );
+
         // Migración: agregar updated_at a project_links
         let _ = conn.execute(
             "ALTER TABLE project_links ADD COLUMN updated_at DATETIME",
@@ -326,6 +343,7 @@ impl Database {
                     status, status_changed_at, is_pinned, pinned_order, display_order,
                     parent_id, group_color, group_icon, is_group_expanded
              FROM projects
+             WHERE deleted_at IS NULL
              ORDER BY display_order ASC, is_pinned DESC, pinned_order ASC, updated_at DESC"
         )?;
 
@@ -573,10 +591,212 @@ impl Database {
         result
     }
 
+    /// Soft-delete: mueve el proyecto a la papelera marcando deleted_at.
+    /// Cascada: marca también los hijos directos AÚN activos con el MISMO
+    /// timestamp (eso identifica el batch para restaurarlo en bloque).
     pub fn delete_project(&self, id: i64) -> Result<()> {
         let conn = self.conn.lock().unwrap();
-        conn.execute("DELETE FROM projects WHERE id = ?1", params![id])?;
+        let now = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
+        let tx = conn.unchecked_transaction()?;
+        // Soft-delete del proyecto + TODOS sus descendientes activos (cualquier
+        // profundidad, no solo hijos directos) con el MISMO timestamp: así no quedan
+        // nietos activos colgando de un padre borrado (invisibles), e identifica el
+        // batch para restaurar/purgar en bloque. `AND deleted_at IS NULL` preserva
+        // los que ya estaban en papelera de antes.
+        tx.execute(
+            "UPDATE projects SET deleted_at = ?1
+             WHERE deleted_at IS NULL AND id IN (
+                 WITH RECURSIVE descendants(did) AS (
+                     SELECT ?2
+                     UNION ALL
+                     SELECT p.id FROM projects p JOIN descendants ON p.parent_id = descendants.did
+                 )
+                 SELECT did FROM descendants
+             )",
+            params![now, id],
+        )?;
+        tx.commit()?;
         Ok(())
+    }
+
+    /// Restaurar un proyecto de la papelera (deleted_at -> NULL).
+    /// - Si tiene padre y el padre sigue en papelera, lo re-parentea a raíz para
+    ///   no dejarlo huérfano colgado de un grupo borrado.
+    /// - Si el id ES un grupo, restaura también los hijos del MISMO batch (mismo
+    ///   timestamp de borrado), preservando la jerarquía original.
+    pub fn restore_project(&self, id: i64) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        let tx = conn.unchecked_transaction()?;
+
+        // Capturar el deleted_at de este proyecto ANTES de limpiarlo: identifica
+        // el batch de hijos que se borraron junto con él.
+        let own_deleted_at: Option<String> = tx
+            .query_row(
+                "SELECT deleted_at FROM projects WHERE id = ?1",
+                params![id],
+                |row| row.get(0),
+            )
+            .ok();
+
+        // ¿El padre está disponible (existe Y activo)? Si NO —porque sigue en papelera
+        // O porque fue purgado (ya no existe)— re-parenteamos a raíz para no dejar el
+        // proyecto colgando de un padre inexistente/borrado (huérfano invisible).
+        let parent_id: Option<i64> = tx
+            .query_row(
+                "SELECT parent_id FROM projects WHERE id = ?1",
+                params![id],
+                |row| row.get(0),
+            )
+            .ok()
+            .flatten();
+
+        let needs_reparent = match parent_id {
+            Some(pid) => {
+                let parent_active: bool = tx.query_row(
+                    "SELECT EXISTS(SELECT 1 FROM projects WHERE id = ?1 AND deleted_at IS NULL)",
+                    params![pid],
+                    |row| row.get(0),
+                )?;
+                !parent_active
+            }
+            None => false,
+        };
+
+        if needs_reparent {
+            tx.execute(
+                "UPDATE projects SET deleted_at = NULL, parent_id = NULL WHERE id = ?1",
+                params![id],
+            )?;
+        } else {
+            tx.execute(
+                "UPDATE projects SET deleted_at = NULL WHERE id = ?1",
+                params![id],
+            )?;
+        }
+
+        // Restaurar TODO el subárbol del MISMO batch (mismo timestamp de borrado),
+        // a cualquier profundidad. El propio id ya quedó en NULL arriba.
+        if let Some(deleted_at) = own_deleted_at {
+            tx.execute(
+                "UPDATE projects SET deleted_at = NULL
+                 WHERE deleted_at = ?2 AND id IN (
+                     WITH RECURSIVE descendants(did) AS (
+                         SELECT ?1
+                         UNION ALL
+                         SELECT p.id FROM projects p JOIN descendants ON p.parent_id = descendants.did
+                     )
+                     SELECT did FROM descendants
+                 )",
+                params![id, deleted_at],
+            )?;
+        }
+
+        tx.commit()?;
+        Ok(())
+    }
+
+    /// Eliminar DEFINITIVAMENTE un proyecto (solo si está en papelera).
+    /// Borra en cascada de todas las tablas hijas dentro de una transacción.
+    pub fn purge_project(&self, id: i64) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+
+        // Validar que el proyecto esté efectivamente en la papelera
+        let deleted_at: Option<String> = conn
+            .query_row(
+                "SELECT deleted_at FROM projects WHERE id = ?1",
+                params![id],
+                |row| row.get(0),
+            )
+            .ok()
+            .flatten();
+        if deleted_at.is_none() {
+            return Err(rusqlite::Error::QueryReturnedNoRows);
+        }
+
+        let tx = conn.unchecked_transaction()?;
+        // Purgar el grupo + sus descendientes QUE TAMBIÉN ESTÉN EN PAPELERA (no tocar
+        // activos): si no, sus subproyectos quedarían como filas zombie apuntando a un
+        // padre inexistente. La recursión solo desciende por ramas borradas.
+        let ids: Vec<i64> = {
+            let mut stmt = tx.prepare(
+                "WITH RECURSIVE descendants(did) AS (
+                     SELECT ?1
+                     UNION ALL
+                     SELECT p.id FROM projects p JOIN descendants ON p.parent_id = descendants.did
+                     WHERE p.deleted_at IS NOT NULL
+                 )
+                 SELECT did FROM descendants",
+            )?;
+            let rows = stmt.query_map(params![id], |row| row.get::<_, i64>(0))?;
+            rows.collect::<Result<Vec<_>>>()?
+        };
+        for pid in ids {
+            Self::purge_project_internal(&tx, pid)?;
+        }
+        tx.commit()?;
+        Ok(())
+    }
+
+    /// Borrado físico de un proyecto y todos sus datos. Recibe la transacción
+    /// YA abierta; NO valida el estado de papelera (eso es del caller).
+    fn purge_project_internal(tx: &Connection, id: i64) -> Result<()> {
+        tx.execute("DELETE FROM project_links WHERE project_id = ?1", params![id])?;
+        tx.execute("DELETE FROM project_attachments WHERE project_id = ?1", params![id])?;
+        tx.execute("DELETE FROM project_journal WHERE project_id = ?1", params![id])?;
+        tx.execute("DELETE FROM project_todos WHERE project_id = ?1", params![id])?;
+        tx.execute("DELETE FROM project_activity WHERE project_id = ?1", params![id])?;
+        tx.execute("DELETE FROM time_tracking_sessions WHERE project_id = ?1", params![id])?;
+        tx.execute("DELETE FROM projects WHERE id = ?1", params![id])?;
+        Ok(())
+    }
+
+    /// Vaciar la papelera: elimina DEFINITIVAMENTE todos los proyectos con
+    /// deleted_at IS NOT NULL y sus datos, en una sola transacción.
+    pub fn empty_trash(&self) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+
+        let ids: Vec<i64> = {
+            let mut stmt = conn.prepare(
+                "SELECT id FROM projects WHERE deleted_at IS NOT NULL",
+            )?;
+            let rows = stmt.query_map([], |row| row.get::<_, i64>(0))?;
+            rows.collect::<Result<Vec<_>>>()?
+        };
+
+        let tx = conn.unchecked_transaction()?;
+        for id in ids {
+            Self::purge_project_internal(&tx, id)?;
+        }
+        tx.commit()?;
+        Ok(())
+    }
+
+    /// Listar los proyectos en la papelera (deleted_at IS NOT NULL).
+    /// Mismo mapeo posicional que get_all_projects.
+    pub fn list_trash(&self) -> Result<Vec<TrashItem>> {
+        let conn = self.conn.lock().unwrap();
+
+        // Devolvemos la fecha de borrado REAL (deleted_at) y cuántos subproyectos
+        // cayeron también a la papelera, sin tocar el struct Project ni su SELECT.
+        let mut stmt = conn.prepare(
+            "SELECT t.id, t.name, t.deleted_at,
+                    (SELECT COUNT(*) FROM projects c
+                     WHERE c.parent_id = t.id AND c.deleted_at IS NOT NULL) AS subproject_count
+             FROM projects t
+             WHERE t.deleted_at IS NOT NULL
+             ORDER BY t.deleted_at DESC",
+        )?;
+
+        let rows = stmt.query_map([], |row| {
+            Ok(TrashItem {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                deleted_at: row.get(2)?,
+                subproject_count: row.get(3)?,
+            })
+        })?;
+
+        rows.collect()
     }
 
     pub fn search_projects(&self, query: &str) -> Result<Vec<Project>> {
@@ -589,7 +809,7 @@ impl Database {
                     status, status_changed_at, is_pinned, pinned_order, display_order,
                     parent_id, group_color, group_icon, is_group_expanded
              FROM projects
-             WHERE name LIKE ?1 OR description LIKE ?1 OR local_path LIKE ?1 OR notes LIKE ?1
+             WHERE (name LIKE ?1 OR description LIKE ?1 OR local_path LIKE ?1 OR notes LIKE ?1) AND deleted_at IS NULL
              ORDER BY display_order ASC, is_pinned DESC, pinned_order ASC, updated_at DESC"
         )?;
 
@@ -821,7 +1041,7 @@ impl Database {
 
         // Total de proyectos
         let total_projects: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM projects",
+            "SELECT COUNT(*) FROM projects WHERE deleted_at IS NULL",
             [],
             |row| row.get(0),
         )?;
@@ -836,7 +1056,7 @@ impl Database {
 
         // Tiempo total en horas
         let total_seconds: i64 = conn.query_row(
-            "SELECT COALESCE(SUM(total_time_seconds), 0) FROM projects",
+            "SELECT COALESCE(SUM(total_time_seconds), 0) FROM projects WHERE deleted_at IS NULL",
             [],
             |row| row.get(0),
         ).unwrap_or(0);
@@ -845,7 +1065,7 @@ impl Database {
         // Proyecto más activo
         let most_active_project: Option<String> = conn.query_row(
             "SELECT name FROM projects
-             WHERE opened_count = (SELECT MAX(opened_count) FROM projects)
+             WHERE deleted_at IS NULL AND opened_count = (SELECT MAX(opened_count) FROM projects WHERE deleted_at IS NULL)
              LIMIT 1",
             [],
             |row| row.get(0),
@@ -1321,7 +1541,7 @@ impl Database {
                     status, status_changed_at, is_pinned, pinned_order, display_order,
                     parent_id, group_color, group_icon, is_group_expanded
              FROM projects
-             WHERE last_opened_at IS NOT NULL
+             WHERE last_opened_at IS NOT NULL AND deleted_at IS NULL
              ORDER BY last_opened_at DESC
              LIMIT 5"
         )?;
@@ -1371,7 +1591,7 @@ impl Database {
                 p.name as project_name
              FROM project_todos pt
              JOIN projects p ON pt.project_id = p.id
-             WHERE pt.is_completed = 0
+             WHERE pt.is_completed = 0 AND p.deleted_at IS NULL
              ORDER BY pt.created_at DESC"
         )?;
 
@@ -1405,6 +1625,7 @@ impl Database {
                 p.name as project_name
              FROM project_journal pj
              JOIN projects p ON pj.project_id = p.id
+             WHERE p.deleted_at IS NULL
              ORDER BY pj.created_at DESC
              LIMIT 5"
         )?;
@@ -1442,7 +1663,7 @@ impl Database {
                     status, status_changed_at, is_pinned, pinned_order, display_order,
                     parent_id, group_color, group_icon, is_group_expanded
              FROM projects
-             WHERE parent_id IS NULL
+             WHERE parent_id IS NULL AND deleted_at IS NULL
              ORDER BY display_order ASC, is_pinned DESC, pinned_order ASC, updated_at DESC"
         )?;
 
@@ -1520,7 +1741,7 @@ impl Database {
                     status, status_changed_at, is_pinned, pinned_order, display_order,
                     parent_id, group_color, group_icon, is_group_expanded
              FROM projects
-             WHERE parent_id = ?1
+             WHERE parent_id = ?1 AND deleted_at IS NULL
              ORDER BY display_order ASC, name ASC"
         )?;
 
@@ -1606,7 +1827,7 @@ impl Database {
         let conn = self.conn.lock().unwrap();
 
         let count: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM projects WHERE parent_id = ?1",
+            "SELECT COUNT(*) FROM projects WHERE parent_id = ?1 AND deleted_at IS NULL",
             params![parent_id],
             |row| row.get(0),
         )?;
@@ -1669,7 +1890,7 @@ impl Database {
             // 2) El grupo padre debe existir (no hay FOREIGN KEY que lo garantice)
             let exists: i64 = conn
                 .query_row(
-                    "SELECT COUNT(*) FROM projects WHERE id = ?1",
+                    "SELECT COUNT(*) FROM projects WHERE id = ?1 AND deleted_at IS NULL",
                     params![parent_id],
                     |row| row.get(0),
                 )
@@ -2079,11 +2300,85 @@ mod tests {
     }
 
     #[test]
-    fn test_delete_project() {
+    fn test_delete_project_is_soft() {
+        // delete_project ahora es SOFT: desaparece de las listas pero queda en la papelera.
         let db = test_db();
         let created = db.create_project(test_project_dto()).unwrap();
         db.delete_project(created.id).unwrap();
+        // No aparece en la lista principal ni en raíz...
+        assert!(db.get_all_projects().unwrap().iter().all(|p| p.id != created.id));
+        assert!(db.get_root_projects().unwrap().iter().all(|p| p.id != created.id));
+        // ...pero SÍ está en la papelera...
+        assert!(db.list_trash().unwrap().iter().any(|p| p.id == created.id));
+        // ...y el lookup por id sigue funcionando (lo necesita restaurar).
+        assert!(db.get_project(created.id).is_ok());
+    }
+
+    #[test]
+    fn test_restore_project() {
+        let db = test_db();
+        let created = db.create_project(test_project_dto()).unwrap();
+        db.delete_project(created.id).unwrap();
+        db.restore_project(created.id).unwrap();
+        // Vuelve a la lista y sale de la papelera.
+        assert!(db.get_all_projects().unwrap().iter().any(|p| p.id == created.id));
+        assert!(db.list_trash().unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_delete_group_cascades_to_children() {
+        // Borrar un grupo manda sus hijos a la papelera (NO quedan huérfanos).
+        let db = test_db();
+        let group = db.create_project(test_project_dto()).unwrap();
+        let mut child_dto = test_project_dto();
+        child_dto.name = "Hijo".to_string();
+        let child = db.create_project(child_dto).unwrap();
+        db.assign_project_to_group(child.id, Some(group.id)).unwrap();
+
+        db.delete_project(group.id).unwrap();
+        // Grupo + hijo en la papelera, ninguno visible (sin huérfanos colgados).
+        assert_eq!(db.list_trash().unwrap().len(), 2);
+        assert!(db.get_root_projects().unwrap().is_empty());
+        assert!(db.get_subprojects(group.id).unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_delete_cascades_recursively_to_grandchildren() {
+        // Cascada N-niveles: borrar el abuelo manda padre Y nieto a la papelera.
+        // Antes (cascada 1 nivel) el nieto quedaba activo e invisible (huérfano).
+        let db = test_db();
+        let a = db.create_project(test_project_dto()).unwrap(); // abuelo (raíz)
+        let mut b_dto = test_project_dto();
+        b_dto.name = "B".to_string();
+        let b = db.create_project(b_dto).unwrap(); // padre
+        let mut c_dto = test_project_dto();
+        c_dto.name = "C".to_string();
+        let c = db.create_project(c_dto).unwrap(); // nieto
+        db.assign_project_to_group(b.id, Some(a.id)).unwrap();
+        db.assign_project_to_group(c.id, Some(b.id)).unwrap();
+
+        db.delete_project(a.id).unwrap();
+        // Los 3 en la papelera, ninguno activo/visible.
+        assert_eq!(db.list_trash().unwrap().len(), 3);
+        assert!(db.get_all_projects().unwrap().is_empty());
+
+        // Y restaurar el abuelo trae de vuelta todo el subárbol del batch.
+        db.restore_project(a.id).unwrap();
+        assert!(db.list_trash().unwrap().is_empty());
+        assert_eq!(db.get_all_projects().unwrap().len(), 3);
+    }
+
+    #[test]
+    fn test_purge_only_on_trashed_and_removes_for_real() {
+        let db = test_db();
+        let created = db.create_project(test_project_dto()).unwrap();
+        // Purgar un proyecto ACTIVO debe rechazarse (solo se purga lo que está en papelera).
+        assert!(db.purge_project(created.id).is_err());
+        // Tras mandarlo a la papelera, el purge sí lo borra DE VERDAD.
+        db.delete_project(created.id).unwrap();
+        db.purge_project(created.id).unwrap();
         assert!(db.get_project(created.id).is_err());
+        assert!(db.list_trash().unwrap().is_empty());
     }
 
     #[test]
