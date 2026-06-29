@@ -2,6 +2,13 @@
 
 Historial detallado de cambios del proyecto Gestor de Proyectos.
 
+## 2026-06-28 - v0.4.7
+
+**Correcciones:**
+
+- sanea backup de archivos por proyecto (destino configurable, --update, anti-traversal)
+---
+
 ## 2026-06-28 - v0.4.6
 
 **Nuevas caracteristicas:**
