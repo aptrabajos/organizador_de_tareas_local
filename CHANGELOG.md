@@ -2,6 +2,13 @@
 
 Historial detallado de cambios del proyecto Gestor de Proyectos.
 
+## 2026-06-29 - v0.5.0
+
+**Nuevas caracteristicas:**
+
+- papelera (soft-delete) con cascada recursiva, restaurar y purga
+---
+
 ## 2026-06-28 - v0.4.7
 
 **Correcciones:**
