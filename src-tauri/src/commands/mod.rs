@@ -291,110 +291,79 @@ pub async fn write_file_to_path(
     Ok(format!("Archivo escrito en: {}", file_path))
 }
 
+/// Sincroniza los ARCHIVOS de un proyecto a la carpeta de backup configurada (no la DB).
+/// Saneado: destino configurable (nunca /mnt/sda1 hardcodeado), `--update` (no borra el
+/// destino), exclusiones por argumento (no ensucia el repo con .rsyncignore).
 #[tauri::command]
 pub async fn sync_project_to_backup(
+    config: State<'_, ConfigManager>,
     source_path: String,
     project_name: String,
 ) -> Result<String, String> {
-    println!("🔄 [RSYNC] Iniciando sincronización:");
-    println!("   📂 Origen: {}", source_path);
-    
-    let backup_path = format!("/mnt/sda1/{}", project_name);
-    println!("   📁 Destino: {}", backup_path);
-    
-    // Crear directorio de destino si no existe
+    println!("🔄 [RSYNC] Sincronizando archivos de '{}'", project_name);
+
+    // Verificar que rsync esté instalado (solo Unix; en Windows `which` no existe)
+    let rsync_ok = std::process::Command::new("which")
+        .arg("rsync")
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false);
+    if !rsync_ok {
+        return Err("rsync no está instalado en el sistema".to_string());
+    }
+
+    // Validar el origen: debe existir y ser un directorio
+    if source_path.trim().is_empty() || !std::path::Path::new(&source_path).is_dir() {
+        return Err(format!("El directorio de origen no existe: {}", source_path));
+    }
+
+    // Sanear project_name contra path traversal: join() con una ruta absoluta o con
+    // componentes '..' ESCAPARÍA la carpeta de backup. Lo reducimos a un único nombre
+    // de carpeta seguro (sin separadores ni '..').
+    let safe_name = project_name
+        .trim()
+        .replace(['/', '\\'], "_")
+        .replace("..", "_");
+    if safe_name.is_empty() {
+        return Err("Nombre de proyecto no válido para el backup".to_string());
+    }
+
+    // Destino CONFIGURABLE: {carpeta de backup}/{proyecto}. Reusa la misma resolución
+    // que el backup de la DB (config.backup.default_path → default de plataforma).
+    let cfg = config.get_config()?;
+    let backup_path = crate::backup::resolve_backup_dir(&cfg)?.join(&safe_name);
     std::fs::create_dir_all(&backup_path)
         .map_err(|e| format!("Error creando directorio de destino: {}", e))?;
-    
-    // Crear .rsyncignore básico si no existe en el proyecto origen
-    let rsyncignore_path = format!("{}/.rsyncignore", source_path);
-    if !std::path::Path::new(&rsyncignore_path).exists() {
-        println!("📝 [RSYNC] Creando .rsyncignore básico para proyecto nuevo");
-        let basic_rsyncignore = r#"# Archivos y directorios a ignorar en la sincronización rsync
+    let backup_str = backup_path
+        .to_str()
+        .ok_or("La ruta de backup contiene caracteres no válidos")?;
 
-# Dependencias de Node.js
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-
-# Archivos de build y distribución
-dist/
-build/
-out/
-.next/
-.nuxt/
-.vuepress/dist/
-
-# Archivos temporales
-.tmp/
-temp/
-*.tmp
-*.temp
-
-# Logs
-*.log
-logs/
-
-# Archivos de sistema
-.DS_Store
-Thumbs.db
-*.swp
-*.swo
-*~
-
-# Archivos de IDE/Editor
-.vscode/settings.json
-.idea/
-*.sublime-*
-
-# Archivos de Git
-.git/
-.gitignore
-
-# Archivos de cache
-.cache/
-.parcel-cache/
-
-# Archivos de testing
-coverage/
-.nyc_output/
-
-# Archivos de backup
-*.backup
-*.bak
-"#;
-        
-        std::fs::write(&rsyncignore_path, basic_rsyncignore)
-            .map_err(|e| format!("Error creando .rsyncignore: {}", e))?;
-        println!("✅ [RSYNC] .rsyncignore creado exitosamente");
+    // Exclusiones por argumento (NO se escribe ningún .rsyncignore en el repo del usuario).
+    // Se excluyen artefactos de build/caches, NO .git (la historia es parte del backup).
+    let excludes = [
+        "node_modules/", "dist/", "build/", "out/", ".next/", ".nuxt/", ".cache/",
+        ".parcel-cache/", "coverage/", ".nyc_output/", "logs/", "*.log", "*.tmp",
+        "*.bak", ".DS_Store", "Thumbs.db", "*.swp",
+    ];
+    let mut args: Vec<String> = vec!["-a".into(), "--update".into()];
+    for ex in excludes {
+        args.push(format!("--exclude={}", ex));
     }
-    
-           // Ejecutar rsync con archivo de exclusión
-           let output = std::process::Command::new("rsync")
-               .args([
-                   "-av",           // Archivo, verboso
-                   "--delete",      // Eliminar archivos que no están en origen
-                   "--progress",    // Mostrar progreso
-                   "--exclude-from=.rsyncignore", // Usar archivo de exclusión
-                   &format!("{}/", source_path), // Origen con / al final
-                   &backup_path,    // Destino
-               ])
-               .current_dir(&source_path) // Establecer directorio de trabajo para .rsyncignore
-               .output()
-               .map_err(|e| format!("Error ejecutando rsync: {}", e))?;
-    
+    args.push(format!("{}/", source_path)); // origen con / final
+    args.push(backup_str.to_string());
+
+    let output = std::process::Command::new("rsync")
+        .args(&args)
+        .output()
+        .map_err(|e| format!("Error ejecutando rsync: {}", e))?;
+
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         return Err(format!("Rsync falló: {}", stderr));
     }
-    
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    println!("✅ [RSYNC] Sincronización completada exitosamente");
-    println!("📊 [RSYNC] Output: {}", stdout);
-    
-    Ok(format!("Proyecto sincronizado: {} -> {}", source_path, backup_path))
+
+    println!("✅ [RSYNC] Sincronización completada en {}", backup_str);
+    Ok(format!("Proyecto sincronizado en: {}", backup_str))
 }
 
 #[tauri::command]

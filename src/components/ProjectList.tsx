@@ -32,7 +32,6 @@ import {
   startWorkSession,
 } from '../services/api';
 import { open } from '@tauri-apps/plugin-dialog';
-import { invoke } from '@tauri-apps/api/core';
 import { writeTextFile } from '@tauri-apps/plugin-fs';
 
 // Configurar marked para soportar GFM y checkboxes
@@ -368,36 +367,6 @@ const ProjectList: Component<ProjectListProps> = (props) => {
     }
   };
 
-  const handleBackupToMnt = async (project: Project) => {
-    try {
-      // Crear carpeta del proyecto en /mnt/sda1 y guardar backup ahí
-      const projectFolder = `/mnt/sda1/${project.name}`;
-      const toastId = toast.loading(`Creando backup en ${projectFolder}...`);
-
-      try {
-        const backupData = await createProjectBackup(project.id);
-        const fullPath = `${projectFolder}/${backupData.filename}`;
-
-        // Usar el comando personalizado de Tauri (crea la carpeta automáticamente)
-        await invoke('write_file_to_path', {
-          filePath: fullPath,
-          content: backupData.content,
-        });
-
-        toast.success(`✅ Backup creado en:\n${fullPath}`, {
-          id: toastId,
-          duration: 5000,
-        });
-      } catch (error) {
-        console.error('Error al crear backup:', error);
-        toast.error(`Error al crear backup: ${error}`, { id: toastId });
-      }
-    } catch (error) {
-      console.error('Error:', error);
-      toast.error(`Error: ${error}`);
-    }
-  };
-
   const handleExportPdf = async (project: Project) => {
     const toastId = toast.loading(`📄 Generando PDF de "${project.name}"...`);
     try {
@@ -414,7 +383,7 @@ const ProjectList: Component<ProjectListProps> = (props) => {
 
   const handleSync = async (project: Project) => {
     try {
-      // Sincronizar directamente al backup en /mnt/sda1 con rsync
+      // Sincroniza los archivos del proyecto a la carpeta de backup configurada (rsync)
       const toastId = toast.loading(
         `Sincronizando ${project.name} con rsync...`
       );
@@ -1007,26 +976,6 @@ const ProjectList: Component<ProjectListProps> = (props) => {
                                         stroke-linejoin="round"
                                         stroke-width="2"
                                         d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"
-                                      />
-                                    </svg>
-                                  </button>
-                                  <button
-                                    onClick={() => handleBackupToMnt(project)}
-                                    class="btn-icon text-indigo-600 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-900/30"
-                                    aria-label="Backup a disco"
-                                    title="Backup directo a /mnt/sda1"
-                                  >
-                                    <svg
-                                      class="h-4 w-4"
-                                      fill="none"
-                                      viewBox="0 0 24 24"
-                                      stroke="currentColor"
-                                    >
-                                      <path
-                                        stroke-linecap="round"
-                                        stroke-linejoin="round"
-                                        stroke-width="2"
-                                        d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"
                                       />
                                     </svg>
                                   </button>
