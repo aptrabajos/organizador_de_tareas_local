@@ -89,6 +89,23 @@ export default function Settings(props: { onClose: () => void }) {
     }
   };
 
+  // Persiste un cambio de config de backup AL INSTANTE, sin pisar cambios sin guardar
+  // de otros tabs (parte de la config persistida y mergea solo `backup`). Necesario
+  // porque el auto-backup se evalúa al ARRANCAR leyendo la config del disco.
+  const persistBackupConfig = async (newCfg: AppConfig) => {
+    const prev = config(); // por si falla la persistencia, revertimos
+    setConfig(newCfg); // optimista
+    try {
+      const persisted = await getConfig();
+      await updateConfig({ ...persisted, backup: newCfg.backup });
+    } catch (err) {
+      // La UI DEBE reflejar el disco (el auto-backup lee la config de ahí al
+      // arrancar): si no se pudo guardar, revertimos el signal para no mentir.
+      setConfig(prev);
+      setError(getErrorMessage(err));
+    }
+  };
+
   const loadConfig = async () => {
     setIsLoading(true);
     setError(null);
@@ -662,23 +679,31 @@ export default function Settings(props: { onClose: () => void }) {
                 <div class="space-y-4 rounded-lg bg-gray-50 p-4 dark:bg-gray-800">
                   <div class="flex items-center justify-between">
                     <div>
-                      <h3 class="flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-white">
+                      <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
                         Backup Automático
-                        <span class="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/40 dark:text-amber-400">
-                          Próximamente
-                        </span>
                       </h3>
                       <p class="text-sm text-gray-600 dark:text-gray-400">
-                        El backup programado llega en una próxima versión. Por
-                        ahora usá “Backup ahora”.
+                        Crea un backup al abrir la app si pasó el intervalo
+                        desde el último.
                       </p>
                     </div>
-                    <label class="relative inline-flex cursor-not-allowed items-center opacity-50">
+                    <label class="relative inline-flex cursor-pointer items-center">
                       <input
                         type="checkbox"
                         class="peer sr-only"
-                        disabled
-                        checked={false}
+                        checked={config()?.backup.auto_backup_enabled || false}
+                        onChange={(e) => {
+                          const cfg = config();
+                          if (cfg) {
+                            persistBackupConfig({
+                              ...cfg,
+                              backup: {
+                                ...cfg.backup,
+                                auto_backup_enabled: e.currentTarget.checked,
+                              },
+                            });
+                          }
+                        }}
                       />
                       <div class="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:start-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-blue-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:border-gray-600 dark:bg-gray-700 dark:peer-focus:ring-blue-800 rtl:peer-checked:after:-translate-x-full" />
                     </label>
@@ -696,16 +721,19 @@ export default function Settings(props: { onClose: () => void }) {
                         max="30"
                         class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                         value={config()?.backup.auto_backup_interval || 7}
-                        onInput={(e) => {
+                        onChange={(e) => {
                           const cfg = config();
                           if (cfg) {
-                            setConfig({
+                            // Guarda de NaN + clamp a [1, 30]; persiste al confirmar.
+                            const n = parseInt(e.currentTarget.value, 10);
+                            const days = Number.isNaN(n)
+                              ? 7
+                              : Math.min(30, Math.max(1, n));
+                            persistBackupConfig({
                               ...cfg,
                               backup: {
                                 ...cfg.backup,
-                                auto_backup_interval: parseInt(
-                                  e.currentTarget.value
-                                ),
+                                auto_backup_interval: days,
                               },
                             });
                           }

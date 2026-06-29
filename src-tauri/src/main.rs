@@ -28,6 +28,14 @@ fn main() {
     let config_manager = ConfigManager::new().expect("Error al inicializar la configuración");
     let active_session = ActiveSession::default();
 
+    // Auto-backup al arrancar: si está activado y pasó el intervalo desde el último,
+    // crea un backup verificado. Corre sincrónico antes de abrir la ventana (rápido
+    // para una DB local; un destino lento/de red podría demorar el arranque). Si falla
+    // NO aborta: se loguea y la app abre igual.
+    if let Err(e) = backup::maybe_auto_backup(&db, &config_manager) {
+        eprintln!("⚠️ [AUTO-BACKUP] No se pudo crear el backup automático: {}", e);
+    }
+
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())

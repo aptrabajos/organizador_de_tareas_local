@@ -266,3 +266,84 @@ fn format_mtime(metadata: &fs::Metadata) -> String {
         Err(_) => String::new(),
     }
 }
+
+/// Auto-backup al ARRANCAR la app: si está activado y corresponde por intervalo,
+/// crea un backup. Se llama UNA vez en el arranque (sin timers ni hilos vivos). El
+/// run_backup es sincrónico (rápido para una DB local). Nunca debe romper el arranque:
+/// el caller loguea el Err y sigue.
+pub fn maybe_auto_backup(db: &Database, config_mgr: &ConfigManager) -> Result<(), String> {
+    let cfg = config_mgr.get_config()?;
+    if !cfg.backup.auto_backup_enabled {
+        return Ok(()); // desactivado por el usuario
+    }
+    if !auto_backup_due(cfg.backup.last_backup.as_deref(), cfg.backup.auto_backup_interval) {
+        return Ok(()); // todavía no pasó el intervalo
+    }
+    // Reusa el flujo verificado (VACUUM INTO + verificación + retención + last_backup).
+    run_backup(db, config_mgr)?;
+    Ok(())
+}
+
+/// ¿Corresponde un auto-backup ahora? Envuelve el núcleo testeable con la hora real.
+fn auto_backup_due(last_backup: Option<&str>, interval_days: u32) -> bool {
+    auto_backup_due_at(last_backup, interval_days, Local::now().naive_local())
+}
+
+/// Núcleo testeable: corresponde backup si nunca hubo (None o no parsea) o si pasó el
+/// intervalo en días desde el último backup.
+fn auto_backup_due_at(
+    last_backup: Option<&str>,
+    interval_days: u32,
+    now: chrono::NaiveDateTime,
+) -> bool {
+    match last_backup {
+        None => true,
+        Some(ts) => match chrono::NaiveDateTime::parse_from_str(ts, "%Y-%m-%d %H:%M:%S") {
+            Ok(last) => {
+                now.signed_duration_since(last) >= chrono::Duration::days(interval_days as i64)
+            }
+            // Defensivo: si la fecha guardada no parsea, mejor hacer un backup.
+            Err(_) => true,
+        },
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::auto_backup_due_at;
+    use chrono::NaiveDateTime;
+
+    fn dt(s: &str) -> NaiveDateTime {
+        NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S").unwrap()
+    }
+
+    #[test]
+    fn due_when_never_backed_up() {
+        assert!(auto_backup_due_at(None, 7, dt("2026-06-29 10:00:00")));
+    }
+
+    #[test]
+    fn due_when_interval_passed() {
+        // último hace 8 días, intervalo 7 → corresponde
+        assert!(auto_backup_due_at(
+            Some("2026-06-21 10:00:00"),
+            7,
+            dt("2026-06-29 10:00:00")
+        ));
+    }
+
+    #[test]
+    fn not_due_when_recent() {
+        // último hace 3 días, intervalo 7 → NO corresponde
+        assert!(!auto_backup_due_at(
+            Some("2026-06-26 10:00:00"),
+            7,
+            dt("2026-06-29 10:00:00")
+        ));
+    }
+
+    #[test]
+    fn due_when_timestamp_unparseable() {
+        assert!(auto_backup_due_at(Some("no-es-fecha"), 7, dt("2026-06-29 10:00:00")));
+    }
+}
