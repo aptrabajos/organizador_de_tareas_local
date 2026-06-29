@@ -2,6 +2,13 @@
 
 Historial detallado de cambios del proyecto Gestor de Proyectos.
 
+## 2026-06-29 - v0.5.1
+
+**Nuevas caracteristicas:**
+
+- backup automatico al arrancar (intervalo configurable, sin timers)
+---
+
 ## 2026-06-29 - v0.5.0
 
 **Nuevas caracteristicas:**
