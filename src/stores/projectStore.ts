@@ -222,6 +222,19 @@ export function createProjectStore() {
     await loadRootProjects();
   }
 
+  // Re-hidrata currentGroup desde la DB. Se usa tras mutar el grupo desde su propia
+  // cabecera (opción A) para que la tarjeta no quede con datos viejos (pin/estado/nombre).
+  async function refreshCurrentGroup() {
+    const g = currentGroup();
+    if (!g) return;
+    try {
+      const fresh = await api.getProject(g.id);
+      setCurrentGroup(fresh);
+    } catch {
+      // Si no se puede refrescar, se conserva el snapshot actual.
+    }
+  }
+
   async function assignToGroup(childId: number, parentId: number | null) {
     setIsLoading(true);
     setError(null);
@@ -263,6 +276,7 @@ export function createProjectStore() {
     loadSubprojects,
     navigateToGroup,
     navigateBack,
+    refreshCurrentGroup,
     assignToGroup,
   };
 }

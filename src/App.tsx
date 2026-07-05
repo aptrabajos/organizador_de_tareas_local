@@ -152,7 +152,13 @@ const AppContent: Component = () => {
 
     if (confirmed) {
       try {
+        // Si borramos el grupo en el que estamos parados, salimos de su vista
+        // para no quedar mostrando una cabecera de un grupo ya eliminado.
+        const wasCurrentGroup = project.id === store.currentGroup()?.id;
         await store.deleteProject(project.id);
+        if (wasCurrentGroup) {
+          await store.navigateBack();
+        }
       } catch {
         alert('Error al mover el proyecto a la papelera');
       }
@@ -513,12 +519,15 @@ const AppContent: Component = () => {
                           store.loadRootProjects();
                         } else if (store.currentGroup()) {
                           store.loadSubprojects(store.currentGroup()!.id);
+                          // Re-hidratar la cabecera del grupo por si se mutó desde ahí
+                          store.refreshCurrentGroup();
                         }
                       }}
                       renderFilters={setFilterProps}
                       viewMode={store.viewMode()}
                       onViewGroup={(group) => enterGroup(group)}
                       searchActive={store.isSearchActive()}
+                      currentGroup={store.currentGroup()}
                     />
                   </Show>
                 </div>
