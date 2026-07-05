@@ -2,6 +2,13 @@
 
 Historial detallado de cambios del proyecto Gestor de Proyectos.
 
+## 2026-07-05 - v0.5.2
+
+**Nuevas caracteristicas:**
+
+- tarjeta del propio grupo al entrar (Trabajar/editar el padre + subproyectos)
+---
+
 ## 2026-06-29 - v0.5.1
 
 **Nuevas caracteristicas:**

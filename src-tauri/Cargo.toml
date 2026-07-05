@@ -1,6 +1,6 @@
 [package]
 name = "gestor-proyectos"
-version = "0.5.1"
+version = "0.5.2"
 description = "Gestor de proyectos multiplataforma con código optimizado y 100% tipado"
 authors = ["you"]
 edition = "2021"
