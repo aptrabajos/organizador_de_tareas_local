@@ -3358,4 +3358,179 @@ mod tests {
         assert_eq!(stats.avg_session_seconds, 450);
         assert_eq!(stats.longest_session_seconds, 600);
     }
+
+    // --- Migraciones contra un schema real pre-existente ---
+
+    /// Auditoría (ALTO): las 21 `ALTER TABLE` de `Database::new()` descartan sus
+    /// errores en silencio (`let _ = conn.execute(...)`). Todos los demás tests parten
+    /// de `test_db()`, que abre un `:memory:` con el `CREATE TABLE IF NOT EXISTS` YA
+    /// actualizado, así que las ALTER nunca corrían de verdad contra un schema viejo:
+    /// el camino de upgrade que atraviesa cada usuario real en cada release nunca se
+    /// ejercitaba en tests.
+    ///
+    /// Este test siembra a mano, en un archivo temporal, un schema deliberadamente
+    /// viejo (pre-v0.4.0: sin ninguna de las columnas que las ALTER agregan después
+    /// -incluida `ai_documentation_url`-, y sin `updated_at` en `project_links`), con
+    /// datos reales adentro, y después corre `Database::new()` sobre ESE MISMO
+    /// archivo -el flujo real de upgrade-, verificando que las columnas nuevas
+    /// existan y que los datos viejos sigan ahí y sean legibles.
+    #[test]
+    fn test_migrations_apply_to_real_old_schema_and_preserve_data() {
+        use tempfile::TempDir;
+
+        let dir = TempDir::new().expect("no se pudo crear directorio temporal");
+        let db_path = dir.path().join("old_schema.db");
+
+        // 1. Sembrar un schema viejo real (pre-v0.4.0) con datos, y cerrar la conexión.
+        {
+            let old_conn = Connection::open(&db_path).expect("no se pudo crear el schema viejo");
+            old_conn
+                .execute(
+                    "CREATE TABLE projects (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        name TEXT NOT NULL,
+                        description TEXT NOT NULL,
+                        local_path TEXT NOT NULL,
+                        documentation_url TEXT,
+                        drive_link TEXT,
+                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                    )",
+                    [],
+                )
+                .unwrap();
+            old_conn
+                .execute(
+                    "CREATE TABLE project_links (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        project_id INTEGER NOT NULL,
+                        link_type TEXT NOT NULL,
+                        title TEXT NOT NULL,
+                        url TEXT NOT NULL,
+                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                    )",
+                    [],
+                )
+                .unwrap();
+
+            old_conn
+                .execute(
+                    "INSERT INTO projects (name, description, local_path, documentation_url, drive_link)
+                     VALUES ('Proyecto Viejo', 'Sembrado en schema pre-v0.4.0', '/tmp/viejo', NULL, NULL)",
+                    [],
+                )
+                .unwrap();
+            let project_id = old_conn.last_insert_rowid();
+            old_conn
+                .execute(
+                    "INSERT INTO project_links (project_id, link_type, title, url)
+                     VALUES (?1, 'repo', 'Link Viejo', 'https://old.example.com')",
+                    params![project_id],
+                )
+                .unwrap();
+        } // old_conn se dropea acá, liberando el archivo antes de que Database::new lo reabra
+
+        // 2. Correr las migraciones reales -el mismo Database::new() que usa la app- sobre
+        // ese mismo archivo.
+        let db = Database::new(db_path.clone())
+            .expect("Database::new debería migrar el schema viejo sin errores");
+
+        let conn = db.conn.lock().unwrap();
+
+        // 3a. Las columnas que las ALTER TABLE agregan ahora existen en `projects`.
+        let projects_columns: Vec<String> = conn
+            .prepare("PRAGMA table_info(projects)")
+            .unwrap()
+            .query_map([], |row| row.get::<_, String>(1))
+            .unwrap()
+            .filter_map(|r| r.ok())
+            .collect();
+        for expected in [
+            "ai_documentation_url",
+            "notes",
+            "image_data",
+            "last_opened_at",
+            "opened_count",
+            "total_time_seconds",
+            "status",
+            "status_changed_at",
+            "is_pinned",
+            "pinned_order",
+            "display_order",
+            "parent_id",
+            "group_color",
+            "group_icon",
+            "is_group_expanded",
+            "deleted_at",
+        ] {
+            assert!(
+                projects_columns.iter().any(|c| c == expected),
+                "falta columna migrada '{}' en projects: {:?}",
+                expected,
+                projects_columns
+            );
+        }
+
+        // 3b. La columna que la ALTER agrega a `project_links` también existe.
+        let links_columns: Vec<String> = conn
+            .prepare("PRAGMA table_info(project_links)")
+            .unwrap()
+            .query_map([], |row| row.get::<_, String>(1))
+            .unwrap()
+            .filter_map(|r| r.ok())
+            .collect();
+        assert!(
+            links_columns.iter().any(|c| c == "updated_at"),
+            "falta columna migrada 'updated_at' en project_links: {:?}",
+            links_columns
+        );
+
+        // 3c. Las tablas nuevas (CREATE TABLE IF NOT EXISTS) también se crean sobre el
+        // schema viejo.
+        let tables: Vec<String> = conn
+            .prepare("SELECT name FROM sqlite_master WHERE type = 'table'")
+            .unwrap()
+            .query_map([], |row| row.get::<_, String>(0))
+            .unwrap()
+            .filter_map(|r| r.ok())
+            .collect();
+        for expected in [
+            "project_activity",
+            "project_attachments",
+            "project_journal",
+            "project_todos",
+            "time_tracking_sessions",
+        ] {
+            assert!(
+                tables.contains(&expected.to_string()),
+                "falta tabla '{}' tras migrar: {:?}",
+                expected,
+                tables
+            );
+        }
+
+        // 4. Los datos sembrados en el schema viejo siguen presentes y legibles.
+        let (name, local_path): (String, String) = conn
+            .query_row(
+                "SELECT name, local_path FROM projects WHERE name = 'Proyecto Viejo'",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .expect("el proyecto sembrado en el schema viejo debería seguir presente");
+        assert_eq!(name, "Proyecto Viejo");
+        assert_eq!(local_path, "/tmp/viejo");
+
+        let link_title: String = conn
+            .query_row(
+                "SELECT title FROM project_links WHERE url = 'https://old.example.com'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("el link sembrado en el schema viejo debería seguir presente");
+        assert_eq!(link_title, "Link Viejo");
+
+        drop(conn);
+        drop(db);
+        // `dir` (TempDir) borra el directorio temporal solo al salir de scope.
+    }
 }
