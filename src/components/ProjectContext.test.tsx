@@ -256,6 +256,5 @@ describe('ProjectContext', () => {
       expect(screen.getByText('Entrada 5')).toBeTruthy();
       expect(screen.queryByText('Entrada 6')).toBeFalsy();
     });
-
   });
 });
