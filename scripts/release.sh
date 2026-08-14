@@ -55,7 +55,11 @@ done
 # ─── Funciones ───────────────────────────────────────────
 
 get_current_version() {
-    grep -m1 '"version"' "$PKG_JSON" | sed 's/.*"\([0-9]*\.[0-9]*\.[0-9]*\)".*/\1/'
+    if command -v jq &>/dev/null; then
+        jq -r '.version' "$PKG_JSON"
+    else
+        node -pe "require('$PKG_JSON').version"
+    fi
 }
 
 bump_version() {
@@ -77,12 +81,24 @@ update_version_files() {
 
     # package.json - actualiza solo el campo "version" en la raiz (linea 3)
     sed -i "s/\"version\": \"$old\"/\"version\": \"$new\"/" "$PKG_JSON"
+    if ! grep -q "\"version\": \"$new\"" "$PKG_JSON"; then
+        echo -e "${RED}Error: no se pudo actualizar la version en package.json (esperaba \"$new\")${NC}" >&2
+        exit 1
+    fi
 
     # Cargo.toml - actualiza solo el campo version del [package]
     sed -i "s/^version = \"$old\"/version = \"$new\"/" "$CARGO_TOML"
+    if ! grep -q "^version = \"$new\"" "$CARGO_TOML"; then
+        echo -e "${RED}Error: no se pudo actualizar la version en Cargo.toml (esperaba \"$new\")${NC}" >&2
+        exit 1
+    fi
 
     # tauri.conf.json - actualiza el campo "version"
     sed -i "s/\"version\": \"$old\"/\"version\": \"$new\"/" "$TAURI_CONF"
+    if ! grep -q "\"version\": \"$new\"" "$TAURI_CONF"; then
+        echo -e "${RED}Error: no se pudo actualizar la version en tauri.conf.json (esperaba \"$new\")${NC}" >&2
+        exit 1
+    fi
 }
 
 generate_changelog_entry() {
@@ -193,6 +209,16 @@ cd "$PROJECT_ROOT"
 # Verificar que estamos en un repo git limpio (o no)
 if ! git rev-parse --is-inside-work-tree &>/dev/null; then
     echo -e "${RED}Error: no se encontro repositorio git${NC}"
+    exit 1
+fi
+
+# Verificar que los archivos de version no tengan cambios sin commitear
+# (evita que una interrupcion a mitad de un release deje un bump sin
+# commitear que una re-ejecucion podria leer como version actual)
+if ! git diff --quiet HEAD -- "$PKG_JSON" "$CARGO_TOML" "$TAURI_CONF" "$CHANGELOG"; then
+    echo -e "${RED}Error: hay cambios sin commitear en los archivos de version${NC}"
+    echo -e "${RED}(package.json, Cargo.toml, tauri.conf.json o CHANGELOG.md).${NC}"
+    echo -e "${RED}Commiteá o descartá esos cambios antes de correr release.sh.${NC}"
     exit 1
 fi
 
