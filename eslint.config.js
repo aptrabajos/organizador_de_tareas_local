@@ -36,6 +36,9 @@ export default [
         Image: 'readonly',
         localStorage: 'readonly',
         writeTextFile: 'readonly',
+        setTimeout: 'readonly',
+        clearTimeout: 'readonly',
+        process: 'readonly',
       },
     },
     rules: {
