@@ -23,6 +23,22 @@ export function createProjectStore() {
   const [searchQuery, setSearchQuery] = createSignal('');
   const isSearchActive = () => searchQuery().trim().length > 0;
 
+  // Contador de versión de datos: se incrementa cada vez que projects() se repuebla
+  // desde una carga real (root/subproyectos/búsqueda). Consumidores externos al store
+  // (p.ej. TreeView) lo usan como trigger reactivo para resincronizarse sin necesitar
+  // su propio mecanismo ad-hoc de "onProjectsChanged".
+  const [dataVersion, setDataVersion] = createSignal(0);
+
+  // Guard de orden de resolución: cada carga que puebla `projects` (root/subproyectos/
+  // búsqueda) se identifica con un id incremental. Si al resolver ya no es la última
+  // solicitud en vuelo, el resultado se descarta (evita que una respuesta vieja pise a
+  // una más nueva, p.ej. al tipear rápido en el buscador o navegar durante una carga).
+  let latestLoadRequestId = 0;
+
+  // Debounce de búsqueda: evita disparar un invoke por cada tecla tipeada.
+  const SEARCH_DEBOUNCE_MS = 200;
+  let searchDebounceTimer: ReturnType<typeof setTimeout> | undefined;
+
   // Fuente ÚNICA de verdad de "qué proyectos mostrar": si hay búsqueda activa muestra
   // resultados; si no, la vista actual (grupos raíz o subproyectos del grupo).
   async function reloadCurrentView() {
@@ -38,9 +54,19 @@ export function createProjectStore() {
   }
 
   // Setear la query y recargar en un solo paso (lo usa el SearchBar).
+  // La query se refleja de inmediato (input controlado sin lag), pero la recarga
+  // real (invoke) se debouncea para no disparar un request por cada tecla.
   async function search(query: string) {
     setSearchQuery(query);
-    await reloadCurrentView();
+    if (searchDebounceTimer !== undefined) {
+      clearTimeout(searchDebounceTimer);
+    }
+    await new Promise<void>((resolve) => {
+      searchDebounceTimer = setTimeout(() => {
+        searchDebounceTimer = undefined;
+        reloadCurrentView().finally(resolve);
+      }, SEARCH_DEBOUNCE_MS);
+    });
   }
 
   async function loadProjects() {
@@ -157,15 +183,21 @@ export function createProjectStore() {
   }
 
   async function searchProjects(query: string) {
+    const requestId = ++latestLoadRequestId;
     setIsLoading(true);
     setError(null);
     try {
       const data = await api.searchProjects(query);
+      if (requestId !== latestLoadRequestId) return; // respuesta obsoleta, descartar
       setProjects(data);
+      setDataVersion((v) => v + 1);
     } catch (err) {
+      if (requestId !== latestLoadRequestId) return;
       setError(err instanceof Error ? err.message : 'Error desconocido');
     } finally {
-      setIsLoading(false);
+      if (requestId === latestLoadRequestId) {
+        setIsLoading(false);
+      }
     }
   }
 
@@ -181,30 +213,42 @@ export function createProjectStore() {
   // ==================== FUNCIONES DE GRUPOS (v0.4.0) ====================
 
   async function loadRootProjects() {
+    const requestId = ++latestLoadRequestId;
     setIsLoading(true);
     setError(null);
     try {
       const data = await api.getRootProjects();
+      if (requestId !== latestLoadRequestId) return; // respuesta obsoleta, descartar
       setProjects(data);
       setViewMode('groups');
       setCurrentGroup(null);
+      setDataVersion((v) => v + 1);
     } catch (err) {
+      if (requestId !== latestLoadRequestId) return;
       setError(err instanceof Error ? err.message : 'Error desconocido');
     } finally {
-      setIsLoading(false);
+      if (requestId === latestLoadRequestId) {
+        setIsLoading(false);
+      }
     }
   }
 
   async function loadSubprojects(parentId: number) {
+    const requestId = ++latestLoadRequestId;
     setIsLoading(true);
     setError(null);
     try {
       const data = await api.getSubprojects(parentId);
+      if (requestId !== latestLoadRequestId) return; // respuesta obsoleta, descartar
       setProjects(data);
+      setDataVersion((v) => v + 1);
     } catch (err) {
+      if (requestId !== latestLoadRequestId) return;
       setError(err instanceof Error ? err.message : 'Error desconocido');
     } finally {
-      setIsLoading(false);
+      if (requestId === latestLoadRequestId) {
+        setIsLoading(false);
+      }
     }
   }
 
@@ -268,6 +312,7 @@ export function createProjectStore() {
     isSearchActive,
     search,
     reloadCurrentView,
+    dataVersion,
     openTerminal,
     // Grupos (v0.4.0)
     currentGroup,

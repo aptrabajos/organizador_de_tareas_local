@@ -454,6 +454,11 @@ const AppContent: Component = () => {
                   <aside class="hidden w-72 flex-shrink-0 lg:block xl:w-80">
                     <div class="sticky top-24">
                       <TreeView
+                        // Mismo trigger que reutiliza reloadCurrentView: cualquier
+                        // mutación (pin, estado, drag-drop, commit, etc.) incrementa
+                        // dataVersion en el store y esto obliga a recargar el árbol
+                        // en vez de quedar stale desde el onMount inicial.
+                        refreshToken={store.dataVersion()}
                         onSelectProject={(project) => {
                           if (!project.parent_id) {
                             enterGroup(project);
@@ -515,10 +520,14 @@ const AppContent: Component = () => {
                       onDelete={handleDelete}
                       onOpenTerminal={handleOpenTerminal}
                       onProjectsChanged={() => {
-                        if (store.viewMode() === 'groups') {
-                          store.loadRootProjects();
-                        } else if (store.currentGroup()) {
-                          store.loadSubprojects(store.currentGroup()!.id);
+                        // Fuente única: reloadCurrentView() ya respeta la búsqueda
+                        // activa (isSearchActive) además de grupos/subproyectos, a
+                        // diferencia de la reimplementación parcial que había acá.
+                        store.reloadCurrentView();
+                        if (
+                          store.viewMode() === 'subprojects' &&
+                          store.currentGroup()
+                        ) {
                           // Re-hidratar la cabecera del grupo por si se mutó desde ahí
                           store.refreshCurrentGroup();
                         }

@@ -1,9 +1,13 @@
-import { Component, createSignal, For, Show, onMount } from 'solid-js';
+import { Component, createSignal, For, Show, createEffect } from 'solid-js';
 import type { Project } from '../types/project';
 import { getRootProjects, getSubprojects } from '../services/api';
 
 interface TreeViewProps {
   onSelectProject: (project: Project) => void;
+  // Token reactivo (p.ej. store.dataVersion()) que dispara un recargo del árbol
+  // cada vez que cambia. Sin esto el árbol se cargaba una sola vez en onMount y
+  // quedaba stale ante cualquier mutación (pin, drag-drop, commit, etc.).
+  refreshToken?: number;
 }
 
 interface TreeNode extends Project {
@@ -30,11 +34,21 @@ const TreeView: Component<TreeViewProps> = (props) => {
   const [loading, setLoading] = createSignal(true);
   const [error, setError] = createSignal<string | null>(null);
 
-  onMount(async () => {
-    await loadTree();
+  // Guard de orden de resolución para loadTree: si mientras carga llega un
+  // refreshToken más nuevo (nueva mutación), el resultado de la carga vieja se
+  // descarta en vez de pisar al árbol ya actualizado.
+  let latestTreeRequestId = 0;
+
+  // createEffect corre de entrada (reemplaza el onMount original) y de nuevo cada
+  // vez que cambia refreshToken, así el árbol se resincroniza ante mutaciones en
+  // vez de quedar stale desde la carga inicial.
+  createEffect(() => {
+    void props.refreshToken;
+    loadTree();
   });
 
   const loadTree = async () => {
+    const requestId = ++latestTreeRequestId;
     setLoading(true);
     setError(null);
     try {
@@ -47,12 +61,16 @@ const TreeView: Component<TreeViewProps> = (props) => {
       });
 
       const tree = await Promise.all(treePromises);
+      if (requestId !== latestTreeRequestId) return; // respuesta obsoleta
       setTreeData(tree);
     } catch (err) {
       console.error('Error loading tree:', err);
+      if (requestId !== latestTreeRequestId) return;
       setError('Error al cargar el árbol de proyectos');
     } finally {
-      setLoading(false);
+      if (requestId === latestTreeRequestId) {
+        setLoading(false);
+      }
     }
   };
 

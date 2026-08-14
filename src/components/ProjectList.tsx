@@ -91,13 +91,21 @@ const ProjectList: Component<ProjectListProps> = (props) => {
     new Set()
   );
 
+  // Token de ejecución del efecto de abajo: si una corrida vieja (IIFE async) resuelve
+  // después de que ya arrancó una más nueva, su resultado se descarta. Sin esto una
+  // resolución tardía podía pisar el resultado correcto y afectar a qué proyecto se
+  // considera "grupo" destino de un drop.
+  let projectGroupsToken = 0;
+
   // Detectar qué proyectos tienen hijos (son grupos)
   createEffect(() => {
     // En búsqueda o vista de grupos, detectar qué proyectos son grupos
     if (props.viewMode === 'groups' || props.searchActive) {
+      const token = ++projectGroupsToken;
+      const currentProjects = props.projects;
       (async () => {
         const groupIds = new Set<number>();
-        for (const project of props.projects) {
+        for (const project of currentProjects) {
           try {
             const count = await countSubprojects(project.id);
             if (count > 0) {
@@ -107,10 +115,13 @@ const ProjectList: Component<ProjectListProps> = (props) => {
             console.error('Error contando subproyectos:', err);
           }
         }
+        if (token !== projectGroupsToken) return; // corrida obsoleta, descartar
         setProjectGroups(groupIds);
       })();
     } else {
-      // En vista de subproyectos (sin búsqueda), ninguno es grupo (nivel único)
+      // En vista de subproyectos (sin búsqueda), ninguno es grupo (nivel único).
+      // Invalida cualquier corrida async pendiente del bloque anterior.
+      projectGroupsToken++;
       setProjectGroups(new Set<number>());
     }
   });
@@ -296,12 +307,12 @@ const ProjectList: Component<ProjectListProps> = (props) => {
       // Caso: Arrastrar proyecto sobre un GroupCard para convertirlo en subproyecto
       try {
         await handleDropOnGroup(activeId, overId);
-        return;
       } catch (error) {
+        // handleDropOnGroup ya mostró el toast de error (con el mensaje específico
+        // del backend); acá solo logueamos para no duplicarlo.
         console.error('Error al asignar proyecto a grupo:', error);
-        toast.error('Error al asignar proyecto al grupo');
-        return;
       }
+      return;
     }
 
     // Caso normal: Reordenamiento de proyectos en la lista
@@ -316,12 +327,32 @@ const ProjectList: Component<ProjectListProps> = (props) => {
       const [removed] = reordered.splice(oldIndex, 1);
       reordered.splice(newIndex, 0, removed);
 
-      // Actualizar display_order en BD para todos los proyectos afectados
+      // Actualizar display_order en BD para todos los proyectos afectados.
+      // Promise.allSettled (no Promise.all): si alguna falla, las demás igual
+      // terminan de escribirse en la BD, así que no podemos simplemente abortar
+      // y dejar la UI con el orden optimista local — hay que resincronizar.
       const updates = reordered.map((p, index) =>
         updateProjectOrder(p.id, index)
       );
 
-      await Promise.all(updates);
+      const results = await Promise.allSettled(updates);
+      const failures = results.filter(
+        (r): r is PromiseRejectedResult => r.status === 'rejected'
+      );
+
+      if (failures.length > 0) {
+        console.error('Error al actualizar orden (parcial):', failures);
+        toast.error(
+          'Error al actualizar el orden; se resincronizó la lista con la base de datos'
+        );
+        // La BD puede tener parte del nuevo orden ya escrito: recargamos en vez de
+        // dejar la UI mostrando el orden optimista local, que puede haber quedado
+        // desincronizado del real.
+        if (props.onProjectsChanged) {
+          props.onProjectsChanged();
+        }
+        return;
+      }
 
       toast.success('Orden actualizado', { duration: 2000 });
 
@@ -332,6 +363,11 @@ const ProjectList: Component<ProjectListProps> = (props) => {
     } catch (error) {
       console.error('Error al actualizar orden:', error);
       toast.error('Error al actualizar orden');
+      // También resincronizamos ante un fallo inesperado antes de llegar al
+      // Promise.allSettled (p.ej. el propio armado del array reordenado).
+      if (props.onProjectsChanged) {
+        props.onProjectsChanged();
+      }
     }
   };
 
