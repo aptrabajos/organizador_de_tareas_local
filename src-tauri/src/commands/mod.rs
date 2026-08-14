@@ -247,6 +247,15 @@ pub struct BackupData {
     filename: String,
 }
 
+/// Sanea un nombre de proyecto para usarlo como componente de nombre de archivo,
+/// evitando path traversal. Reemplaza separadores de path ('/' y '\') y colapsa
+/// secuencias '..' para que el resultado nunca contenga un separador ni una
+/// referencia a directorio padre. Usado por `create_project_backup`; el mismo
+/// criterio (mínimo) ya se aplica en `sync_project_to_backup` y en el export a PDF.
+fn sanitize_backup_filename_component(name: &str) -> String {
+    name.trim().replace(['/', '\\'], "_").replace("..", "_")
+}
+
 #[tauri::command]
 pub async fn create_project_backup(
     db: State<'_, Database>,
@@ -327,8 +336,12 @@ pub async fn create_project_backup(
         project.updated_at
     );
 
-    // Crear nombre del archivo
-    let filename = format!("{}_BACKUP.md", project.name.replace(" ", "_"));
+    // Crear nombre del archivo. Sanear project.name contra path traversal: reemplazar
+    // espacios NO alcanza (a diferencia de lo que hacía antes), hay que neutralizar
+    // separadores de path y '..' igual que en sync_project_to_backup (arriba) y en el
+    // export a PDF (más abajo), o un nombre de proyecto malicioso podría escapar la
+    // carpeta destino elegida por el usuario.
+    let filename = format!("{}_BACKUP.md", sanitize_backup_filename_component(&project.name));
     let backup_path = PathBuf::from(&project.local_path).join(&filename);
 
     let result_path = backup_path
@@ -1661,5 +1674,47 @@ pub async fn get_work_session_status(
             project_path: None,
             elapsed_seconds: 0,
         })
+    }
+}
+
+#[cfg(test)]
+mod backup_filename_sanitization_tests {
+    use super::sanitize_backup_filename_component;
+
+    /// Auditoría (ALTO): un project.name con separadores de path o '..' no debe
+    /// sobrevivir en el nombre de archivo del backup, o escapa la carpeta destino
+    /// elegida por el usuario (path traversal).
+    #[test]
+    fn strips_forward_slashes() {
+        let safe = sanitize_backup_filename_component("../../etc/passwd");
+        assert!(!safe.contains('/'), "no debe contener '/': {safe}");
+        assert!(!safe.contains(".."), "no debe contener '..': {safe}");
+    }
+
+    #[test]
+    fn strips_backslashes_windows_style() {
+        let safe = sanitize_backup_filename_component("..\\..\\Windows\\System32\\evil");
+        assert!(!safe.contains('\\'), "no debe contener '\\': {safe}");
+        assert!(!safe.contains(".."), "no debe contener '..': {safe}");
+    }
+
+    #[test]
+    fn strips_parent_dir_references_without_slashes() {
+        let safe = sanitize_backup_filename_component("proyecto....secreto");
+        assert!(!safe.contains(".."), "no debe contener '..': {safe}");
+    }
+
+    #[test]
+    fn mixed_traversal_payload_produces_sane_filename() {
+        let safe = sanitize_backup_filename_component("a/../b\\..\\c/../../d");
+        assert!(!safe.contains('/'), "no debe contener '/': {safe}");
+        assert!(!safe.contains('\\'), "no debe contener '\\': {safe}");
+        assert!(!safe.contains(".."), "no debe contener '..': {safe}");
+    }
+
+    #[test]
+    fn normal_names_are_left_intact_modulo_trim() {
+        assert_eq!(sanitize_backup_filename_component("Mi Proyecto"), "Mi Proyecto");
+        assert_eq!(sanitize_backup_filename_component("  Mi Proyecto  "), "Mi Proyecto");
     }
 }

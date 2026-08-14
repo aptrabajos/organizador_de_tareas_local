@@ -33,6 +33,7 @@ import {
 } from '../services/api';
 import { open } from '@tauri-apps/plugin-dialog';
 import { writeTextFile } from '@tauri-apps/plugin-fs';
+import { join, normalize, sep } from '@tauri-apps/api/path';
 
 // Configurar marked para soportar GFM y checkboxes
 marked.use({
@@ -351,8 +352,25 @@ const ProjectList: Component<ProjectListProps> = (props) => {
       const toastId = toast.loading('Creando backup...');
       try {
         const backupData = await createProjectBackup(project.id);
-        // Construir ruta completa con la carpeta elegida
-        const fullPath = `${destinationFolder}/${backupData.filename}`;
+        // Construir ruta completa con la carpeta elegida y validar, como defensa
+        // adicional a la sanitización del backend, que el resultado no escape la
+        // carpeta destino elegida por el usuario (path traversal).
+        const normalizedDestination = await normalize(destinationFolder);
+        const fullPath = await normalize(
+          await join(destinationFolder, backupData.filename)
+        );
+        const separator = sep();
+        const destinationWithSep = normalizedDestination.endsWith(separator)
+          ? normalizedDestination
+          : `${normalizedDestination}${separator}`;
+        if (
+          fullPath !== normalizedDestination &&
+          !fullPath.startsWith(destinationWithSep)
+        ) {
+          throw new Error(
+            'El nombre de archivo del backup intenta escribir fuera de la carpeta seleccionada'
+          );
+        }
         await writeTextFile(fullPath, backupData.content);
         toast.success(`✅ Backup creado en:\n${fullPath}`, {
           id: toastId,
