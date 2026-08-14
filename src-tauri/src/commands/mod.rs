@@ -173,13 +173,41 @@ pub async fn list_trash(db: State<'_, Database>) -> Result<Vec<crate::db::TrashI
 }
 
 #[tauri::command]
-pub async fn purge_project(db: State<'_, Database>, id: i64) -> Result<(), String> {
+pub async fn purge_project(
+    db: State<'_, Database>,
+    config: State<'_, ConfigManager>,
+    id: i64,
+) -> Result<(), String> {
+    // Red de seguridad antes del DELETE irreversible: backup fire-and-forget
+    // reusando la infraestructura ya verificada de backup/mod.rs (VACUUM INTO +
+    // integrity_check + retención). Si el backup falla (disco lleno, sin permisos,
+    // etc.) NO bloqueamos el purge -solo se loguea-: preferimos un purge sin backup
+    // fresco a un purge que deja de funcionar por completo.
+    if let Err(e) = crate::backup::run_backup(&db, &config) {
+        eprintln!(
+            "⚠️ [PURGE] No se pudo crear el backup de seguridad antes de purgar: {}",
+            e
+        );
+    }
+
     db.purge_project(id)
         .map_err(|e| format!("Error purging project: {}", e))
 }
 
 #[tauri::command]
-pub async fn empty_trash(db: State<'_, Database>) -> Result<(), String> {
+pub async fn empty_trash(
+    db: State<'_, Database>,
+    config: State<'_, ConfigManager>,
+) -> Result<(), String> {
+    // Misma red de seguridad que purge_project: empty_trash es igual de irreversible
+    // (borra TODA la papelera de una vez) y hasta ahora no tenía ningún backup previo.
+    if let Err(e) = crate::backup::run_backup(&db, &config) {
+        eprintln!(
+            "⚠️ [EMPTY_TRASH] No se pudo crear el backup de seguridad antes de vaciar la papelera: {}",
+            e
+        );
+    }
+
     db.empty_trash()
         .map_err(|e| format!("Error emptying trash: {}", e))
 }

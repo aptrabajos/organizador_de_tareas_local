@@ -22,6 +22,17 @@ impl Database {
     pub fn new(db_path: PathBuf) -> Result<Self> {
         let conn = Connection::open(db_path)?;
 
+        // Activar el enforcement de FOREIGN KEY (SQLite lo trae OFF por conexión salvo
+        // que se pida explícitamente). Las 6 tablas hijas ya declaran
+        // `ON DELETE CASCADE`, pero esas cláusulas eran inertes sin este PRAGMA: la
+        // corrección de purge/empty_trash dependía 100% de que `purge_project_internal`
+        // se mantuviera sincronizado a mano con el schema. Con el PRAGMA activo queda
+        // como red de seguridad real a nivel motor. `purge_project_internal` ya borra
+        // manualmente en el orden correcto (hijos antes que el padre), así que el
+        // CASCADE queda redundante-pero-inofensivo ahí: nunca llega a dispararse porque
+        // para cuando se borra la fila de `projects` sus hijos ya no existen.
+        conn.execute_batch("PRAGMA foreign_keys = ON;")?;
+
         conn.execute(
             "CREATE TABLE IF NOT EXISTS projects (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -273,6 +284,24 @@ impl Database {
 
     pub fn create_project(&self, project: CreateProjectDTO) -> Result<Project> {
         let conn = self.conn.lock().unwrap();
+
+        // Validar parent_id ANTES del INSERT (misma regla que assign_project_to_group,
+        // la única barrera hoy validada contra grupos padre inexistentes/borrados): sin
+        // esto, create_project podía insertar un parent_id que no existe o que está en
+        // papelera, dejando el proyecto nuevo como huérfano invisible en la jerarquía.
+        // No hace falta chequeo anti-ciclos acá: el proyecto todavía no tiene id propio.
+        if let Some(parent_id) = project.parent_id {
+            let exists: i64 = conn.query_row(
+                "SELECT COUNT(*) FROM projects WHERE id = ?1 AND deleted_at IS NULL",
+                params![parent_id],
+                |row| row.get(0),
+            )?;
+            if exists == 0 {
+                return Err(rusqlite::Error::InvalidParameterName(
+                    "El grupo padre seleccionado no existe o está en la papelera.".to_string(),
+                ));
+            }
+        }
 
         conn.execute(
             "INSERT INTO projects (name, description, local_path, documentation_url, ai_documentation_url, drive_link, notes, image_data, parent_id, group_color, group_icon)
@@ -626,17 +655,24 @@ impl Database {
     ///   timestamp de borrado), preservando la jerarquía original.
     pub fn restore_project(&self, id: i64) -> Result<()> {
         let conn = self.conn.lock().unwrap();
-        let tx = conn.unchecked_transaction()?;
 
-        // Capturar el deleted_at de este proyecto ANTES de limpiarlo: identifica
-        // el batch de hijos que se borraron junto con él.
-        let own_deleted_at: Option<String> = tx
+        // Validar que el proyecto exista Y esté efectivamente en la papelera ANTES de
+        // cualquier UPDATE (mismo guard que ya tiene purge_project). Sin esto, para un
+        // id inexistente o ya activo el UPDATE de abajo afecta 0 filas, no hay error, y
+        // la función devolvía Ok(()) como si hubiera restaurado algo.
+        let own_deleted_at: Option<String> = conn
             .query_row(
                 "SELECT deleted_at FROM projects WHERE id = ?1",
                 params![id],
                 |row| row.get(0),
             )
-            .ok();
+            .ok()
+            .flatten();
+        if own_deleted_at.is_none() {
+            return Err(rusqlite::Error::QueryReturnedNoRows);
+        }
+
+        let tx = conn.unchecked_transaction()?;
 
         // ¿El padre está disponible (existe Y activo)? Si NO —porque sigue en papelera
         // O porque fue purgado (ya no existe)— re-parenteamos a raíz para no dejar el
@@ -2052,6 +2088,63 @@ mod tests {
         Database::new(PathBuf::from(":memory:")).expect("Failed to create in-memory database")
     }
 
+    /// Siembra UNA fila en cada una de las 6 tablas hijas de `project_id`. Usado para
+    /// verificar que purge_project/empty_trash realmente vacían las 6, no solo las
+    /// que el test anterior (`test_purge_only_on_trashed_and_removes_for_real`) nunca
+    /// llegaba a poblar.
+    fn seed_all_child_tables(db: &Database, project_id: i64) {
+        db.create_link(CreateLinkDTO {
+            project_id,
+            link_type: "repo".to_string(),
+            title: "Repo".to_string(),
+            url: "https://example.com".to_string(),
+        })
+        .unwrap();
+        db.add_attachment(CreateAttachmentDTO {
+            project_id,
+            filename: "a.txt".to_string(),
+            file_data: "ZGF0YQ==".to_string(),
+            file_size: 4,
+            mime_type: "text/plain".to_string(),
+        })
+        .unwrap();
+        db.create_journal_entry(CreateJournalEntryDTO {
+            project_id,
+            content: "entrada de prueba".to_string(),
+            tags: None,
+        })
+        .unwrap();
+        db.create_todo(CreateTodoDTO {
+            project_id,
+            content: "todo de prueba".to_string(),
+        })
+        .unwrap();
+        db.track_project_open(project_id).unwrap(); // siembra project_activity
+        db.create_tracking_session(project_id, "test").unwrap(); // siembra time_tracking_sessions
+    }
+
+    /// Cuenta filas de las 6 tablas hijas para `project_id`, en el mismo orden que
+    /// `seed_all_child_tables`: (links, attachments, journal, todos, activity, sessions).
+    fn child_row_counts(db: &Database, project_id: i64) -> (i64, i64, i64, i64, i64, i64) {
+        let conn = db.conn.lock().unwrap();
+        let count = |table: &str| -> i64 {
+            conn.query_row(
+                &format!("SELECT COUNT(*) FROM {} WHERE project_id = ?1", table),
+                params![project_id],
+                |row| row.get(0),
+            )
+            .unwrap()
+        };
+        (
+            count("project_links"),
+            count("project_attachments"),
+            count("project_journal"),
+            count("project_todos"),
+            count("project_activity"),
+            count("time_tracking_sessions"),
+        )
+    }
+
     fn test_project_dto() -> CreateProjectDTO {
         CreateProjectDTO {
             name: "Test Project".to_string(),
@@ -2326,6 +2419,31 @@ mod tests {
     }
 
     #[test]
+    fn test_restore_project_rejects_nonexistent_id() {
+        // Antes: un id inexistente hacía que el UPDATE afectara 0 filas y la función
+        // devolviera Ok(()) como si hubiera restaurado algo.
+        let db = test_db();
+        let result = db.restore_project(9999);
+        assert!(
+            result.is_err(),
+            "restaurar un id inexistente debe devolver Err, no un Ok(()) silencioso"
+        );
+    }
+
+    #[test]
+    fn test_restore_project_rejects_already_active_project() {
+        // Un proyecto que nunca se borró (deleted_at IS NULL) no está "en papelera":
+        // restaurarlo debe rechazarse igual que purge_project rechaza purgar un activo.
+        let db = test_db();
+        let created = db.create_project(test_project_dto()).unwrap();
+        let result = db.restore_project(created.id);
+        assert!(
+            result.is_err(),
+            "restaurar un proyecto ya activo debe devolver Err, no un Ok(()) silencioso"
+        );
+    }
+
+    #[test]
     fn test_delete_group_cascades_to_children() {
         // Borrar un grupo manda sus hijos a la papelera (NO quedan huérfanos).
         let db = test_db();
@@ -2379,6 +2497,106 @@ mod tests {
         db.purge_project(created.id).unwrap();
         assert!(db.get_project(created.id).is_err());
         assert!(db.list_trash().unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_purge_project_cascades_all_six_child_tables() {
+        // El test anterior (arriba) nunca sembraba las 6 tablas hijas, así que nunca
+        // verificaba que el DELETE en cascada de purge_project_internal funcionara de
+        // verdad contra las 6. Este sí.
+        let db = test_db();
+        let created = db.create_project(test_project_dto()).unwrap();
+        seed_all_child_tables(&db, created.id);
+        assert_eq!(
+            child_row_counts(&db, created.id),
+            (1, 1, 1, 1, 1, 1),
+            "sanity: las 6 tablas hijas deben tener su fila sembrada antes de purgar"
+        );
+
+        db.delete_project(created.id).unwrap();
+        db.purge_project(created.id).unwrap();
+
+        assert_eq!(
+            child_row_counts(&db, created.id),
+            (0, 0, 0, 0, 0, 0),
+            "purge_project debe dejar las 6 tablas hijas vacías para el proyecto purgado"
+        );
+    }
+
+    #[test]
+    fn test_empty_trash_cascades_all_six_child_tables() {
+        // empty_trash no tenía UN SOLO test antes de este work-unit.
+        let db = test_db();
+        let created = db.create_project(test_project_dto()).unwrap();
+        seed_all_child_tables(&db, created.id);
+
+        db.delete_project(created.id).unwrap();
+        db.empty_trash().unwrap();
+
+        assert_eq!(
+            child_row_counts(&db, created.id),
+            (0, 0, 0, 0, 0, 0),
+            "empty_trash debe dejar las 6 tablas hijas vacías para el proyecto purgado"
+        );
+        assert!(db.get_project(created.id).is_err());
+        assert!(db.list_trash().unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_foreign_keys_pragma_is_enabled() {
+        // Las 6 tablas hijas declaran ON DELETE CASCADE, pero esas cláusulas son
+        // inertes si SQLite no tiene el enforcement de FK prendido en la conexión.
+        let db = test_db();
+        let conn = db.conn.lock().unwrap();
+        let fk_on: i64 = conn
+            .query_row("PRAGMA foreign_keys", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(
+            fk_on, 1,
+            "PRAGMA foreign_keys debe estar activado en cada conexión abierta por Database::new"
+        );
+    }
+
+    #[test]
+    fn test_create_project_rejects_nonexistent_parent_id() {
+        let db = test_db();
+        let mut dto = test_project_dto();
+        dto.parent_id = Some(9999);
+        let result = db.create_project(dto);
+        assert!(
+            result.is_err(),
+            "crear un proyecto con un parent_id inexistente debe rechazarse"
+        );
+    }
+
+    #[test]
+    fn test_create_project_rejects_trashed_parent_id() {
+        let db = test_db();
+        let parent = db.create_project(test_project_dto()).unwrap();
+        db.delete_project(parent.id).unwrap(); // el padre ahora está en papelera
+
+        let mut dto = test_project_dto();
+        dto.name = "Hijo".to_string();
+        dto.parent_id = Some(parent.id);
+        let result = db.create_project(dto);
+        assert!(
+            result.is_err(),
+            "crear un proyecto con un parent_id en papelera debe rechazarse"
+        );
+    }
+
+    #[test]
+    fn test_create_project_accepts_active_parent_id() {
+        // Caso feliz: no romper el flujo normal de crear un subproyecto dentro de un
+        // grupo activo.
+        let db = test_db();
+        let parent = db.create_project(test_project_dto()).unwrap();
+
+        let mut dto = test_project_dto();
+        dto.name = "Hijo".to_string();
+        dto.parent_id = Some(parent.id);
+        let child = db.create_project(dto).unwrap();
+        assert_eq!(child.parent_id, Some(parent.id));
     }
 
     #[test]
