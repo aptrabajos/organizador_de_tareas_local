@@ -23,21 +23,32 @@ impl WindowsPlatform {
     }
 
     /// Intentar abrir PowerShell
+    ///
+    /// Nota de seguridad: en vez de armar `Set-Location '{path}'` como string
+    /// para `-Command` (vulnerable a inyección si `path` contiene comillas o
+    /// metacaracteres de PowerShell), se fija el directorio de trabajo del
+    /// proceso vía `current_dir` (argv real / API de creación de proceso),
+    /// sin necesidad de interpolar `path` en ningún string ejecutable.
     fn try_powershell(&self, path: &str) -> Result<(), String> {
         Command::new("powershell")
+            .current_dir(path)
             .arg("-NoExit")
-            .arg("-Command")
-            .arg(&format!("Set-Location '{}'", path))
             .spawn()
             .map_err(|e| format!("Error al abrir PowerShell: {}", e))?;
         Ok(())
     }
 
     /// Intentar abrir CMD
+    ///
+    /// Nota de seguridad: en vez de armar `cd /d "{path}"` como string para
+    /// `/K` (vulnerable a inyección si `path` contiene comillas o
+    /// metacaracteres de cmd.exe como `&`, `|`, `%`), se fija el directorio
+    /// de trabajo del proceso vía `current_dir`, sin interpolar `path` en
+    /// ningún string ejecutable.
     fn try_cmd(&self, path: &str) -> Result<(), String> {
         Command::new("cmd")
+            .current_dir(path)
             .arg("/K")
-            .arg(&format!("cd /d \"{}\"", path))
             .spawn()
             .map_err(|e| format!("Error al abrir CMD: {}", e))?;
         Ok(())
@@ -51,6 +62,33 @@ impl WindowsPlatform {
             .or_else(|_| self.try_cmd(path))
             .map_err(|_| "No se encontró ningún terminal instalado".to_string())
     }
+
+    /// Reemplazar variables en un string que será interpretado por
+    /// PowerShell (`powershell -Command "..."`). Cada valor sustituido se
+    /// escapa como literal de PowerShell (comillas simples, duplicando las
+    /// comillas simples embebidas), de forma que datos de origen no
+    /// confiable (p. ej. el path de un proyecto elegido por el usuario) no
+    /// puedan inyectar comandos adicionales vía `;`, `&`, backticks,
+    /// `$(...)`, comillas, etc.
+    fn replace_variables_powershell_escaped(
+        &self,
+        text: &str,
+        vars: &HashMap<String, String>,
+    ) -> String {
+        let mut result = text.to_string();
+        for (key, value) in vars {
+            result = result.replace(&format!("{{{}}}", key), &escape_powershell(value));
+        }
+        result
+    }
+}
+
+/// Escapa un valor como literal de PowerShell envolviéndolo en comillas
+/// simples. Dentro de un string de comillas simples, PowerShell no expande
+/// variables (`$foo`), subexpresiones (`$(...)`) ni backticks; la única
+/// regla de escape necesaria es duplicar cada comilla simple embebida.
+fn escape_powershell(value: &str) -> String {
+    format!("'{}'", value.replace('\'', "''"))
 }
 
 impl PlatformOperations for WindowsPlatform {
@@ -232,8 +270,12 @@ impl PlatformOperations for WindowsPlatform {
         script: &str,
         vars: HashMap<String, String>,
     ) -> Result<(), String> {
-        // Reemplazar variables en el script
-        let script_with_vars = self.replace_variables(script, &vars);
+        // Reemplazar variables escapando cada valor como literal de
+        // PowerShell. El script en sí lo escribe el usuario (modo "Custom
+        // Script") y se ejecuta intencionalmente con `powershell -Command`,
+        // pero los VALORES sustituidos (p. ej. el path del proyecto) son
+        // texto libre que no debe poder inyectar comandos adicionales.
+        let script_with_vars = self.replace_variables_powershell_escaped(script, &vars);
 
         // Ejecutar con PowerShell
         Command::new("powershell")
@@ -244,5 +286,45 @@ impl PlatformOperations for WindowsPlatform {
             .map_err(|e| format!("Error al ejecutar script: {}", e))?;
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn escape_powershell_wraps_plain_value_in_single_quotes() {
+        assert_eq!(
+            escape_powershell("C:\\proyectos\\foo"),
+            "'C:\\proyectos\\foo'"
+        );
+    }
+
+    #[test]
+    fn escape_powershell_neutralizes_embedded_quotes_and_metacharacters() {
+        // Un path malicioso que intenta cerrar el string y encadenar un
+        // comando adicional vía `;`.
+        let malicious = "foo'; Remove-Item -Recurse -Force C:\\ #";
+        let escaped = escape_powershell(malicious);
+        // La comilla simple embebida se duplica en vez de cerrar el string,
+        // así que todo el contenido queda como un único literal inerte.
+        assert_eq!(escaped, "'foo''; Remove-Item -Recurse -Force C:\\ #'");
+    }
+
+    #[test]
+    fn replace_variables_powershell_escaped_substitutes_escaped_value() {
+        let platform = WindowsPlatform::new();
+        let malicious = "foo'; Remove-Item -Recurse -Force C:\\ #";
+        let vars: HashMap<String, String> = [("path".to_string(), malicious.to_string())]
+            .into_iter()
+            .collect();
+
+        let script = platform.replace_variables_powershell_escaped("Set-Location {path}", &vars);
+
+        assert_eq!(
+            script,
+            "Set-Location 'foo''; Remove-Item -Recurse -Force C:\\ #'"
+        );
     }
 }

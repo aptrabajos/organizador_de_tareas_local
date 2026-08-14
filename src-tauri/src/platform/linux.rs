@@ -68,10 +68,17 @@ impl LinuxPlatform {
             return Ok(());
         }
 
-        // Intentar xterm como último recurso
-        let xterm_cmd = format!("cd '{}' && exec $SHELL", path);
+        // Intentar xterm como último recurso.
+        // Nota de seguridad: se usa `current_dir` para fijar el directorio de
+        // trabajo (vía argv real, sin pasar por un shell) en vez de armar un
+        // string `cd '{path}' && exec $SHELL` para `xterm -e`, que era
+        // vulnerable a inyección de comandos si `path` contenía comillas o
+        // metacaracteres de shell.
+        let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/sh".to_string());
         if Command::new("xterm")
-            .args(["-e", &xterm_cmd])
+            .current_dir(path)
+            .arg("-e")
+            .arg(&shell)
             .spawn()
             .is_ok()
         {
@@ -271,8 +278,12 @@ impl PlatformOperations for LinuxPlatform {
         script: &str,
         vars: HashMap<String, String>,
     ) -> Result<(), String> {
-        // Reemplazar variables en el script
-        let script_with_vars = self.replace_variables(script, &vars);
+        // Reemplazar variables escapando cada valor como literal de shell
+        // POSIX. El script en sí lo escribe el usuario (modo "Custom Script")
+        // y se ejecuta intencionalmente con `bash -c`, pero los VALORES
+        // sustituidos (p. ej. el path del proyecto) son texto libre que no
+        // debe poder inyectar comandos adicionales.
+        let script_with_vars = self.replace_variables_shell_escaped(script, &vars);
 
         // Ejecutar con bash
         Command::new("bash")
@@ -282,5 +293,64 @@ impl PlatformOperations for LinuxPlatform {
             .map_err(|e| format!("Error al ejecutar script: {}", e))?;
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn execute_script_escapes_malicious_path_as_single_argument() {
+        let platform = LinuxPlatform::new();
+        let malicious = "foo'; touch /tmp/gestor_proyectos_pwned_marker; echo '";
+        let vars: HashMap<String, String> = [("path".to_string(), malicious.to_string())]
+            .into_iter()
+            .collect();
+
+        // Mismo patrón que execute_script: sustituir variables escapadas y
+        // pasar el resultado a `bash -c`.
+        let script = platform.replace_variables_shell_escaped("printf '%s' {path}", &vars);
+
+        let output = Command::new("bash")
+            .arg("-c")
+            .arg(&script)
+            .output()
+            .expect("bash debería poder ejecutarse en el entorno de test");
+
+        assert!(
+            output.status.success(),
+            "el comando generado no debería fallar: {:?}",
+            output
+        );
+        assert_eq!(
+            String::from_utf8_lossy(&output.stdout),
+            malicious,
+            "el path malicioso debe llegar intacto como UN solo argumento, sin ejecutar el `touch` embebido"
+        );
+        assert!(
+            !std::path::Path::new("/tmp/gestor_proyectos_pwned_marker").exists(),
+            "el comando embebido en el path NO debía ejecutarse"
+        );
+    }
+
+    #[test]
+    fn execute_script_plain_path_still_substitutes_correctly() {
+        let platform = LinuxPlatform::new();
+        let path = "/home/user/mi proyecto";
+        let vars: HashMap<String, String> = [("path".to_string(), path.to_string())]
+            .into_iter()
+            .collect();
+
+        let script = platform.replace_variables_shell_escaped("printf '%s' {path}", &vars);
+
+        let output = Command::new("bash")
+            .arg("-c")
+            .arg(&script)
+            .output()
+            .expect("bash debería poder ejecutarse en el entorno de test");
+
+        assert!(output.status.success());
+        assert_eq!(String::from_utf8_lossy(&output.stdout), path);
     }
 }
