@@ -60,8 +60,11 @@ impl ConfigManager {
     /// Cargar configuración del archivo o crear una nueva con defaults
     fn load_or_create(path: &PathBuf) -> Result<AppConfig, String> {
         if path.exists() {
-            // Cargar configuración existente
-            Self::load_from_file(path)
+            // Cargar configuración existente. `load_from_file` es infalible: si el
+            // archivo está corrupto (JSON inválido, enum desconocido, etc.) lo
+            // respalda y cae a los defaults del OS en vez de propagar un error que
+            // terminaría en panic en main.rs antes de que exista la ventana.
+            Ok(Self::load_from_file(path))
         } else {
             // Crear configuración nueva con defaults del OS
             println!("🎉 Primera ejecución - Creando configuración predeterminada");
@@ -71,25 +74,81 @@ impl ConfigManager {
         }
     }
 
-    /// Cargar configuración desde archivo
-    fn load_from_file(path: &PathBuf) -> Result<AppConfig, String> {
+    /// Cargar configuración desde archivo. Nunca falla: ante cualquier problema
+    /// (archivo ilegible, JSON corrupto/truncado, enum inválido, etc.) respalda el
+    /// archivo original y devuelve los defaults del OS.
+    fn load_from_file(path: &PathBuf) -> AppConfig {
+        match Self::try_load_from_file(path) {
+            Ok(config) => {
+                println!("✅ Configuración cargada desde: {}", path.display());
+                config
+            }
+            Err(e) => {
+                eprintln!(
+                    "⚠️ [CONFIG] No se pudo cargar la configuración desde {}: {}. Se usarán valores predeterminados.",
+                    path.display(),
+                    e
+                );
+                Self::backup_corrupt_file(path);
+                get_os_defaults()
+            }
+        }
+    }
+
+    /// Intento de carga que sí propaga el error, para que `load_from_file` decida
+    /// cómo recuperarse.
+    fn try_load_from_file(path: &PathBuf) -> Result<AppConfig, String> {
         let contents = fs::read_to_string(path)
             .map_err(|e| format!("Error al leer archivo de configuración: {}", e))?;
 
-        let config: AppConfig = serde_json::from_str(&contents)
-            .map_err(|e| format!("Error al parsear configuración: {}", e))?;
-
-        println!("✅ Configuración cargada desde: {}", path.display());
-        Ok(config)
+        serde_json::from_str(&contents)
+            .map_err(|e| format!("Error al parsear configuración: {}", e))
     }
 
-    /// Guardar configuración en archivo
+    /// Respaldar un archivo de configuración corrupto renombrándolo con sufijo
+    /// `.corrupto-<timestamp>` en el mismo directorio, para no perder el contenido
+    /// original y dejar evidencia de qué pasó.
+    fn backup_corrupt_file(path: &PathBuf) {
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+
+        let mut backup_name = path.clone().into_os_string();
+        backup_name.push(format!(".corrupto-{}", timestamp));
+        let backup_path = PathBuf::from(backup_name);
+
+        match fs::rename(path, &backup_path) {
+            Ok(_) => eprintln!(
+                "📦 [CONFIG] Archivo corrupto respaldado en: {}",
+                backup_path.display()
+            ),
+            Err(e) => eprintln!(
+                "⚠️ [CONFIG] No se pudo respaldar el archivo corrupto ({}): {}",
+                path.display(),
+                e
+            ),
+        }
+    }
+
+    /// Guardar configuración en archivo de forma atómica: se escribe primero a un
+    /// archivo temporal en el mismo directorio y luego se reemplaza el archivo final
+    /// con un rename (atómico en Linux/Windows/macOS). Así una escritura interrumpida
+    /// (crash, corte de luz) nunca deja config.json truncado o a medio escribir.
     fn save_to_file(path: &PathBuf, config: &AppConfig) -> Result<(), String> {
         let json = serde_json::to_string_pretty(config)
             .map_err(|e| format!("Error al serializar configuración: {}", e))?;
 
-        fs::write(path, json)
-            .map_err(|e| format!("Error al escribir archivo de configuración: {}", e))?;
+        let mut tmp_name = path.clone().into_os_string();
+        tmp_name.push(".tmp");
+        let tmp_path = PathBuf::from(tmp_name);
+
+        fs::write(&tmp_path, json).map_err(|e| {
+            format!("Error al escribir archivo temporal de configuración: {}", e)
+        })?;
+
+        fs::rename(&tmp_path, path)
+            .map_err(|e| format!("Error al reemplazar archivo de configuración: {}", e))?;
 
         println!("💾 Configuración guardada en: {}", path.display());
         Ok(())
@@ -176,5 +235,111 @@ impl ConfigManager {
 impl Default for ConfigManager {
     fn default() -> Self {
         Self::new().expect("Error al crear ConfigManager")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Busca en el directorio del archivo original un sibling cuyo nombre empiece
+    /// con `<nombre original>.corrupto-`, generado por `backup_corrupt_file`.
+    fn find_corrupt_backup(path: &PathBuf) -> Option<PathBuf> {
+        let dir = path.parent()?;
+        let file_name = path.file_name()?.to_string_lossy().to_string();
+        let prefix = format!("{}.corrupto-", file_name);
+
+        fs::read_dir(dir).ok()?.filter_map(|e| e.ok()).find_map(|entry| {
+            let name = entry.file_name().to_string_lossy().to_string();
+            if name.starts_with(&prefix) {
+                Some(entry.path())
+            } else {
+                None
+            }
+        })
+    }
+
+    #[test]
+    fn test_save_and_load_roundtrip() {
+        let dir = tempfile::tempdir().expect("no se pudo crear tempdir");
+        let path = dir.path().join("config.json");
+
+        let mut config = get_os_defaults();
+        config.ui.language = "en".to_string();
+        config.ui.theme = ThemeMode::Dark;
+
+        ConfigManager::save_to_file(&path, &config).expect("save_to_file falló");
+        assert!(path.exists(), "el archivo final debe existir tras guardar");
+
+        // No debe quedar archivo temporal huérfano.
+        let tmp_path = {
+            let mut s = path.clone().into_os_string();
+            s.push(".tmp");
+            PathBuf::from(s)
+        };
+        assert!(!tmp_path.exists(), "no debe quedar un .tmp tras un save exitoso");
+
+        let loaded = ConfigManager::load_from_file(&path);
+        assert_eq!(loaded.version, config.version);
+        assert_eq!(loaded.ui.language, "en");
+        assert_eq!(loaded.ui.theme, ThemeMode::Dark);
+    }
+
+    #[test]
+    fn test_load_from_corrupted_json_falls_back_to_defaults_without_panicking() {
+        let dir = tempfile::tempdir().expect("no se pudo crear tempdir");
+        let path = dir.path().join("config.json");
+
+        // JSON truncado/inválido (ej. simulando un crash a mitad de escritura).
+        fs::write(&path, r#"{ "version": "0.3.0", "ui": { "theme":"#)
+            .expect("no se pudo escribir config corrupto");
+
+        let loaded = ConfigManager::load_from_file(&path);
+        let defaults = get_os_defaults();
+
+        assert_eq!(loaded.version, defaults.version);
+        assert_eq!(loaded.ui.theme, defaults.ui.theme);
+
+        // El archivo corrupto se respalda y ya no queda en la ruta original.
+        assert!(!path.exists(), "el archivo corrupto debe haberse movido al backup");
+        assert!(
+            find_corrupt_backup(&path).is_some(),
+            "debe existir un backup .corrupto-<timestamp> del archivo inválido"
+        );
+    }
+
+    #[test]
+    fn test_load_from_invalid_enum_value_falls_back_to_defaults_without_panicking() {
+        let dir = tempfile::tempdir().expect("no se pudo crear tempdir");
+        let path = dir.path().join("config.json");
+
+        // JSON sintácticamente válido pero con un valor de enum que no existe.
+        let json = r#"{
+            "version": "0.3.0",
+            "ui": { "theme": "blue", "language": "es", "confirm_delete": true, "show_welcome": true }
+        }"#;
+        fs::write(&path, json).expect("no se pudo escribir config con enum inválido");
+
+        let loaded = ConfigManager::load_from_file(&path);
+        let defaults = get_os_defaults();
+
+        assert_eq!(loaded.ui.theme, defaults.ui.theme);
+        assert!(!path.exists(), "el archivo inválido debe haberse movido al backup");
+        assert!(
+            find_corrupt_backup(&path).is_some(),
+            "debe existir un backup .corrupto-<timestamp> del archivo con enum inválido"
+        );
+    }
+
+    #[test]
+    fn test_config_manager_new_does_not_panic_on_corrupted_config() {
+        let dir = tempfile::tempdir().expect("no se pudo crear tempdir");
+        let path = dir.path().join("config.json");
+        fs::write(&path, "esto no es json").expect("no se pudo escribir config corrupto");
+
+        // Ejercita el mismo camino que `load_or_create`, que es lo que usa
+        // `ConfigManager::new()` internamente: no debe propagar un error de parseo.
+        let result = ConfigManager::load_or_create(&path);
+        assert!(result.is_ok(), "load_or_create no debe fallar ante un config corrupto");
     }
 }
