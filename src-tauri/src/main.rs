@@ -15,14 +15,9 @@ use config::ConfigManager;
 use commands::ActiveSession;
 
 fn main() {
-    // Crear directorio de datos de la app
-    let data_dir = dirs::data_local_dir()
-        .expect("No se pudo obtener el directorio de datos local")
-        .join("gestor-proyectos");
-
-    std::fs::create_dir_all(&data_dir).expect("No se pudo crear el directorio de datos");
-
-    let db_path = data_dir.join("projects.db");
+    // Ruta de la DB viva: misma resolución que usa `backup::restore_backup` para
+    // reemplazarla, así ambas quedan garantizadas en sync (una sola fuente de verdad).
+    let db_path = backup::live_db_path().expect("No se pudo resolver la ruta de la base de datos");
 
     let db = Database::new(db_path).expect("Error al inicializar la base de datos");
     let config_manager = ConfigManager::new().expect("Error al inicializar la configuración");
@@ -134,6 +129,7 @@ fn main() {
             // Backup de la base de datos
             commands::backup_database,
             commands::list_backups,
+            commands::restore_backup,
         ])
         .run(tauri::generate_context!())
         .expect("Error al ejecutar la aplicación Tauri");

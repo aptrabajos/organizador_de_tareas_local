@@ -16,6 +16,7 @@ import {
   selectBackupFolder,
   backupDatabase,
   listBackups,
+  restoreBackup,
 } from '../services/api';
 import { getErrorMessage } from '../utils/errors';
 
@@ -36,6 +37,9 @@ export default function Settings(props: { onClose: () => void }) {
   const [lastBackupResult, setLastBackupResult] =
     createSignal<BackupResult | null>(null);
   const [backupList, setBackupList] = createSignal<BackupEntry[]>([]);
+  // Path del backup que se está restaurando (null = ninguno en curso). Se usa el
+  // path como id porque deshabilita SOLO el botón clickeado, no toda la lista.
+  const [restoringPath, setRestoringPath] = createSignal<string | null>(null);
 
   // Cargar configuración y programas detectados
   onMount(async () => {
@@ -86,6 +90,39 @@ export default function Settings(props: { onClose: () => void }) {
       setError(`Error al crear el backup: ${getErrorMessage(err)}`);
     } finally {
       setIsBackingUp(false);
+    }
+  };
+
+  // Restaura la DB viva desde un backup elegido. Operación IRREVERSIBLE: reemplaza
+  // TODOS los proyectos actuales por los del backup. El backend verifica integridad
+  // antes y después de copiar, y solo confirma si el swap fue seguro; si algo sale
+  // mal, la DB actual queda intacta. Si sale bien, la app se cierra sola (la conexión
+  // viva quedó apuntando al archivo anterior) y hay que volver a abrirla.
+  const handleRestore = async (entry: BackupEntry) => {
+    const confirmed = window.confirm(
+      `⚠️ ESTO REEMPLAZA TU BASE DE DATOS ACTUAL\n\n` +
+        `Vas a restaurar el backup "${entry.filename}" (${entry.created_at}).\n\n` +
+        `TODOS los proyectos, links, notas y tareas actuales se van a REEMPLAZAR ` +
+        `por los del backup. Esta acción NO se puede deshacer.\n\n` +
+        `La app se va a cerrar automáticamente al terminar; volvé a abrirla para ` +
+        `ver los datos restaurados.\n\n` +
+        `¿Confirmás la restauración?`
+    );
+    if (!confirmed) return;
+
+    setRestoringPath(entry.file_path);
+    setError(null);
+    setSuccessMessage(null);
+    try {
+      const result = await restoreBackup(entry.file_path);
+      setSuccessMessage(
+        `✅ Restauración completa (${result.project_count} proyectos). Cerrando la app...`
+      );
+      // No hace falta setRestoringPath(null) ni refrescar nada: el backend cierra
+      // la app en breve (~800ms) para forzar una conexión nueva a la DB restaurada.
+    } catch (err) {
+      setError(`Error al restaurar el backup: ${getErrorMessage(err)}`);
+      setRestoringPath(null);
     }
   };
 
@@ -591,20 +628,50 @@ export default function Settings(props: { onClose: () => void }) {
                         </p>
                       }
                     >
-                      <ul class="max-h-48 space-y-1 overflow-y-auto">
+                      <ul class="max-h-64 space-y-1 overflow-y-auto">
                         <For each={backupList()}>
                           {(entry) => (
-                            <li class="flex items-center justify-between rounded-md bg-white px-3 py-2 text-sm dark:bg-gray-700">
-                              <span
-                                class="truncate font-mono text-gray-700 dark:text-gray-300"
-                                title={entry.file_path}
+                            <li class="flex items-center justify-between gap-2 rounded-md bg-white px-3 py-2 text-sm dark:bg-gray-700">
+                              <div class="min-w-0 flex-1">
+                                <div class="flex items-center gap-1.5">
+                                  <span
+                                    class="truncate font-mono text-gray-700 dark:text-gray-300"
+                                    title={entry.file_path}
+                                  >
+                                    {entry.filename}
+                                  </span>
+                                  <Show when={!entry.integrity_ok}>
+                                    <span
+                                      class="shrink-0 rounded bg-red-100 px-1.5 py-0.5 text-xs font-semibold text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                                      title="Este backup no pasó PRAGMA integrity_check y no se puede restaurar"
+                                    >
+                                      CORRUPTO
+                                    </span>
+                                  </Show>
+                                </div>
+                                <span class="text-xs text-gray-500 dark:text-gray-400">
+                                  {formatBytes(entry.size_bytes)} ·{' '}
+                                  {entry.created_at}
+                                </span>
+                              </div>
+                              <button
+                                type="button"
+                                class="shrink-0 rounded-md border border-orange-300 px-2.5 py-1 text-xs font-medium text-orange-700 hover:bg-orange-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-orange-700 dark:text-orange-400 dark:hover:bg-orange-900/20"
+                                disabled={
+                                  !entry.integrity_ok ||
+                                  restoringPath() === entry.file_path
+                                }
+                                title={
+                                  entry.integrity_ok
+                                    ? 'Restaurar este backup (reemplaza la DB actual)'
+                                    : 'No se puede restaurar: falló la verificación de integridad'
+                                }
+                                onClick={() => handleRestore(entry)}
                               >
-                                {entry.filename}
-                              </span>
-                              <span class="ml-3 shrink-0 text-gray-500 dark:text-gray-400">
-                                {formatBytes(entry.size_bytes)} ·{' '}
-                                {entry.created_at}
-                              </span>
+                                {restoringPath() === entry.file_path
+                                  ? 'Restaurando...'
+                                  : '♻️ Restaurar'}
+                              </button>
                             </li>
                           )}
                         </For>

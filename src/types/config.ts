@@ -48,6 +48,13 @@ export interface BackupEntry {
   filename: string;
   size_bytes: number;
   created_at: string;
+  integrity_ok: boolean;
+}
+
+// Resultado de una restauración (matchea backup::RestoreResult en Rust)
+export interface RestoreResult {
+  restored_from: string;
+  project_count: number;
 }
 
 // Configuración de UI

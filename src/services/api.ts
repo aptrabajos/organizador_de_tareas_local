@@ -22,6 +22,7 @@ import type {
   DetectedPrograms,
   BackupResult,
   BackupEntry,
+  RestoreResult,
 } from '../types/config';
 import type { DashboardData } from '../types/dashboard';
 
@@ -363,6 +364,16 @@ export async function backupDatabase(): Promise<BackupResult> {
 
 export async function listBackups(): Promise<BackupEntry[]> {
   return await invoke('list_backups');
+}
+
+// Restaura la DB viva a partir de un backup. Operación IRREVERSIBLE: reemplaza
+// projects.db completo. La app se cierra sola tras una restauración exitosa
+// (la conexión SQLite viva queda apuntando al archivo anterior; hay que
+// reabrirla para que lea los datos restaurados).
+export async function restoreBackup(
+  backupPath: string
+): Promise<RestoreResult> {
+  return await invoke('restore_backup', { backupPath });
 }
 
 // ==================== DIÁLOGOS NATIVOS ====================

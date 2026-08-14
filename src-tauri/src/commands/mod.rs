@@ -76,6 +76,36 @@ pub async fn list_backups(
     crate::backup::list_backups(&config)
 }
 
+/// Restaura la DB viva a partir de un backup elegido por el usuario. Operación
+/// IRREVERSIBLE: reemplaza `projects.db` completo. `restore_backup` (módulo
+/// `backup`) verifica integridad antes y después de copiar, y solo hace el
+/// rename atómico final si todo salió bien; si algo falla, la DB actual queda
+/// intacta.
+#[tauri::command]
+pub async fn restore_backup(
+    app: tauri::AppHandle,
+    backup_path: String,
+) -> Result<crate::backup::RestoreResult, String> {
+    println!("♻️ [BACKUP] Iniciando restauración desde: {}", backup_path);
+    let result = crate::backup::restore_backup(&backup_path)?;
+    println!("✅ [BACKUP] Restauración completa desde: {}", backup_path);
+
+    // La conexión SQLite viva (State<Database>) sigue con el file descriptor abierto
+    // sobre el archivo ANTERIOR: un rename no la mueve a leer el nuevo archivo. Si la
+    // app siguiera corriendo, seguiría leyendo/escribiendo los datos VIEJOS y cualquier
+    // escritura posterior se perdería al cerrar (el inodo viejo queda sin ningún path
+    // que lo referencie). Para evitar ese estado inconsistente, cerramos la app: el
+    // usuario debe reabrirla para que la nueva conexión lea el archivo restaurado. El
+    // pequeño delay le da tiempo al frontend a mostrar el aviso antes de que el
+    // proceso termine.
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(800));
+        app.exit(0);
+    });
+
+    Ok(result)
+}
+
 #[tauri::command]
 pub async fn create_project(
     db: State<'_, Database>,
