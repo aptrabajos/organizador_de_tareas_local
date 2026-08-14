@@ -2,6 +2,23 @@
 
 Historial detallado de cambios del proyecto Gestor de Proyectos.
 
+## 2026-08-14 - v0.6.0
+
+**Otros cambios:**
+
+- aplica lint:fix y format post-merge
+- agrega @eslint/js faltante y globals de setTimeout/clearTimeout/process para destrabar pnpm run lint
+- valida sustitucion de version y arbol sucio en release.sh
+- agrega test de migraciones ALTER TABLE contra schema viejo real
+- onProjectsChanged usa reloadCurrentView, debounce+guard de busqueda, reorder resiliente y TreeView reactivo
+- persiste sesion de tracking al cerrar y arregla race de start_work_session
+- sanitiza nombre de archivo del backup markdown contra path traversal
+- red de seguridad en purge/empty_trash + fix restore_project y create_project
+- guardado atomico de config.json y recuperacion ante corrupcion
+- agrega restore_backup real, re-verificacion de integridad en list_backups y tests de run_backup/apply_retention
+- cierra inyeccion de comandos en rutas de shell (custom script y terminal)
+---
+
 ## 2026-07-05 - v0.5.2
 
 **Nuevas caracteristicas:**
