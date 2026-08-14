@@ -22,6 +22,18 @@ impl Database {
     pub fn new(db_path: PathBuf) -> Result<Self> {
         let conn = Connection::open(db_path)?;
 
+        // Auditoría (ALTO): sin busy_timeout, cualquier contención de escritura entre
+        // conexiones (p.ej. el backup por VACUUM INTO corriendo en paralelo a un write,
+        // o -antes de agregar el guard de instancia única- dos copias de la app contra
+        // el mismo archivo) tiraba SQLITE_BUSY crudo en vez de esperar. 5s es margen de
+        // sobra para una DB local de este tamaño sin bloquear la UI de forma perceptible.
+        // Nota: journal_mode = WAL se evaluó y se descartó por ahora: `backup_to` usa
+        // `VACUUM INTO` bajo el mismo Mutex que serializa todas las escrituras (ver más
+        // abajo), así que no hay concurrencia real que aprovechar, y WAL agrega archivos
+        // -wal/-shm cuyo ciclo de vida complicaría el copiado/restore de backups sin
+        // beneficio medible acá. Queda documentado por si en el futuro se justifica.
+        conn.execute_batch("PRAGMA busy_timeout = 5000;")?;
+
         // Activar el enforcement de FOREIGN KEY (SQLite lo trae OFF por conexión salvo
         // que se pida explícitamente). Las 6 tablas hijas ya declaran
         // `ON DELETE CASCADE`, pero esas cláusulas eran inertes sin este PRAGMA: la

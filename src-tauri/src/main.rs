@@ -13,6 +13,7 @@ mod tracking;
 use db::Database;
 use config::ConfigManager;
 use commands::ActiveSession;
+use tauri::Manager;
 
 fn main() {
     // Ruta de la DB viva: misma resolución que usa `backup::restore_backup` para
@@ -32,6 +33,16 @@ fn main() {
     }
 
     tauri::Builder::default()
+        // Auditoría (ALTO): sin guard de instancia única, dos copias de la app corrían
+        // en paralelo contra el mismo archivo SQLite, duplicando tiempo trackeado en
+        // silencio. Debe ir primero: si ya hay una instancia corriendo, este plugin
+        // aborta el arranque de la nueva y en su lugar reenfoca la ventana existente.
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            if let Some(window) = app.webview_windows().values().next() {
+                let _ = window.set_focus();
+                let _ = window.unminimize();
+            }
+        }))
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
@@ -39,6 +50,27 @@ fn main() {
         .manage(db)
         .manage(config_manager)
         .manage(active_session)
+        // Auditoría (CRÍTICO): antes no había ningún on_window_event/CloseRequested
+        // registrado, así que `stop_work_session` nunca se llamaba al cerrar la app:
+        // la sesión de tracking activa quedaba con ended_at/duration_seconds en NULL
+        // para siempre. Esto es best-effort y síncrono (bloquea brevemente el cierre,
+        // la app se está yendo de todos modos): usa la misma lógica que el comando
+        // manual `stop_work_session` vía `stop_active_session_sync`.
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { .. } = event {
+                let db = window.state::<Database>();
+                let active_session = window.state::<ActiveSession>();
+                match commands::stop_active_session_sync(&db, &active_session) {
+                    Ok(Some(duration)) => {
+                        println!("⏹️ [WORK] Sesión activa cerrada al salir de la app ({}s)", duration);
+                    }
+                    Ok(None) => {}
+                    Err(e) => {
+                        eprintln!("⚠️ [WORK] No se pudo cerrar la sesión activa al salir: {}", e);
+                    }
+                }
+            }
+        })
         .invoke_handler(tauri::generate_handler![
             commands::create_project,
             commands::get_all_projects,

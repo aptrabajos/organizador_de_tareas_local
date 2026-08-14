@@ -1546,46 +1546,16 @@ pub async fn start_work_session(
 ) -> Result<WorkSessionResponse, String> {
     println!("🚀 [WORK] Iniciando sesión de trabajo para proyecto ID: {}", project_id);
 
-    let mut previous_stopped = false;
-    let mut tracking_initialized = false;
-
-    // Obtener información del proyecto
+    // Obtener información del proyecto. No depende del lock de sesión: puede resolverse
+    // antes de tomarlo.
     let project = db.get_project(project_id)
         .map_err(|e| format!("Error getting project: {}", e))?;
 
     let project_path = std::path::Path::new(&project.local_path);
 
-    // 1. Verificar si hay una sesión activa y pararla
-    {
-        let mut session_state = active_session.0.lock()
-            .map_err(|_| "Error locking session state")?;
-
-        if let (Some(prev_session_id), Some(started_at)) = (session_state.session_id, session_state.started_at) {
-            // Calcular duración de la sesión anterior
-            let duration = started_at.elapsed().as_secs() as i64;
-
-            // Solo guardar si duró más de 10 segundos (evitar sesiones accidentales)
-            if duration > 10 {
-                println!("⏹️ [WORK] Parando sesión anterior {} ({}s)", prev_session_id, duration);
-                db.end_tracking_session(prev_session_id, duration)
-                    .map_err(|e| format!("Error stopping previous session: {}", e))?;
-                previous_stopped = true;
-            } else {
-                // Eliminar sesión muy corta
-                println!("🗑️ [WORK] Descartando sesión muy corta {} ({}s)", prev_session_id, duration);
-                // Marcar como 0 segundos para que no cuente
-                let _ = db.end_tracking_session(prev_session_id, 0);
-            }
-        }
-
-        // Limpiar estado
-        session_state.session_id = None;
-        session_state.project_id = None;
-        session_state.project_name = None;
-        session_state.started_at = None;
-    }
-
-    // 2. Verificar/inicializar tracking si no existe
+    // Verificar/inicializar tracking si no existe. Es idempotente por proyecto (no por
+    // sesión activa), así que tampoco necesita el lock de sesión.
+    let mut tracking_initialized = false;
     if project_path.exists() && !has_tracking_config(project_path) {
         println!("📁 [WORK] Inicializando tracking automáticamente para: {}", project.name);
         let _config = init_gestor_config(project_path, project_id, project.name.clone())
@@ -1593,20 +1563,8 @@ pub async fn start_work_session(
         tracking_initialized = true;
     }
 
-    // 3. Crear nueva sesión de tracking
-    let session_id = db.create_tracking_session(project_id, "work_button")
-        .map_err(|e| format!("Error creating tracking session: {}", e))?;
-
-    // 4. Actualizar estado global
-    {
-        let mut session_state = active_session.0.lock()
-            .map_err(|_| "Error locking session state")?;
-
-        session_state.session_id = Some(session_id);
-        session_state.project_id = Some(project_id);
-        session_state.project_name = Some(project.name.clone());
-        session_state.started_at = Some(std::time::Instant::now());
-    }
+    let (session_id, previous_stopped) =
+        start_new_session_sync(&db, &active_session, project_id, &project.name)?;
 
     println!("✅ [WORK] Sesión {} iniciada para: {}", session_id, project.name);
 
@@ -1619,14 +1577,75 @@ pub async fn start_work_session(
     })
 }
 
-/// Parar la sesión de trabajo actual manualmente
-#[tauri::command]
-pub async fn stop_work_session(
-    db: State<'_, Database>,
-    active_session: State<'_, ActiveSession>,
-) -> Result<Option<i64>, String> {
-    println!("⏹️ [WORK] Parando sesión de trabajo actual");
+/// Sección crítica de `start_work_session`: parar la sesión anterior (si existe) +
+/// crear la fila de la nueva sesión en la DB + publicar el nuevo estado en memoria,
+/// todo bajo UN ÚNICO lock sostenido de punta a punta.
+///
+/// Auditoría (CRÍTICO): antes el lock se soltaba entre "parar la anterior" y "escribir
+/// el nuevo estado", y `create_tracking_session` corría en esa ventana sin ningún lock:
+/// dos invocaciones casi simultáneas de `start_work_session` podían cada una crear su
+/// propia fila en la DB y pisarse mutuamente el estado final en memoria, huerfanando
+/// una de las dos sesiones (nunca recibía su `ended_at`/`duration`). Extraída como
+/// función libre (no `#[tauri::command]`) para poder testearla directamente con
+/// instancias reales de `Database`/`ActiveSession`, sin necesitar un `AppHandle`.
+/// Devuelve `(session_id, previous_session_stopped)`.
+fn start_new_session_sync(
+    db: &Database,
+    active_session: &ActiveSession,
+    project_id: i64,
+    project_name: &str,
+) -> Result<(i64, bool), String> {
+    let mut session_state = active_session.0.lock()
+        .map_err(|_| "Error locking session state")?;
 
+    let mut previous_stopped = false;
+
+    if let (Some(prev_session_id), Some(started_at)) = (session_state.session_id, session_state.started_at) {
+        // Calcular duración de la sesión anterior
+        let duration = started_at.elapsed().as_secs() as i64;
+
+        // Solo guardar si duró más de 10 segundos (evitar sesiones accidentales)
+        if duration > 10 {
+            println!("⏹️ [WORK] Parando sesión anterior {} ({}s)", prev_session_id, duration);
+            db.end_tracking_session(prev_session_id, duration)
+                .map_err(|e| format!("Error stopping previous session: {}", e))?;
+            previous_stopped = true;
+        } else {
+            // Eliminar sesión muy corta
+            println!("🗑️ [WORK] Descartando sesión muy corta {} ({}s)", prev_session_id, duration);
+            // Marcar como 0 segundos para que no cuente
+            let _ = db.end_tracking_session(prev_session_id, 0);
+        }
+    }
+
+    // Limpiar estado previo (todavía bajo el mismo lock)
+    session_state.session_id = None;
+    session_state.project_id = None;
+    session_state.project_name = None;
+    session_state.started_at = None;
+
+    // Crear nueva sesión de tracking (todavía bajo el mismo lock)
+    let session_id = db.create_tracking_session(project_id, "work_button")
+        .map_err(|e| format!("Error creating tracking session: {}", e))?;
+
+    // Publicar el nuevo estado global (todavía bajo el mismo lock)
+    session_state.session_id = Some(session_id);
+    session_state.project_id = Some(project_id);
+    session_state.project_name = Some(project_name.to_string());
+    session_state.started_at = Some(std::time::Instant::now());
+
+    Ok((session_id, previous_stopped))
+}
+
+/// Lógica compartida para parar la sesión de tracking activa (si existe) y persistir
+/// su duración final. La usan tanto el comando `stop_work_session` (parada manual desde
+/// la UI) como el handler `on_window_event(CloseRequested)` en `main.rs` (parada
+/// best-effort al cerrar la ventana). Es síncrona a propósito: ambos call sites pueden
+/// invocarla sin `.await` (el handler de cierre de ventana no es async).
+pub fn stop_active_session_sync(
+    db: &Database,
+    active_session: &ActiveSession,
+) -> Result<Option<i64>, String> {
     let mut session_state = active_session.0.lock()
         .map_err(|_| "Error locking session state")?;
 
@@ -1649,6 +1668,16 @@ pub async fn stop_work_session(
         println!("ℹ️ [WORK] No hay sesión activa para parar");
         Ok(None)
     }
+}
+
+/// Parar la sesión de trabajo actual manualmente
+#[tauri::command]
+pub async fn stop_work_session(
+    db: State<'_, Database>,
+    active_session: State<'_, ActiveSession>,
+) -> Result<Option<i64>, String> {
+    println!("⏹️ [WORK] Parando sesión de trabajo actual");
+    stop_active_session_sync(&db, &active_session)
 }
 
 /// Obtener estado de la sesión de trabajo actual (mejorado)
@@ -1716,5 +1745,179 @@ mod backup_filename_sanitization_tests {
     fn normal_names_are_left_intact_modulo_trim() {
         assert_eq!(sanitize_backup_filename_component("Mi Proyecto"), "Mi Proyecto");
         assert_eq!(sanitize_backup_filename_component("  Mi Proyecto  "), "Mi Proyecto");
+    }
+}
+
+#[cfg(test)]
+mod work_session_tests {
+    use super::{start_new_session_sync, stop_active_session_sync, ActiveSession};
+    use crate::db::Database;
+    use crate::models::project::CreateProjectDTO;
+    use std::path::PathBuf;
+    use std::sync::Arc;
+
+    fn test_db() -> Database {
+        Database::new(PathBuf::from(":memory:")).expect("Failed to create in-memory database")
+    }
+
+    fn seed_project(db: &Database, name: &str) -> i64 {
+        let project = db
+            .create_project(CreateProjectDTO {
+                name: name.to_string(),
+                description: "desc".to_string(),
+                local_path: "/tmp/does-not-matter".to_string(),
+                documentation_url: None,
+                ai_documentation_url: None,
+                drive_link: None,
+                notes: None,
+                image_data: None,
+                parent_id: None,
+                group_color: None,
+                group_icon: None,
+            })
+            .expect("Failed to seed project");
+        project.id
+    }
+
+    /// Auditoría (CRÍTICO): dos llamadas a `start_work_session` en rápida sucesión no
+    /// deben perder ninguna sesión. Antes del fix, la ventana sin lock entre "parar la
+    /// sesión anterior" y "escribir el nuevo estado" permitía que la segunda llamada
+    /// creara su propia fila en la DB sin enterarse de la primera, huerfanando una fila
+    /// con `ended_at` NULL para siempre. Con el fix (un único lock sostenido), la
+    /// segunda llamada siempre ve el estado que dejó la primera y la cierra como
+    /// "sesión anterior", así que cada fila queda con `ended_at` seteado salvo la
+    /// última (la activa).
+    #[test]
+    fn two_rapid_start_calls_do_not_lose_any_session() {
+        let db = test_db();
+        let active_session = ActiveSession::default();
+        let project_id = seed_project(&db, "Proyecto de prueba");
+
+        let (session_id_1, previous_stopped_1) =
+            start_new_session_sync(&db, &active_session, project_id, "Proyecto de prueba")
+                .expect("primer start_work_session no debería fallar");
+        assert!(!previous_stopped_1, "no había sesión previa que parar");
+
+        let (session_id_2, _previous_stopped_2) =
+            start_new_session_sync(&db, &active_session, project_id, "Proyecto de prueba")
+                .expect("segundo start_work_session no debería fallar");
+
+        assert_ne!(session_id_1, session_id_2, "cada llamada debe crear su propia fila");
+
+        let sessions = db
+            .get_tracking_sessions(project_id, 10)
+            .expect("no se pudieron leer las sesiones");
+        assert_eq!(sessions.len(), 2, "las dos sesiones deben existir en la DB");
+
+        // La sesión 1 (la vieja) tiene que haber quedado cerrada (ended_at set),
+        // sin importar que haya durado <10s (se descarta con duration=0, pero
+        // `ended_at` SIEMPRE se setea). La sesión 2 (la activa) queda abierta.
+        let session_1 = sessions.iter().find(|s| s.id == Some(session_id_1)).unwrap();
+        let session_2 = sessions.iter().find(|s| s.id == Some(session_id_2)).unwrap();
+
+        assert!(
+            session_1.ended_at.is_some(),
+            "la sesión anterior no debe quedar huérfana con ended_at NULL para siempre"
+        );
+        assert!(
+            session_2.ended_at.is_none(),
+            "la sesión activa todavía no debería estar cerrada"
+        );
+
+        // El estado en memoria debe apuntar exclusivamente a la última sesión creada.
+        let state = active_session.0.lock().unwrap();
+        assert_eq!(state.session_id, Some(session_id_2));
+    }
+
+    /// Variante bajo concurrencia real (hilos de SO + barrera) del test anterior: aun
+    /// disparando ambas llamadas lo más simultáneamente posible contra el mismo
+    /// `ActiveSession`/`Database`, el lock único serializa las dos secciones críticas
+    /// completas -sin la ventana intermedia que existía antes del fix- así que ninguna
+    /// fila queda huérfana.
+    #[test]
+    fn concurrent_start_calls_serialize_without_orphaning_a_session() {
+        let db = Arc::new(test_db());
+        let active_session = Arc::new(ActiveSession::default());
+        let project_id = seed_project(&db, "Proyecto concurrente");
+
+        let barrier = Arc::new(std::sync::Barrier::new(2));
+
+        let handles: Vec<_> = (0..2)
+            .map(|_| {
+                let db = Arc::clone(&db);
+                let active_session = Arc::clone(&active_session);
+                let barrier = Arc::clone(&barrier);
+                std::thread::spawn(move || {
+                    barrier.wait();
+                    start_new_session_sync(&db, &active_session, project_id, "Proyecto concurrente")
+                        .expect("start_work_session no debería fallar bajo concurrencia")
+                })
+            })
+            .collect();
+
+        let results: Vec<(i64, bool)> = handles.into_iter().map(|h| h.join().unwrap()).collect();
+        let session_ids: Vec<i64> = results.iter().map(|(id, _)| *id).collect();
+        assert_ne!(session_ids[0], session_ids[1], "cada hilo debe crear su propia fila");
+
+        let sessions = db
+            .get_tracking_sessions(project_id, 10)
+            .expect("no se pudieron leer las sesiones");
+        assert_eq!(sessions.len(), 2);
+
+        let open_sessions = sessions.iter().filter(|s| s.ended_at.is_none()).count();
+        assert_eq!(
+            open_sessions, 1,
+            "debe quedar exactamente UNA sesión abierta (la última en tomar el lock); \
+             cualquier otro número indica una fila huérfana o pisada"
+        );
+    }
+
+    /// El handler `on_window_event(CloseRequested)` de `main.rs` llama exactamente a
+    /// `stop_active_session_sync` para cerrar cualquier sesión activa al salir de la
+    /// app. No es testeable a nivel de ventana real sin un `AppHandle` de Tauri vivo,
+    /// así que este test cubre la lógica que ese handler ejecuta: que efectivamente
+    /// persiste `ended_at`/`duration_seconds` en la DB. Verificado manualmente además:
+    /// abrir un proyecto (arranca sesión), cerrar la ventana de la app, reabrir y
+    /// confirmar en la DB que la fila de `time_tracking_sessions` quedó con
+    /// `ended_at`/`duration_seconds` completos (no NULL).
+    #[test]
+    fn stop_active_session_sync_persists_the_open_session_on_close() {
+        let db = test_db();
+        let active_session = ActiveSession::default();
+        let project_id = seed_project(&db, "Proyecto a cerrar");
+
+        let (session_id, _) =
+            start_new_session_sync(&db, &active_session, project_id, "Proyecto a cerrar")
+                .expect("start_work_session no debería fallar");
+
+        let stopped = stop_active_session_sync(&db, &active_session)
+            .expect("stop_active_session_sync no debería fallar");
+        assert_eq!(stopped, Some(0));
+
+        let sessions = db
+            .get_tracking_sessions(project_id, 10)
+            .expect("no se pudieron leer las sesiones");
+        let session = sessions.iter().find(|s| s.id == Some(session_id)).unwrap();
+        assert!(
+            session.ended_at.is_some(),
+            "cerrar la sesión activa (equivalente a CloseRequested) debe setear ended_at"
+        );
+        assert_eq!(session.duration_seconds, Some(0));
+
+        // El estado en memoria queda limpio: no hay sesión activa colgada.
+        let state = active_session.0.lock().unwrap();
+        assert!(state.session_id.is_none());
+    }
+
+    /// Parar sin sesión activa (p.ej. cerrar la app sin haber tocado "Trabajar") no
+    /// debe fallar ni escribir nada.
+    #[test]
+    fn stop_active_session_sync_is_a_noop_without_an_active_session() {
+        let db = test_db();
+        let active_session = ActiveSession::default();
+
+        let stopped = stop_active_session_sync(&db, &active_session)
+            .expect("no debería fallar aunque no haya sesión activa");
+        assert_eq!(stopped, None);
     }
 }
