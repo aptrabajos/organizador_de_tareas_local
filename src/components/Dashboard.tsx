@@ -19,10 +19,6 @@ const Dashboard: Component<DashboardProps> = (props) => {
     return getDashboardData();
   });
 
-  data.state === 'ready' && console.log('Dashboard data loaded:', data());
-  data.state === 'errored' &&
-    console.error('Dashboard data error:', data.error);
-
   const formatDate = (dateString: string) => {
     try {
       return new Date(dateString).toLocaleDateString('es-ES', {
