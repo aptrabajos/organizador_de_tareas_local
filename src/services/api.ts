@@ -474,21 +474,6 @@ export async function getTrackingSessions(
   return await invoke('get_tracking_sessions', { projectId, limit });
 }
 
-export async function getTrackingStatus(): Promise<TrackingStatusResponse> {
-  return await invoke('get_tracking_status');
-}
-
-export async function startTracking(projectId: number): Promise<number> {
-  return await invoke('start_tracking', { projectId });
-}
-
-export async function stopTracking(
-  sessionId: number,
-  durationSeconds: number
-): Promise<void> {
-  await invoke('stop_tracking', { sessionId, durationSeconds });
-}
-
 export async function checkTrackingConfig(path: string): Promise<boolean> {
   return await invoke('check_tracking_config', { path });
 }

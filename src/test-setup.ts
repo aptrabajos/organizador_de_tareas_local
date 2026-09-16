@@ -99,12 +99,6 @@ vi.mock('@tauri-apps/api/core', () => ({
     if (cmd === 'get_tracking_sessions') {
       return Promise.resolve([]);
     }
-    if (cmd === 'get_tracking_status') {
-      return Promise.resolve({
-        is_tracking: false,
-        elapsed_seconds: 0,
-      });
-    }
     // Mocks para git
     if (cmd === 'get_git_branch') {
       return Promise.resolve('main');

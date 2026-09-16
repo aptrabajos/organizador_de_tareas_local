@@ -246,13 +246,11 @@ const FullView: Component<{
                   />
                 </svg>
                 <div class="text-xs text-blue-700 dark:text-blue-300">
-                  <p class="font-medium">Shell Hook configurado</p>
+                  <p class="font-medium">Tracking activo</p>
                   <p class="mt-1 opacity-80">
-                    Agrega{' '}
-                    <code class="rounded bg-blue-100 px-1 dark:bg-blue-900">
-                      source gestor-track.sh
-                    </code>{' '}
-                    a tu .bashrc/.zshrc para tracking automatico.
+                    El tiempo se registra al abrir la terminal del proyecto con
+                    el boton Trabajar. La sesion se cierra sola al abrir otra o
+                    al cerrar la aplicacion.
                   </p>
                 </div>
               </div>
