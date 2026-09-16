@@ -1,5 +1,10 @@
 import { afterEach, vi } from 'vitest';
 import { cleanup } from '@solidjs/testing-library';
+import packageJson from '../package.json';
+
+// La versión del mock se lee de package.json a propósito: hardcodearla hizo que el
+// setup quedara clavado en 0.4.3 mientras la app ya iba por otra versión.
+const APP_VERSION = packageJson.version;
 
 // Mock de @tauri-apps/api/core
 vi.mock('@tauri-apps/api/core', () => ({
@@ -38,7 +43,10 @@ vi.mock('@tauri-apps/api/core', () => ({
       return Promise.resolve('clean');
     }
     if (cmd === 'get_git_file_count') {
-      return Promise.resolve({ tracked: 10, modified: 0, staged: 0 });
+      // Debe respetar el contrato real `GitFileCount { modified, staged, untracked }`
+      // (src/types/git.ts y el struct de Rust). Los tres valores son DISTINTOS a
+      // propósito: si fueran iguales, un test que confunda campos pasaría igual.
+      return Promise.resolve({ modified: 2, staged: 1, untracked: 3 });
     }
     if (cmd === 'get_git_ahead_behind') {
       return Promise.resolve([0, 0]);
@@ -91,7 +99,7 @@ vi.mock('@tauri-apps/api/core', () => ({
     // Mocks para config
     if (cmd === 'get_config') {
       return Promise.resolve({
-        version: '0.4.3',
+        version: APP_VERSION,
         platform: {
           os_override: 'auto',
           terminal: { mode: 'auto', custom_args: [] },
@@ -169,7 +177,7 @@ vi.mock('@tauri-apps/api/core', () => ({
 
 // Mock de @tauri-apps/api/app
 vi.mock('@tauri-apps/api/app', () => ({
-  getVersion: vi.fn(() => Promise.resolve('0.4.3')),
+  getVersion: vi.fn(() => Promise.resolve(APP_VERSION)),
   getName: vi.fn(() => Promise.resolve('Gestor de Proyectos')),
   getTauriVersion: vi.fn(() => Promise.resolve('2.1.0')),
 }));
