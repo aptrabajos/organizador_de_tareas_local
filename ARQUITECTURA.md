@@ -333,11 +333,9 @@ gestor_proyecto/
 │   │   │   └── windows.rs        # WindowsPlatform
 │   │   ├── pdf_export/           # Exportación de proyectos a PDF
 │   │   │   └── mod.rs
-│   │   └── tracking/             # Time tracking (PARCIALMENTE CABLEADO)
+│   │   └── tracking/             # Time tracking
 │   │       ├── config.rs         # Carpeta .gestor/ por proyecto
-│   │       ├── session.rs        # TrackingSession / SessionManager
-│   │       ├── socket.rs         # SocketServer (Unix socket)
-│   │       └── aggregator.rs     # TimeAggregator (persistencia)
+│   │       └── aggregator.rs     # Tipos TimeTrackingSession / TimeStats
 │   ├── Cargo.toml                # Dependencias Rust
 │   └── tauri.conf.json           # Configuración Tauri
 │
@@ -428,57 +426,51 @@ Arma una portada con nombre, descripción, estado y fecha de exportación, y
 después vuelca los datos del proyecto. Las constantes de tipografía y color
 (`FONT_SIZE_*`, `COLOR_*`) están arriba del archivo.
 
-### `tracking/` — time tracking automático por shell hooks
+### `tracking/` — registro del tiempo de trabajo
 
-> ### ⚠️ LEER ESTO ANTES DE TOCAR `tracking/`
->
-> **`SocketServer`, `SessionManager` y `TimeAggregator` están implementados y
-> tienen tests, pero NO se instancian en producción.** Sus únicas
-> instanciaciones en todo el repo están dentro de sus propios `#[cfg(test)]`
-> (`socket.rs:317`, `socket.rs:320`, `socket.rs:359`, `session.rs:342`,
-> `session.rs:365`, `session.rs:381`). Ningún comando Tauri, ni `main.rs`, los
-> construye.
->
-> **No hay ningún socket escuchando en `/tmp/gestor-proyectos.sock` cuando la
-> app corre.** El `SocketServer` nunca arranca porque nadie lo arranca.
->
-> **`get_tracking_status` es un stub.** Devuelve siempre
-> `is_tracking: false, project_id: None, project_path: None, elapsed_seconds: 0`
-> — valores fijos, no consulta nada. El comentario en
-> `commands/mod.rs:1385` lo dice: *"Cuando el socket esté integrado, esto leerá
-> del SessionManager"*. Todavía no está integrado.
->
-> Si estás debuggeando "el tracking por socket no anda": no está roto, no está
-> conectado.
+Hay **un solo camino** de tracking, y es el de `work_session`:
 
-Lo que el módulo **sí** tiene escrito:
+1. El usuario aprieta "Trabajar" en un proyecto (`ProjectList.tsx` →
+   `handleOpenTerminal`), que llama a `start_work_session`.
+2. El backend cierra la sesión anterior si había una, abre una fila en
+   `time_tracking_sessions` con `source = "work_button"` y guarda el arranque en
+   un `ActiveSession` (un `Mutex`) registrado con `.manage()` en `main.rs`.
+3. La sesión se cierra al abrir otra (`start_new_session_sync`) o al cerrar la
+   ventana (`on_window_event` con `CloseRequested`, `main.rs`), que llama a
+   `stop_active_session_sync`. La duración la mide el backend con `Instant`, no
+   el cliente.
+4. `end_tracking_session` acredita los segundos en `projects.total_time_seconds`
+   en la misma transacción.
+
+**Para saber si hay una sesión activa, el comando es `get_work_session_status`**,
+que lee el `ActiveSession` real.
 
 | Archivo | Qué contiene |
 | ------- | ------------ |
-| `config.rs` | Carpeta `.gestor/` por proyecto, con un `config.json` adentro — el mismo patrón que `.git/`. `GestorConfig` guarda `project_id`, `project_name`, `created_at`, `tracking_enabled`. `find_gestor_config()` busca hacia arriba desde un path. **Esta parte sí se usa en producción** vía los comandos `check_tracking_config` y `find_tracking_project`. |
-| `session.rs` | Máquina de estados `SessionState` (`Idle` → `Active` → `Paused`), `TrackingSession` con tiempo acumulado y heartbeat, y `SessionManager` que mantiene un `HashMap` de sesiones por path con auto-pausa por inactividad (default: 15 minutos). Solo se ejercita desde sus tests. |
-| `socket.rs` | `SocketServer` sobre Unix socket en `/tmp/gestor-proyectos.sock`, con el protocolo `TrackingMessage` (`Enter`, `Exit`, `Heartbeat`, `Status`) y `TrackingResponse`. Solo se ejercita desde sus tests. |
-| `aggregator.rs` | `TimeAggregator`, que persiste sesiones en SQLite (`start_session` / `end_session`) y define `TimeTrackingSession` y `TimeStats`. Solo se ejercita desde sus tests: los comandos van directo a `Database`, sin pasar por el agregador. |
+| `config.rs` | Carpeta `.gestor/` por proyecto, con un `config.json` adentro — el mismo patrón que `.git/`. `GestorConfig` guarda `project_id`, `project_name`, `created_at`, `tracking_enabled`. `find_gestor_config()` busca hacia arriba desde un path. Se usa desde `init_tracking`, `check_tracking_config`, `find_tracking_project` y `start_work_session`, que inicializa la config sola si falta. |
+| `aggregator.rs` | Los structs `TimeTrackingSession` y `TimeStats`: el contrato de datos entre `Database` y los comandos que los devuelven al frontend. Sin lógica. |
 
-#### Qué del tracking SÍ funciona en producción
+#### Qué se eliminó en el B17, y por qué
 
-El tracking que realmente anda es **manual y por comando Tauri**, y no toca ni
-el socket ni el `SessionManager`:
+Hasta v0.6.0 el módulo tenía además un `SocketServer` sobre un Unix socket en
+`/tmp/gestor-proyectos.sock`, un `SessionManager` en memoria con auto-pausa por
+inactividad, un `TimeAggregator` y los scripts `scripts/gestor-track.{sh,zsh,fish}`.
+Estaban implementados y tenían 24 tests en verde, pero **nunca se instanciaban en
+producción**: las únicas construcciones estaban dentro de sus propios
+`#[cfg(test)]`. El socket no escuchaba porque nadie lo arrancaba.
 
-- `start_tracking` / `stop_tracking` — crean y cierran filas en SQLite llamando
-  directo a `db.create_tracking_session` / `db.end_tracking_session`.
-- `get_time_stats` — lee estadísticas desde `db.get_time_stats`.
-- `check_tracking_config` / `find_tracking_project` — usan `tracking::config`
-  para detectar la carpeta `.gestor/`.
-- `start_work_session` / `stop_work_session` / `get_work_session_status` — el
-  camino de "sesión de trabajo" introducido en v0.5.1, que mantiene el estado en
-  un `ActiveSession` registrado con `.manage()` en `main.rs`. **Este es el que
-  hay que mirar si querés saber si hay una sesión activa**, no
-  `get_tracking_status`.
+Con eso se fueron también tres comandos Tauri:
 
-En resumen: hay dos caminos de tracking en el repo. Uno funciona
-(`work_session` + comandos manuales sobre la BD) y el otro está escrito,
-testeado y desconectado (`socket` + `SessionManager` + `TimeAggregator`).
+- `get_tracking_status`, un stub que devolvía siempre `is_tracking: false`. Es la
+  razón principal del borrado: un stub que miente es peor que un comando
+  ausente, porque quien lo llame le va a creer.
+- `start_tracking` / `stop_tracking`, el segundo camino de escritura sobre
+  `time_tracking_sessions` (`source = "manual"`), donde la duración la calculaba
+  y la mandaba el cliente. Sin consumidor en el frontend.
+
+La decisión está en la sección 6.1 del plan de arreglo de bugs (Opción B). Si
+algún día se quiere tracking automático por shell hooks, hay que empezar por el
+cliente, que es lo que nunca existió — no por el servidor.
 
 ---
 
