@@ -1217,7 +1217,7 @@ impl Database {
         // Validar tamaño
         if attachment.file_size > MAX_FILE_SIZE {
             return Err(rusqlite::Error::InvalidParameterName(
-                "File size exceeds 5MB limit".to_string(),
+                "El archivo supera el límite de 5 MB. Elegí uno más chico.".to_string(),
             ));
         }
 

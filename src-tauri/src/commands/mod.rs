@@ -120,8 +120,12 @@ pub async fn create_project(
     db: State<'_, Database>,
     project: CreateProjectDTO,
 ) -> Result<Project, String> {
+    // Prefijo en español: este wrapper transporta la validación de dominio
+    // "El grupo padre seleccionado no existe o está en la papelera." (db/mod.rs), que
+    // el usuario SÍ puede corregir. Con el prefijo en inglés llegaba a la UI como un
+    // híbrido "Error creating project: El grupo padre...".
     db.create_project(project)
-        .map_err(|e| format!("Error creating project: {}", e))
+        .map_err(|e| format!("No se pudo crear el proyecto: {}", e))
 }
 
 #[tauri::command]
@@ -541,8 +545,10 @@ pub async fn add_attachment(
     attachment: crate::models::project::CreateAttachmentDTO,
 ) -> Result<crate::models::project::ProjectAttachment, String> {
     println!("📎 [ATTACHMENT] Agregando archivo: {} ({} bytes)", attachment.filename, attachment.file_size);
+    // Prefijo en español: transporta la validación del límite de 5 MB, que el usuario
+    // puede corregir eligiendo otro archivo.
     db.add_attachment(attachment)
-        .map_err(|e| format!("Error adding attachment: {}", e))
+        .map_err(|e| format!("No se pudo adjuntar el archivo: {}", e))
 }
 
 #[tauri::command]
@@ -701,6 +707,12 @@ pub async fn update_project_order(
 // guard la app corre git sobre cualquier repositorio del disco, gestionado o no (ver
 // `commands::guards`). El `db: State<'_, Database>` lo inyecta Tauri, NO viaja en el
 // payload de `invoke`, así que la firma del lado del cliente no cambia.
+//
+// IDIOMA DE LOS MENSAJES DE ERROR (ver CLAUDE.md, "Mensajes de error"):
+// - "La carpeta del proyecto no es un repositorio git." → ESPAÑOL: el usuario puede
+//   corregirlo (inicializar el repo, elegir otro proyecto).
+// - "Failed to execute git command" → INGLÉS a propósito: es un fallo al spawnear el
+//   proceso. No hay nada que el usuario pueda hacer; es una línea de log.
 #[tauri::command]
 pub async fn get_git_branch(db: State<'_, Database>, path: String) -> Result<String, String> {
     assert_registered_project_path(&db, &path)?;
@@ -716,7 +728,7 @@ pub async fn get_git_branch(db: State<'_, Database>, path: String) -> Result<Str
             .to_string();
         Ok(branch)
     } else {
-        Err("Not a git repository".to_string())
+        Err("La carpeta del proyecto no es un repositorio git.".to_string())
     }
 }
 
@@ -733,7 +745,7 @@ pub async fn get_git_status(db: State<'_, Database>, path: String) -> Result<Str
         let status = String::from_utf8_lossy(&output.stdout).to_string();
         Ok(status)
     } else {
-        Err("Not a git repository".to_string())
+        Err("La carpeta del proyecto no es un repositorio git.".to_string())
     }
 }
 
@@ -785,7 +797,7 @@ pub async fn get_recent_commits(
             .collect();
         Ok(commits)
     } else {
-        Err("Not a git repository or no commits".to_string())
+        Err("La carpeta del proyecto no es un repositorio git, o todavía no tiene commits.".to_string())
     }
 }
 
@@ -813,7 +825,7 @@ pub async fn get_git_file_count(
         .map_err(|e| format!("Failed to execute git command: {}", e))?;
 
     if !output.status.success() {
-        return Err("Not a git repository".to_string());
+        return Err("La carpeta del proyecto no es un repositorio git.".to_string());
     }
 
     let status = String::from_utf8_lossy(&output.stdout);
@@ -866,7 +878,7 @@ pub async fn get_git_modified_files(
         .map_err(|e| format!("Failed to execute git command: {}", e))?;
 
     if !output.status.success() {
-        return Err("Not a git repository".to_string());
+        return Err("La carpeta del proyecto no es un repositorio git.".to_string());
     }
 
     let status = String::from_utf8_lossy(&output.stdout);
@@ -909,7 +921,7 @@ pub async fn git_add(
         Ok("Archivos staged exitosamente".to_string())
     } else {
         let error = String::from_utf8_lossy(&output.stderr);
-        Err(format!("Error staging files: {}", error))
+        Err(format!("No se pudieron preparar los archivos para el commit: {}", error))
     }
 }
 
@@ -935,7 +947,7 @@ pub async fn git_commit(
         Ok(stdout.to_string())
     } else {
         let error = String::from_utf8_lossy(&output.stderr);
-        Err(format!("Error creating commit: {}", error))
+        Err(format!("No se pudo crear el commit: {}", error))
     }
 }
 
@@ -958,7 +970,7 @@ pub async fn git_push(db: State<'_, Database>, path: String) -> Result<String, S
         Ok(format!("{}{}", stdout, stderr))
     } else {
         let error = String::from_utf8_lossy(&output.stderr);
-        Err(format!("Error pushing: {}", error))
+        Err(format!("No se pudo hacer push al remoto: {}", error))
     }
 }
 
@@ -980,7 +992,7 @@ pub async fn git_pull(db: State<'_, Database>, path: String) -> Result<String, S
         Ok(stdout.to_string())
     } else {
         let error = String::from_utf8_lossy(&output.stderr);
-        Err(format!("Error pulling: {}", error))
+        Err(format!("No se pudo hacer pull del remoto: {}", error))
     }
 }
 

@@ -177,6 +177,44 @@ el directorio del proyecto: `get_git_branch`, `get_git_status`, `get_recent_comm
 - `Database` y `ConfigManager` se inyectan como `State<>` en comandos
 - Los comandos retornan `Result<T, String>` para manejo de errores
 
+### Mensajes de error
+
+Los comandos devuelven `Result<T, String>` con texto libre, sin tipo estructurado ni
+códigos, y ese texto **llega tal cual a la UI** (el store lo propaga con
+`getErrorMessage`). Hasta que exista un tipo de error con código + i18n, el idioma se
+decide **mensaje por mensaje** con este criterio:
+
+| El mensaje… | Idioma | Por qué |
+| --- | --- | --- |
+| Responde a una acción del usuario **y describe algo que él puede corregir** | **Español rioplatense** | Lo va a leer una persona que necesita saber qué hacer |
+| Describe un fallo de sistema (spawn de proceso, I/O, mutex envenenado) | Inglés | Es una línea de log; no hay acción posible del otro lado |
+
+Ejemplos reales del repo:
+
+```rust
+// ESPAÑOL: el usuario puede inicializar el repo o elegir otro proyecto
+Err("La carpeta del proyecto no es un repositorio git.".to_string())
+
+// ESPAÑOL: el usuario puede elegir otro archivo
+"El archivo supera el límite de 5 MB. Elegí uno más chico."
+
+// INGLÉS: falló el spawn del proceso, no hay nada que el usuario pueda hacer
+.map_err(|e| format!("Failed to execute git command: {}", e))?
+```
+
+Reglas de redacción para los de español:
+
+- **Voseo y directo**: "No podés asignar un proyecto como su propio grupo padre."
+- **Accionable**: decí qué hacer, no solo qué falló. Comparar
+  `"Nombre de proyecto no válido"` con
+  `"El archivo supera el límite de 5 MB. Elegí uno más chico."`
+- **Cuidado con los wrappers `map_err`**: si el prefijo está en inglés y envuelve una
+  validación de dominio en español, el usuario recibe un híbrido
+  (`"Error creating project: El grupo padre no existe."`). Si el wrapper transporta un
+  mensaje que el usuario puede accionar, el prefijo va en español.
+- Un `map_err` que solo envuelve un error de rusqlite/IO **no** es un mensaje de
+  usuario: no hace falta traducirlo, y traducir solo el prefijo deja un híbrido peor.
+
 ### Testing
 
 - Tests unitarios en archivos `*.test.tsx` junto a componentes
