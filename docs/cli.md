@@ -70,7 +70,7 @@ gestor crear "Mi Proyecto" --ruta ~/proyectos/mi_proyecto
 gestor crear "Web Cliente" --grupo "Clientes web"
 gestor crear "API interna" --ruta /srv/api --descripcion "backend de facturación"
 
-gestor crear                   # sin argumentos: imprime el uso y sale ≠ 0
+gestor crear                   # sin argumentos: abre el ASISTENTE paso a paso
 gestor crear "Algo"            # sin --ruta: pregunta "Ruta del proyecto (Enter para cancelar):"
 ```
 
@@ -111,6 +111,113 @@ Al terminar confirma por `stderr` y reporta el id:
 `crear` **no te lleva a ningún lado**: no escribe `GESTOR_CD_FILE`, así que la
 función de shell no hace `cd`. Es un alta, no un viaje. Funciona igual invocando
 el script directo que a través de la función.
+
+---
+
+## El asistente interactivo (`gestor crear`, sin argumentos)
+
+`gestor crear` a secas no imprime la ayuda: **abre un asistente que te pregunta
+campo por campo**. Es la misma alta de siempre —misma validación, mismo
+`INSERT`— pero sin tener que acordarte de ninguna flag.
+
+```
+gestor — asistente para dar de alta un proyecto
+Ctrl+D o "q" cancela en cualquier campo. La carpeta NO se crea: tiene que existir.
+
+Nombre del proyecto ("?" lista los que ya existen): API de facturación
+Descripción (Enter para omitir): backend nuevo de Telwinet
+Ruta del proyecto (TAB completa carpetas): ~/2025/telwinet/api-fact
+grupo del proyecto > (ninguno — sin grupo)
+                     Telwinet
+                     Clientes web
+
+  ── resumen ──────────────────────────────
+  Nombre:       API de facturación
+  Descripción:  backend nuevo de Telwinet
+  Ruta:         /home/vos/2025/telwinet/api-fact
+  Grupo:        Telwinet
+  ─────────────────────────────────────────
+
+¿Confirmar? [S/n]: 
+→ proyecto 'API de facturación' creado (/home/vos/2025/telwinet/api-fact)
+  id 67 · grupo Telwinet
+```
+
+### Campo por campo
+
+| # | Campo | Obligatorio | Qué hace |
+| - | ----- | ----------- | -------- |
+| 1 | **Nombre** | Sí | Vacío no pasa. Escribí `?` y te **lista los proyectos que ya existen** (con `fzf` si está, si no en texto plano) sin perder el campo. Si el nombre ya está tomado, te avisa **en el momento** y te vuelve a preguntar: no llegás al resumen con un duplicado. |
+| 2 | **Descripción** | No | Texto libre. Enter vacío la omite. |
+| 3 | **Ruta** | Sí | **TAB completa carpetas reales** (readline nativo). Acepta relativas y `~`; se guarda siempre **absoluta**. Si la carpeta no existe o no es un directorio, te lo dice y te vuelve a preguntar — no te patea afuera del asistente. |
+| 4 | **Grupo** | No | Menú de los **grupos activos** (las filas que ya son padre de algún proyecto vivo), más una opción `(ninguno — sin grupo)`. Si no hay ningún grupo en la base, el campo **ni aparece**. |
+| 5 | **Resumen** | — | Te muestra los cuatro valores y pregunta `¿Confirmar? [S/n]`. Enter = sí. Cualquier otra cosa cancela sin escribir nada. |
+
+### Cancelar y revalidar
+
+**Ctrl+D** o escribir **`q`** cancela en cualquier campo de texto, y en el menú
+de grupo alcanza con Esc. Se sale con código `130` y **no se inserta nada**.
+
+Dos revalidaciones contra la base ocurren *después* de que ya elegiste, porque
+la app gráfica puede estar tocando la base al mismo tiempo que vos tipeás:
+
+- el **grupo** se vuelve a consultar entre el menú y el `INSERT` (pudo irse a la
+  papelera mientras decidías);
+- el **nombre** se vuelve a chequear por duplicado justo antes de escribir.
+
+---
+
+## Completado con TAB
+
+Instalado en `~/.bashrc` **y** en `~/.zshrc`. TAB completa subcomandos, flags y
+—lo que de verdad importa— **nombres reales sacados de tu base**:
+
+| Lo que tipeás | Lo que te completa | De dónde salen los datos |
+| ------------- | ------------------ | ------------------------ |
+| `gestor <TAB>` | `abrir` `ir` `open` `list` `ls` `listar` `crear` `nuevo` `new` `ayuda` `help` `--help` `-h` | Fijo: son los alias reales del router. |
+| `gestor abrir <TAB>` | Nombres de **proyectos activos** | `SELECT name FROM projects WHERE deleted_at IS NULL` |
+| `gestor list <TAB>` | `--grupos` `--con-papelera` `--todo` | Fijo. |
+| `gestor crear <TAB>` | `--ruta` `--descripcion` `--grupo` **+ los nombres que ya existen** | Los nombres, de la misma consulta de arriba. |
+| `gestor crear -<TAB>` | Solo flags: `--ruta` `--descripcion` `--grupo` `--help` | Fijo. |
+| `gestor crear --grupo <TAB>` | Nombres de **grupos activos** | `SELECT DISTINCT g.name FROM projects g JOIN projects c ON c.parent_id = g.id WHERE g.deleted_at IS NULL AND c.deleted_at IS NULL` |
+| `gestor crear --ruta <TAB>` | **Carpetas** del disco | El completado de directorios del shell (`_filedir -d` / `_path_files -/`). |
+| `gestor crear --descripcion <TAB>` | Nada, a propósito | Es texto libre: no hay nada que adivinar. |
+
+Que `crear` te sugiera **nombres ya usados** no es un error: son justamente los
+que **no** podés repetir. Verlos antes de tipear te ahorra el rebote por
+duplicado.
+
+### Tres reglas que cumple siempre
+
+1. **Read-only.** Toda consulta abre la base como `file:...?mode=ro`. El
+   completado **nunca** escribe, ni siquiera un journal.
+2. **Rápido o nada.** Va con `.timeout 100`: si la app tiene la base tomada, el
+   TAB no se cuelga — devuelve vacío y seguís. Medido sobre una base real de 65
+   proyectos, cada consulta tarda **~1 ms**.
+3. **Nunca rompe tu línea de comandos.** Si falta la base, falta `sqlite3` o la
+   consulta falla, la función **no sugiere nada y devuelve 0**. `stderr` va a
+   `/dev/null`. Un error de completado jamás te escupe basura en el prompt.
+
+Y como el texto que tipeás entra en un `LIKE`, se escapa igual que en el resto
+de la CLI: comilla simple duplicada y `%`, `_`, `\` neutralizados con `ESCAPE`.
+
+### La diferencia entre bash y zsh
+
+No es el mismo código, y no por capricho:
+
+- **bash** necesita que cada candidato entre en `COMPREPLY` como **una sola
+  palabra**, así que los nombres pasan por `printf %q`: `Bilbao MP` se ofrece
+  como `Bilbao\ MP`. Y como readline compara contra esa forma ya escapada, el
+  filtro por prefijo también se hace contra ella.
+- **zsh** recibe el nombre **crudo** por `_describe` y el quoting lo resuelve el
+  sistema de completado. Menos código y sin sorpresas con espacios ni acentos.
+  Encima `_describe` etiqueta cada grupo de candidatos (`proyecto activo`,
+  `grupo activo`, `nombre YA usado`), así que el menú de zsh te dice *qué* te
+  está ofreciendo.
+
+En zsh el `compdef` se registra solo si el sistema de completado ya está
+inicializado (`compinit`, que oh-my-zsh corre más arriba del `.zshrc`). Si no lo
+está, el bloque **no hace nada** en vez de tirar un error al abrir la terminal.
 
 ---
 
@@ -214,6 +321,29 @@ Se agrega al final de `~/.bashrc` **y** de `~/.zshrc`, entre marcas:
 Las marcas hacen que la instalación sea idempotente y que desinstalar sea
 borrar el bloque completo. La función es compatible con bash y con zsh sin
 cambios.
+
+### 3. El completado con TAB
+
+Va en un bloque **aparte** del de la función, con sus propias marcas, en cada
+archivo:
+
+```
+# >>> gestor-proyectos completion >>>
+...el completado...
+# <<< gestor-proyectos completion <<<
+```
+
+Son **dos implementaciones distintas** —`complete -F _gestor gestor` en
+`~/.bashrc`, `compdef _gestor gestor` en `~/.zshrc`— porque bash y zsh no
+comparten sistema de completado. Bloque separado a propósito: podés borrar el
+completado y quedarte con la función del `cd`, o al revés.
+
+Para chequear que quedó cargado:
+
+```bash
+bash -ic 'complete -p gestor'          # complete -F _gestor gestor
+zsh  -ic 'print -r -- $_comps[gestor]' # _gestor
+```
 
 Después, recargá: `source ~/.zshrc` (o abrí una terminal nueva).
 
@@ -319,6 +449,42 @@ antes de entrar al `INSERT`, y el `parent_id` se fuerza a entero. Un proyecto
 llamado `O'Brien's App`, o una carpeta con comilla simple en el nombre, se
 guardan tal cual sin romper nada.
 
+### Por qué el campo "Nombre" del asistente no completa con TAB
+
+Es la pregunta obvia: si `gestor abrir <TAB>` te completa nombres de proyecto,
+¿por qué **adentro** del asistente el campo `Nombre` te ofrece `?` en vez de TAB?
+
+Porque son **dos readlines distintos**, y uno de ellos no es nuestro.
+
+El TAB de la **capa de shell** (`gestor abrir <TAB>`) corre en el readline del
+*usuario*, en *su* shell interactivo. Ahí registrar un completado es lo normal y
+lo esperable: bash tiene `complete`, zsh tiene `compdef`, y el shell se encarga
+de todo.
+
+El TAB de **adentro del script** es otra cosa. `read -e` levanta el readline del
+proceso del script, que arranca con el `inputrc` del usuario ya cargado. Para
+que TAB completara nombres de proyecto ahí habría que:
+
+1. `bind` sobre TAB y colgarle una función de completado propia,
+2. **pisando** la configuración de readline que el usuario tenga puesta,
+3. y restaurándola después — incluso si el script muere a mitad de camino, con
+   Ctrl+C o con un `die` en medio de una validación.
+
+Es frágil y, peor, tiene **efectos fuera del script**. Un asistente para dar de
+alta un proyecto no tiene ningún derecho a dejarte el TAB roto.
+
+Así que el reparto quedó así, y es el correcto:
+
+| Dónde | Quién completa | Qué se usa |
+| ----- | -------------- | ---------- |
+| Campo **Ruta** del asistente | El readline del script, **sin tocar nada** | El completado de directorios que `read -e` ya trae **gratis**. |
+| Campo **Nombre** del asistente | Nadie | `?` lista los existentes, y el chequeo de duplicado **bloquea** en el momento. |
+| `gestor abrir <TAB>`, `--grupo <TAB>` | El readline del **usuario** | `complete` / `compdef`, donde sí corresponde. |
+
+Fijate que el campo Nombre **no pierde nada**: `?` te muestra la lista completa,
+y el duplicado es un chequeo **obligatorio** que corta antes del resumen. El TAB
+te habría dado comodidad; el chequeo te da la garantía. La garantía vale más.
+
 ### Comparaciones sin distinguir mayúsculas
 
 El duplicado de nombre y la búsqueda de grupo usan `COLLATE NOCASE`, que es la
@@ -335,4 +501,4 @@ CLI; `Ñandú` y `ñandú`, no.
 | `0` | Todo bien. |
 | `1` | Error de uso o de datos: sin coincidencias, falta un argumento, la carpeta no existe, el nombre está duplicado, el grupo no existe. |
 | `2` | Subcomando o flag desconocidos (se imprime la ayuda). |
-| `130` | Cancelaste el menú, o la pregunta de ruta de `crear` (Esc o Enter vacío). |
+| `130` | Cancelaste: el menú (Esc), la pregunta de ruta de `crear` (Enter vacío), o el asistente (Ctrl+D, `q`, Esc en el menú de grupo, o un `n` en `¿Confirmar?`). |
