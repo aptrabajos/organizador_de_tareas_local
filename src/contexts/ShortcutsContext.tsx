@@ -9,6 +9,7 @@ import {
 import { register, unregisterAll } from '@tauri-apps/plugin-global-shortcut';
 import type { ShortcutsConfig, ShortcutAction } from '../types/config';
 import { getShortcutsConfig } from '../services/api';
+import { logger } from '../utils/logger';
 
 // Tipo para los handlers de shortcuts
 type ShortcutHandler = () => void | Promise<void>;
@@ -34,9 +35,9 @@ export const ShortcutsProvider: ParentComponent = (props) => {
     try {
       const shortcutsConfig = await getShortcutsConfig();
       setConfig(shortcutsConfig);
-      console.log('⚙️ [SHORTCUTS] Configuración cargada');
+      logger.debug('⚙️ [SHORTCUTS] Configuración cargada');
     } catch (error) {
-      console.error('Error cargando configuración de shortcuts:', error);
+      logger.error('Error cargando configuración de shortcuts:', error);
     }
   });
 
@@ -44,9 +45,9 @@ export const ShortcutsProvider: ParentComponent = (props) => {
   onCleanup(async () => {
     try {
       await unregisterAll();
-      console.log('✅ [SHORTCUTS] Todos los atajos limpiados');
+      logger.debug('✅ [SHORTCUTS] Todos los atajos limpiados');
     } catch (error) {
-      console.error('Error limpiando shortcuts:', error);
+      logger.error('Error limpiando shortcuts:', error);
     }
   });
 
@@ -54,45 +55,45 @@ export const ShortcutsProvider: ParentComponent = (props) => {
   const registerAllShortcuts = async (shortcutsConfig: ShortcutsConfig) => {
     const registered: string[] = [];
 
-    console.log('🔍 [SHORTCUTS] registerAllShortcuts iniciado');
-    console.log(
+    logger.debug('🔍 [SHORTCUTS] registerAllShortcuts iniciado');
+    logger.debug(
       '🔍 [SHORTCUTS] Shortcuts en config:',
       Object.keys(shortcutsConfig.shortcuts)
     );
 
     for (const [action, binding] of Object.entries(shortcutsConfig.shortcuts)) {
-      console.log(
+      logger.debug(
         `🔍 [SHORTCUTS] Procesando ${action}: enabled=${binding.enabled}, key=${binding.key}`
       );
 
       if (binding.enabled) {
         try {
-          console.log(`📝 [SHORTCUTS] Intentando registrar ${binding.key}...`);
+          logger.debug(`📝 [SHORTCUTS] Intentando registrar ${binding.key}...`);
           await register(binding.key, async () => {
-            console.log(`⌨️ [SHORTCUT] Ejecutando acción: ${action}`);
+            logger.debug(`⌨️ [SHORTCUT] Ejecutando acción: ${action}`);
             const handler = handlers().get(action as ShortcutAction);
             if (handler) {
               await handler();
             } else {
-              console.warn(
+              logger.warn(
                 `⚠️ [SHORTCUT] No hay handler registrado para: ${action}`
               );
             }
           });
           registered.push(binding.key);
-          console.log(`✅ [SHORTCUT] Registrado: ${binding.key} → ${action}`);
+          logger.debug(`✅ [SHORTCUT] Registrado: ${binding.key} → ${action}`);
         } catch (error) {
-          console.error(
+          logger.error(
             `❌ [SHORTCUT] Error registrando ${binding.key}:`,
             error
           );
         }
       } else {
-        console.log(`⏭️ [SHORTCUTS] Saltando ${action} (deshabilitado)`);
+        logger.debug(`⏭️ [SHORTCUTS] Saltando ${action} (deshabilitado)`);
       }
     }
 
-    console.log(`✅ [SHORTCUTS] Total registrados: ${registered.length}`);
+    logger.debug(`✅ [SHORTCUTS] Total registrados: ${registered.length}`);
   };
 
   // Registrar un handler para una acción
@@ -105,7 +106,7 @@ export const ShortcutsProvider: ParentComponent = (props) => {
       newHandlers.set(action, handler);
       return newHandlers;
     });
-    console.log(`📝 [SHORTCUT] Handler registrado para: ${action}`);
+    logger.debug(`📝 [SHORTCUT] Handler registrado para: ${action}`);
   };
 
   // Desregistrar un handler
@@ -115,7 +116,7 @@ export const ShortcutsProvider: ParentComponent = (props) => {
       newHandlers.delete(action);
       return newHandlers;
     });
-    console.log(`🗑️ [SHORTCUT] Handler eliminado para: ${action}`);
+    logger.debug(`🗑️ [SHORTCUT] Handler eliminado para: ${action}`);
   };
 
   const isEnabled = () => config()?.enabled ?? false;
@@ -125,43 +126,43 @@ export const ShortcutsProvider: ParentComponent = (props) => {
     const cfg = config();
     const handlersMap = handlers();
 
-    console.log(
+    logger.debug(
       `🔄 [SHORTCUTS] Re-registrando con ${handlersMap.size} handlers disponibles`
     );
-    console.log(`🔄 [SHORTCUTS] Config:`, cfg);
-    console.log(`🔄 [SHORTCUTS] Enabled:`, cfg?.enabled);
+    logger.debug(`🔄 [SHORTCUTS] Config:`, cfg);
+    logger.debug(`🔄 [SHORTCUTS] Enabled:`, cfg?.enabled);
 
     if (!cfg) {
-      console.warn('⚠️ [SHORTCUTS] No hay configuración disponible');
+      logger.warn('⚠️ [SHORTCUTS] No hay configuración disponible');
       return;
     }
 
     if (!cfg.enabled) {
-      console.warn('⚠️ [SHORTCUTS] Shortcuts deshabilitados en configuración');
+      logger.warn('⚠️ [SHORTCUTS] Shortcuts deshabilitados en configuración');
       return;
     }
 
     if (handlersMap.size === 0) {
-      console.warn('⚠️ [SHORTCUTS] No hay handlers registrados');
+      logger.warn('⚠️ [SHORTCUTS] No hay handlers registrados');
       return;
     }
 
     // Limpiar shortcuts existentes primero
     try {
-      console.log('🧹 [SHORTCUTS] Limpiando shortcuts existentes...');
+      logger.debug('🧹 [SHORTCUTS] Limpiando shortcuts existentes...');
       await unregisterAll();
-      console.log('✅ [SHORTCUTS] Shortcuts limpiados');
+      logger.debug('✅ [SHORTCUTS] Shortcuts limpiados');
     } catch (error) {
-      console.error(
+      logger.error(
         '❌ [SHORTCUTS] Error limpiando shortcuts anteriores:',
         error
       );
     }
 
     // Registrar nuevamente
-    console.log('📝 [SHORTCUTS] Iniciando registro de shortcuts...');
+    logger.debug('📝 [SHORTCUTS] Iniciando registro de shortcuts...');
     await registerAllShortcuts(cfg);
-    console.log('✅ [SHORTCUTS] Registro completado');
+    logger.debug('✅ [SHORTCUTS] Registro completado');
   };
 
   const contextValue: ShortcutsContextValue = {

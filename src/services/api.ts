@@ -8,7 +8,6 @@ import type {
   UpdateProjectDTO,
   ProjectAttachment,
   CreateAttachmentDTO,
-  GitCommit,
   JournalEntry,
   CreateJournalEntryDTO,
   UpdateJournalEntryDTO,
@@ -24,6 +23,11 @@ import type {
   BackupEntry,
   RestoreResult,
 } from '../types/config';
+// Los tipos de git viven en types/git.ts, que es su dominio. `GitCommit` estaba
+// definido TAMBIÉN en types/project.ts y cada consumidor importaba uno distinto:
+// eran estructuralmente compatibles, así que TS no se quejaba, pero el día que
+// uno cambiara el error iba a aparecer lejos del cambio.
+import type { GitCommit, GitFileCount } from '../types/git';
 import type { DashboardData } from '../types/dashboard';
 
 export async function createProject(
@@ -89,13 +93,6 @@ export async function createProjectBackup(
   projectId: number
 ): Promise<BackupData> {
   return await invoke('create_project_backup', { projectId });
-}
-
-export async function syncProject(
-  sourcePath: string,
-  destinationPath: string
-): Promise<string> {
-  return await invoke('sync_project', { sourcePath, destinationPath });
 }
 
 export async function syncProjectToBackup(
@@ -215,7 +212,7 @@ export async function getRecentCommits(
 // Funciones Git mejoradas
 export async function getGitFileCount(
   path: string
-): Promise<import('../types/git').GitFileCount> {
+): Promise<GitFileCount> {
   return await invoke('get_git_file_count', { path });
 }
 
@@ -475,21 +472,6 @@ export async function getTrackingSessions(
   limit?: number
 ): Promise<TimeTrackingSession[]> {
   return await invoke('get_tracking_sessions', { projectId, limit });
-}
-
-export async function getTrackingStatus(): Promise<TrackingStatusResponse> {
-  return await invoke('get_tracking_status');
-}
-
-export async function startTracking(projectId: number): Promise<number> {
-  return await invoke('start_tracking', { projectId });
-}
-
-export async function stopTracking(
-  sessionId: number,
-  durationSeconds: number
-): Promise<void> {
-  await invoke('stop_tracking', { sessionId, durationSeconds });
 }
 
 export async function checkTrackingConfig(path: string): Promise<boolean> {

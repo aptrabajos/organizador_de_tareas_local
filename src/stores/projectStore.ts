@@ -6,6 +6,7 @@ import type {
   UpdateProjectDTO,
 } from '../types/project';
 import * as api from '../services/api';
+import { logger } from '../utils/logger';
 
 export function createProjectStore() {
   const [projects, setProjects] = createSignal<Project[]>([]);
@@ -76,7 +77,7 @@ export function createProjectStore() {
       const data = await api.getAllProjects();
       setProjects(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error desconocido');
+      setError(getErrorMessage(err));
     } finally {
       setIsLoading(false);
     }
@@ -98,7 +99,7 @@ export function createProjectStore() {
   }
 
   async function updateProject(id: number, updates: UpdateProjectDTO) {
-    console.log(
+    logger.debug(
       '🔧 [STORE] Iniciando actualización del proyecto:',
       id,
       updates
@@ -106,17 +107,17 @@ export function createProjectStore() {
     setIsLoading(true);
     setError(null);
     try {
-      console.log('📡 [STORE] Llamando a API updateProject...');
+      logger.debug('📡 [STORE] Llamando a API updateProject...');
       await api.updateProject(id, updates);
-      console.log(
+      logger.debug(
         '✅ [STORE] API updateProject exitosa, recargando proyectos...'
       );
       // Recargar respetando la búsqueda/vista activa (fuente única)
       await reloadCurrentView();
-      console.log('✅ [STORE] Proyectos recargados exitosamente');
+      logger.debug('✅ [STORE] Proyectos recargados exitosamente');
     } catch (err) {
-      console.error('❌ [STORE] Error en updateProject:', err);
-      setError(err instanceof Error ? err.message : 'Error desconocido');
+      logger.error('❌ [STORE] Error en updateProject:', err);
+      setError(getErrorMessage(err));
       throw err;
     } finally {
       setIsLoading(false);
@@ -193,7 +194,7 @@ export function createProjectStore() {
       setDataVersion((v) => v + 1);
     } catch (err) {
       if (requestId !== latestLoadRequestId) return;
-      setError(err instanceof Error ? err.message : 'Error desconocido');
+      setError(getErrorMessage(err));
     } finally {
       if (requestId === latestLoadRequestId) {
         setIsLoading(false);
@@ -205,7 +206,7 @@ export function createProjectStore() {
     try {
       await api.openTerminal(path);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al abrir terminal');
+      setError(getErrorMessage(err));
       throw err;
     }
   }
@@ -225,7 +226,7 @@ export function createProjectStore() {
       setDataVersion((v) => v + 1);
     } catch (err) {
       if (requestId !== latestLoadRequestId) return;
-      setError(err instanceof Error ? err.message : 'Error desconocido');
+      setError(getErrorMessage(err));
     } finally {
       if (requestId === latestLoadRequestId) {
         setIsLoading(false);
@@ -244,7 +245,7 @@ export function createProjectStore() {
       setDataVersion((v) => v + 1);
     } catch (err) {
       if (requestId !== latestLoadRequestId) return;
-      setError(err instanceof Error ? err.message : 'Error desconocido');
+      setError(getErrorMessage(err));
     } finally {
       if (requestId === latestLoadRequestId) {
         setIsLoading(false);

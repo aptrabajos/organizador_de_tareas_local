@@ -1,6 +1,12 @@
 // ==================== TIPOS GIT ====================
 
-// Información de un commit
+// Información de un commit.
+//
+// Única definición del tipo. Estaba duplicado en types/project.ts y cada
+// consumidor importaba uno distinto: eran estructuralmente compatibles, así
+// que TypeScript no se quejaba, pero el día que uno cambiara el error iba a
+// aparecer lejos del cambio. Git es el dominio de este archivo, así que la
+// definición vive acá.
 export interface GitCommit {
   hash: string;
   author: string;
@@ -8,25 +14,9 @@ export interface GitCommit {
   message: string;
 }
 
-// Conteo de archivos modificados
+// Conteo de archivos modificados. Lo devuelve `get_git_file_count`.
 export interface GitFileCount {
   modified: number;
   staged: number;
   untracked: number;
-}
-
-// Información del remote
-export interface GitRemoteInfo {
-  url: string | null;
-  ahead: number;
-  behind: number;
-}
-
-// Estado completo de Git para un proyecto
-export interface GitStatus {
-  branch: string;
-  hasChanges: boolean;
-  fileCount: GitFileCount;
-  remoteInfo: GitRemoteInfo;
-  recentCommits: GitCommit[];
 }

@@ -1,4 +1,6 @@
-use rusqlite::{params, Connection, Result};
+use log::{debug, error};
+use rusqlite::{params, Connection, Result, Row};
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Mutex;
 
@@ -14,11 +16,87 @@ pub struct TrashItem {
     pub subproject_count: i64,
 }
 
+/// Las 23 columnas de `projects`, EN ORDEN.
+///
+/// Esta lista aparecía textualmente en siete métodos (`create_project`,
+/// `get_all_projects`, `get_project`, `search_projects`, `get_recent_projects`,
+/// `get_root_projects`, `get_subprojects`). Agregar una columna obligaba a tocar
+/// los siete en sincronía, y olvidarse de uno no rompe la compilación: rompe en
+/// runtime, en el índice posicional de [`row_to_project`], y solo en el camino
+/// que se olvidó.
+///
+/// El orden ES el contrato: [`row_to_project`] lee por posición.
+const PROJECT_COLUMNS: &str = "id, name, description, local_path, documentation_url, ai_documentation_url, drive_link, notes, image_data,
+                    created_at, updated_at, last_opened_at, opened_count, total_time_seconds,
+                    status, status_changed_at, is_pinned, pinned_order, display_order,
+                    parent_id, group_color, group_icon, is_group_expanded";
+
+/// Construye un `Project` desde una fila que trae [`PROJECT_COLUMNS`] en ese orden.
+///
+/// `links` queda en `None` a propósito: los enlaces viven en otra tabla y quien
+/// los necesite los completa después con [`Database::get_links_for_projects`].
+/// Mezclarlos acá era justamente lo que producía el N+1.
+fn row_to_project(row: &Row) -> Result<Project> {
+    Ok(Project {
+        id: row.get(0)?,
+        name: row.get(1)?,
+        description: row.get(2)?,
+        local_path: row.get(3)?,
+        documentation_url: row.get(4)?,
+        ai_documentation_url: row.get(5)?,
+        drive_link: row.get(6)?,
+        notes: row.get(7)?,
+        image_data: row.get(8)?,
+        links: None,
+        created_at: row.get(9)?,
+        updated_at: row.get(10)?,
+        last_opened_at: row.get(11)?,
+        opened_count: row.get(12)?,
+        total_time_seconds: row.get(13)?,
+        status: row.get(14)?,
+        status_changed_at: row.get(15)?,
+        is_pinned: row.get(16)?,
+        pinned_order: row.get(17)?,
+        display_order: row.get(18)?,
+        parent_id: row.get(19)?,
+        group_color: row.get(20)?,
+        group_icon: row.get(21)?,
+        is_group_expanded: row.get(22)?,
+    })
+}
+
 pub struct Database {
     conn: Mutex<Connection>,
 }
 
 impl Database {
+    /// Toma el lock de la conexión, recuperándose del envenenamiento.
+    ///
+    /// Había 45 `self.conn()` en el código de producción de este
+    /// archivo, y el problema no era el `unwrap()` en abstracto: `Mutex::lock()`
+    /// devuelve `Err` SOLO si el mutex quedó envenenado, o sea si otro hilo entró
+    /// en panic mientras lo tenía tomado. Con `unwrap()`, ese primer panic
+    /// convertía en panic TODAS las operaciones de base posteriores: un fallo
+    /// aislado en un camino cualquiera dejaba la app muerta hasta el reinicio.
+    ///
+    /// La política es recuperar, no propagar. El envenenamiento es una marca que
+    /// pone Rust, no una corrupción de SQLite: la conexión sigue siendo
+    /// perfectamente válida, así que `into_inner()` devuelve el guard y la app
+    /// sigue viva. Propagar un error tipado sería más "honesto" pero convertiría
+    /// el panic ajeno en un error visible al usuario en cada operación siguiente,
+    /// que es el mismo desastre con mejores modales.
+    ///
+    /// El `error!` no es opcional: si esto dispara, hubo un panic en algún lado y
+    /// alguien tiene que poder encontrarlo.
+    fn conn(&self) -> std::sync::MutexGuard<'_, Connection> {
+        self.conn.lock().unwrap_or_else(|poisoned| {
+            error!(
+                "❌ [DB] El mutex de la conexión estaba envenenado (hubo un panic con el lock tomado). Se recupera y se sigue operando."
+            );
+            poisoned.into_inner()
+        })
+    }
+
     pub fn new(db_path: PathBuf) -> Result<Self> {
         let conn = Connection::open(db_path)?;
 
@@ -267,7 +345,7 @@ impl Database {
     /// `dest` debe ser una ruta de archivo que NO exista: `VACUUM INTO` falla si
     /// el archivo destino ya existe.
     pub fn backup_to(&self, dest: &str) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
         conn.execute("VACUUM INTO ?1", params![dest])?;
         Ok(())
     }
@@ -295,7 +373,7 @@ impl Database {
     }
 
     pub fn create_project(&self, project: CreateProjectDTO) -> Result<Project> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         // Validar parent_id ANTES del INSERT (misma regla que assign_project_to_group,
         // la única barrera hoy validada contra grupos padre inexistentes/borrados): sin
@@ -336,131 +414,71 @@ impl Database {
         let id = conn.last_insert_rowid();
 
         let project = conn.query_row(
-            "SELECT id, name, description, local_path, documentation_url, ai_documentation_url, drive_link, notes, image_data,
-                    created_at, updated_at, last_opened_at, opened_count, total_time_seconds,
-                    status, status_changed_at, is_pinned, pinned_order, display_order,
-                    parent_id, group_color, group_icon, is_group_expanded
-             FROM projects WHERE id = ?1",
+            &format!("SELECT {}
+             FROM projects WHERE id = ?1", PROJECT_COLUMNS),
             params![id],
-            |row| {
-                Ok(Project {
-                    id: row.get(0)?,
-                    name: row.get(1)?,
-                    description: row.get(2)?,
-                    local_path: row.get(3)?,
-                    documentation_url: row.get(4)?,
-                    ai_documentation_url: row.get(5)?,
-                    drive_link: row.get(6)?,
-                    notes: row.get(7)?,
-                    image_data: row.get(8)?,
-                    links: None, // Los enlaces se cargan por separado
-                    created_at: row.get(9)?,
-                    updated_at: row.get(10)?,
-                    last_opened_at: row.get(11)?,
-                    opened_count: row.get(12)?,
-                    total_time_seconds: row.get(13)?,
-                    status: row.get(14)?,
-                    status_changed_at: row.get(15)?,
-                    is_pinned: row.get(16)?,
-                    pinned_order: row.get(17)?,
-                    display_order: row.get(18)?,
-                    parent_id: row.get(19)?,
-                    group_color: row.get(20)?,
-                    group_icon: row.get(21)?,
-                    is_group_expanded: row.get(22)?,
-                })
-            },
+            row_to_project,
         )?;
 
         Ok(project)
     }
 
     pub fn get_all_projects(&self) -> Result<Vec<Project>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         let mut stmt = conn.prepare(
-            "SELECT id, name, description, local_path, documentation_url, ai_documentation_url, drive_link, notes, image_data,
-                    created_at, updated_at, last_opened_at, opened_count, total_time_seconds,
-                    status, status_changed_at, is_pinned, pinned_order, display_order,
-                    parent_id, group_color, group_icon, is_group_expanded
+            &format!("SELECT {}
              FROM projects
              WHERE deleted_at IS NULL
-             ORDER BY display_order ASC, is_pinned DESC, pinned_order ASC, updated_at DESC"
+             ORDER BY display_order ASC, is_pinned DESC, pinned_order ASC, updated_at DESC", PROJECT_COLUMNS)
         )?;
 
-        let mut projects = Vec::new();
-        let project_rows = stmt.query_map([], |row| {
-            Ok((
-                row.get::<_, i64>(0)?,  // id
-                row.get::<_, String>(1)?,  // name
-                row.get::<_, String>(2)?,  // description
-                row.get::<_, String>(3)?,  // local_path
-                row.get::<_, Option<String>>(4)?,  // documentation_url
-                row.get::<_, Option<String>>(5)?,  // ai_documentation_url
-                row.get::<_, Option<String>>(6)?,  // drive_link
-                row.get::<_, Option<String>>(7)?,  // notes
-                row.get::<_, Option<String>>(8)?,  // image_data
-                row.get::<_, String>(9)?,  // created_at
-                row.get::<_, String>(10)?,  // updated_at
-                row.get::<_, Option<String>>(11)?,  // last_opened_at
-                row.get::<_, Option<i64>>(12)?,  // opened_count
-                row.get::<_, Option<i64>>(13)?,  // total_time_seconds
-                row.get::<_, Option<String>>(14)?,  // status
-                row.get::<_, Option<String>>(15)?,  // status_changed_at
-                row.get::<_, Option<bool>>(16)?,  // is_pinned
-                row.get::<_, Option<i64>>(17)?,  // pinned_order
-                row.get::<_, Option<i64>>(18)?,  // display_order
-                row.get::<_, Option<i64>>(19)?,  // parent_id
-                row.get::<_, Option<String>>(20)?,  // group_color
-                row.get::<_, Option<String>>(21)?,  // group_icon
-                row.get::<_, Option<bool>>(22)?,  // is_group_expanded
-            ))
-        })?
-        .collect::<Result<Vec<_>>>()?;
+        let projects_without_links = stmt
+            .query_map([], row_to_project)?
+            .collect::<Result<Vec<_>>>()?;
 
-        // Para cada proyecto, obtener sus enlaces
-        for (id, name, description, local_path, documentation_url, ai_documentation_url, drive_link, notes, image_data, created_at, updated_at, last_opened_at, opened_count, total_time_seconds, status, status_changed_at, is_pinned, pinned_order, display_order, parent_id, group_color, group_icon, is_group_expanded) in project_rows {
-            let links = self.get_project_links_internal(id, &conn).unwrap_or_else(|_| Vec::new());
+        // Los enlaces de TODA la lista en una sola consulta. Antes era una
+        // consulta por proyecto, y encima con `unwrap_or_else(|_| Vec::new())`:
+        // un fallo al cargar enlaces se tragaba en silencio y el proyecto
+        // aparecía sin enlaces sin que nadie se enterara. Ahora el error sube.
+        let ids: Vec<i64> = projects_without_links.iter().map(|p| p.id).collect();
+        let mut links_by_project = self.get_links_for_projects(&ids, &conn)?;
 
-            projects.push(Project {
-                id,
-                name,
-                description,
-                local_path,
-                documentation_url,
-                ai_documentation_url,
-                drive_link,
-                notes,
-                image_data,
-                links: Some(links),
-                created_at,
-                updated_at,
-                last_opened_at,
-                opened_count,
-                total_time_seconds,
-                status,
-                status_changed_at,
-                is_pinned,
-                pinned_order,
-                display_order,
-                parent_id,
-                group_color,
-                group_icon,
-                is_group_expanded,
-            });
-        }
+        let projects: Vec<Project> = projects_without_links
+            .into_iter()
+            .map(|mut project| {
+                project.links =
+                    Some(links_by_project.remove(&project.id).unwrap_or_default());
+                project
+            })
+            .collect();
 
         Ok(projects)
     }
 
+    /// Leer UN proyecto activo por id.
+    ///
+    /// `AND deleted_at IS NULL`: era la única lectura del archivo que NO filtraba la
+    /// papelera (`get_all_projects`, `search_projects`, `get_root_projects` y
+    /// `get_subprojects` sí lo hacen), así que un proyecto borrado seguía apareciendo
+    /// en la cabecera de grupo y en el modal de contexto vía `refreshCurrentGroup()`.
+    /// `get_project_with_children` compone esta función y heredaba el defecto.
+    ///
+    /// Un proyecto en papelera devuelve `QueryReturnedNoRows`. NO hay variante
+    /// `_including_trashed` porque nadie la necesita: `restore_project` y
+    /// `purge_project` hacen su propio `SELECT deleted_at ... WHERE id = ?1` y exigen
+    /// que el proyecto SÍ esté en papelera.
     pub fn get_project(&self, id: i64) -> Result<Project> {
-        println!("🔍 [DB] get_project iniciado para ID: {}", id);
-        
-        // Intentar obtener la conexión con timeout
+        // Intentar obtener la conexión con timeout.
+        // NO tocar este try_lock: es la posible cicatriz de un deadlock por reentrancia
+        // del Mutex y nadie documentó el motivo original (§6.6 del plan de auditoría).
         let conn = match self.conn.try_lock() {
             Ok(conn) => conn,
             Err(_) => {
-                println!("❌ [DB] No se pudo obtener lock de conexión - posible deadlock");
+                // Este log SÍ se queda, y en nivel `error`: sólo dispara en el camino de
+                // deadlock, no en cada invocación. Es diagnóstico real, no ruido, y es
+                // justo lo que querés seguir viendo aunque el nivel esté en `error`.
+                error!("❌ [DB] No se pudo obtener lock de conexión - posible deadlock");
                 return Err(rusqlite::Error::SqliteFailure(
                     rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_BUSY),
                     None
@@ -468,73 +486,31 @@ impl Database {
             }
         };
 
-        println!("🔒 [DB] Conexión obtenida exitosamente");
-
-        let result = conn.query_row(
-            "SELECT id, name, description, local_path, documentation_url, ai_documentation_url, drive_link, notes, image_data,
-                    created_at, updated_at, last_opened_at, opened_count, total_time_seconds,
-                    status, status_changed_at, is_pinned, pinned_order, display_order,
-                    parent_id, group_color, group_icon, is_group_expanded
-             FROM projects WHERE id = ?1",
+        let mut project = conn.query_row(
+            &format!("SELECT {}
+             FROM projects WHERE id = ?1 AND deleted_at IS NULL", PROJECT_COLUMNS),
             params![id],
-            |row| {
-                println!("📊 [DB] Leyendo fila de base de datos...");
-                let project_id = row.get::<_, i64>(0)?;
+            row_to_project,
+        )?;
 
-                // Obtener enlaces del proyecto
-                let links = self.get_project_links_internal(project_id, &conn).unwrap_or_else(|_| Vec::new());
+        // Los enlaces se cargan DESPUÉS de cerrar la fila, no adentro del closure de
+        // `query_row`. Es un solo proyecto, así que acá nunca hubo N+1; lo que había
+        // era `unwrap_or_else(|_| Vec::new())`, que se tragaba en silencio un fallo
+        // al cargar enlaces y devolvía el proyecto como si no tuviera ninguno. Ahora
+        // el error sube.
+        project.links = Some(self.get_project_links_internal(id, &conn)?);
 
-                let project = Project {
-                    id: project_id,
-                    name: row.get(1)?,
-                    description: row.get(2)?,
-                    local_path: row.get(3)?,
-                    documentation_url: row.get(4)?,
-                    ai_documentation_url: row.get(5)?,
-                    drive_link: row.get(6)?,
-                    notes: row.get(7)?,
-                    image_data: row.get(8)?,
-                    links: Some(links),
-                    created_at: row.get(9)?,
-                    updated_at: row.get(10)?,
-                    last_opened_at: row.get(11)?,
-                    opened_count: row.get(12)?,
-                    total_time_seconds: row.get(13)?,
-                    status: row.get(14)?,
-                    status_changed_at: row.get(15)?,
-                    is_pinned: row.get(16)?,
-                    pinned_order: row.get(17)?,
-                    display_order: row.get(18)?,
-                    parent_id: row.get(19)?,
-                    group_color: row.get(20)?,
-                    group_icon: row.get(21)?,
-                    is_group_expanded: row.get(22)?,
-                };
-                println!("✅ [DB] Proyecto leído de BD: '{}'", project.name);
-                Ok(project)
-            },
-        );
-
-        match &result {
-            Ok(proj) => {
-                println!("✅ [DB] get_project exitoso: '{}'", proj.name);
-            }
-            Err(e) => {
-                println!("❌ [DB] Error en get_project: {}", e);
-            }
-        }
-
-        result
+        Ok(project)
     }
 
     pub fn update_project(&self, id: i64, updates: UpdateProjectDTO) -> Result<Project> {
-        println!("🗄️ [DB] Iniciando update_project en base de datos para ID: {}", id);
+        debug!("🗄️ [DB] Iniciando update_project en base de datos para ID: {}", id);
         
         // Intentar obtener la conexión con timeout
         let conn = match self.conn.try_lock() {
             Ok(conn) => conn,
             Err(_) => {
-                println!("❌ [DB] No se pudo obtener lock de conexión en update_project - posible deadlock");
+                error!("❌ [DB] No se pudo obtener lock de conexión en update_project - posible deadlock");
                 return Err(rusqlite::Error::SqliteFailure(
                     rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_BUSY),
                     None
@@ -542,7 +518,7 @@ impl Database {
             }
         };
 
-        println!("🔒 [DB] Conexión obtenida exitosamente para update_project");
+        debug!("🔒 [DB] Conexión obtenida exitosamente para update_project");
 
         let mut query_parts = vec![];
         let mut params: Vec<Box<dyn rusqlite::ToSql>> = vec![];
@@ -600,33 +576,36 @@ impl Database {
             query_parts.join(", ")
         );
 
-        println!("🗄️ [DB] Query SQL: {}", query);
-        println!("🗄️ [DB] Número de parámetros: {}", params.len());
+        // NO se loguea la query ni el conteo de parámetros. Acá había dos `println!` que
+        // volcaban el SQL completo del UPDATE y la cantidad de valores en CADA
+        // actualización. Se BORRARON en vez de bajarlos a `debug!`: una query con datos
+        // del usuario no debería poder aparecer en un log, ni siquiera en modo debug.
+        // Para diagnosticar alcanza con el id afectado y las filas modificadas.
 
         let params_ref: Vec<&dyn rusqlite::ToSql> = params.iter().map(|p| p.as_ref()).collect();
         
         match conn.execute(&query, params_ref.as_slice()) {
             Ok(rows_affected) => {
-                println!("🗄️ [DB] UPDATE ejecutado exitosamente, filas afectadas: {}", rows_affected);
+                debug!("🗄️ [DB] UPDATE ejecutado exitosamente, filas afectadas: {}", rows_affected);
             }
             Err(e) => {
-                println!("🗄️ [DB] ERROR en UPDATE: {}", e);
+                debug!("🗄️ [DB] ERROR en UPDATE: {}", e);
                 return Err(e);
             }
         }
 
         // Liberar la conexión antes de llamar a get_project
-        println!("🔓 [DB] Liberando conexión después del UPDATE");
+        debug!("🔓 [DB] Liberando conexión después del UPDATE");
         drop(conn); // Liberar explícitamente la conexión
         
-        println!("🔍 [DB] Obteniendo proyecto actualizado con ID: {}", id);
+        debug!("🔍 [DB] Obteniendo proyecto actualizado con ID: {}", id);
         let result = self.get_project(id);
         match &result {
             Ok(project) => {
-                println!("✅ [DB] Proyecto obtenido exitosamente: '{}'", project.name);
+                debug!("✅ [DB] Proyecto obtenido exitosamente: '{}'", project.name);
             }
             Err(e) => {
-                println!("❌ [DB] Error al obtener proyecto: {}", e);
+                error!("❌ [DB] Error al obtener proyecto: {}", e);
             }
         }
         result
@@ -636,7 +615,7 @@ impl Database {
     /// Cascada: marca también los hijos directos AÚN activos con el MISMO
     /// timestamp (eso identifica el batch para restaurarlo en bloque).
     pub fn delete_project(&self, id: i64) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
         let now = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
         let tx = conn.unchecked_transaction()?;
         // Soft-delete del proyecto + TODOS sus descendientes activos (cualquier
@@ -666,7 +645,7 @@ impl Database {
     /// - Si el id ES un grupo, restaura también los hijos del MISMO batch (mismo
     ///   timestamp de borrado), preservando la jerarquía original.
     pub fn restore_project(&self, id: i64) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         // Validar que el proyecto exista Y esté efectivamente en la papelera ANTES de
         // cualquier UPDATE (mismo guard que ya tiene purge_project). Sin esto, para un
@@ -746,7 +725,7 @@ impl Database {
     /// Eliminar DEFINITIVAMENTE un proyecto (solo si está en papelera).
     /// Borra en cascada de todas las tablas hijas dentro de una transacción.
     pub fn purge_project(&self, id: i64) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         // Validar que el proyecto esté efectivamente en la papelera
         let deleted_at: Option<String> = conn
@@ -801,7 +780,7 @@ impl Database {
     /// Vaciar la papelera: elimina DEFINITIVAMENTE todos los proyectos con
     /// deleted_at IS NOT NULL y sus datos, en una sola transacción.
     pub fn empty_trash(&self) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         let ids: Vec<i64> = {
             let mut stmt = conn.prepare(
@@ -822,7 +801,7 @@ impl Database {
     /// Listar los proyectos en la papelera (deleted_at IS NOT NULL).
     /// Mismo mapeo posicional que get_all_projects.
     pub fn list_trash(&self) -> Result<Vec<TrashItem>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         // Devolvemos la fecha de borrado REAL (deleted_at) y cuántos subproyectos
         // cayeron también a la papelera, sin tocar el struct Project ni su SELECT.
@@ -847,88 +826,77 @@ impl Database {
         rows.collect()
     }
 
+    /// ¿Hay un proyecto ACTIVO cuyo `local_path` sea exactamente `path`?
+    ///
+    /// Es la fuente de verdad de AUTORIZACIÓN para los comandos git: la app sólo puede
+    /// operar git sobre carpetas de proyectos que ella misma gestiona. El riesgo que
+    /// cubre no es inyección de comandos (los argumentos van como argv real, nunca a
+    /// un shell), sino que la app corra git contra un repositorio arbitrario del disco.
+    ///
+    /// El filtro `deleted_at IS NULL` es DELIBERADO y explícito acá: mandar un proyecto
+    /// a la papelera tiene que REVOCAR el permiso git sobre su carpeta. `get_project`
+    /// ya aplica el mismo criterio (B4), pero esto NO es redundancia: este método no
+    /// compone `get_project` —consulta por `local_path`, no por id— así que necesita su
+    /// propio filtro. Los dos tienen que decir lo mismo y cada uno lo asserta aparte.
+    pub fn is_registered_project_path(&self, path: &str) -> Result<bool> {
+        let conn = self.conn();
+        let mut stmt = conn.prepare(
+            "SELECT 1 FROM projects WHERE local_path = ?1 AND deleted_at IS NULL LIMIT 1",
+        )?;
+        stmt.exists(params![path])
+    }
+
+    /// `local_path` de todos los proyectos ACTIVOS (mismo criterio que
+    /// `is_registered_project_path`, en bloque).
+    ///
+    /// La usa el guard de git para comparar en forma CANÓNICA: el match textual exacto
+    /// no alcanza si la ruta guardada y la recibida difieren en forma (barra final,
+    /// './' intermedio, symlink) apuntando al mismo directorio real.
+    pub fn active_project_paths(&self) -> Result<Vec<String>> {
+        let conn = self.conn();
+        let mut stmt =
+            conn.prepare("SELECT local_path FROM projects WHERE deleted_at IS NULL")?;
+        let rows = stmt.query_map([], |row| row.get::<_, String>(0))?;
+        rows.collect()
+    }
+
     pub fn search_projects(&self, query: &str) -> Result<Vec<Project>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
         let search_pattern = format!("%{}%", query);
 
         let mut stmt = conn.prepare(
-            "SELECT id, name, description, local_path, documentation_url, ai_documentation_url, drive_link, notes, image_data,
-                    created_at, updated_at, last_opened_at, opened_count, total_time_seconds,
-                    status, status_changed_at, is_pinned, pinned_order, display_order,
-                    parent_id, group_color, group_icon, is_group_expanded
+            &format!("SELECT {}
              FROM projects
              WHERE (name LIKE ?1 OR description LIKE ?1 OR local_path LIKE ?1 OR notes LIKE ?1) AND deleted_at IS NULL
-             ORDER BY display_order ASC, is_pinned DESC, pinned_order ASC, updated_at DESC"
+             ORDER BY display_order ASC, is_pinned DESC, pinned_order ASC, updated_at DESC", PROJECT_COLUMNS)
         )?;
 
-        let mut projects = Vec::new();
-        let project_rows = stmt.query_map(params![search_pattern], |row| {
-            Ok((
-                row.get::<_, i64>(0)?,  // id
-                row.get::<_, String>(1)?,  // name
-                row.get::<_, String>(2)?,  // description
-                row.get::<_, String>(3)?,  // local_path
-                row.get::<_, Option<String>>(4)?,  // documentation_url
-                row.get::<_, Option<String>>(5)?,  // ai_documentation_url
-                row.get::<_, Option<String>>(6)?,  // drive_link
-                row.get::<_, Option<String>>(7)?,  // notes
-                row.get::<_, Option<String>>(8)?,  // image_data
-                row.get::<_, String>(9)?,  // created_at
-                row.get::<_, String>(10)?,  // updated_at
-                row.get::<_, Option<String>>(11)?,  // last_opened_at
-                row.get::<_, Option<i64>>(12)?,  // opened_count
-                row.get::<_, Option<i64>>(13)?,  // total_time_seconds
-                row.get::<_, Option<String>>(14)?,  // status
-                row.get::<_, Option<String>>(15)?,  // status_changed_at
-                row.get::<_, Option<bool>>(16)?,  // is_pinned
-                row.get::<_, Option<i64>>(17)?,  // pinned_order
-                row.get::<_, Option<i64>>(18)?,  // display_order
-                row.get::<_, Option<i64>>(19)?,  // parent_id
-                row.get::<_, Option<String>>(20)?,  // group_color
-                row.get::<_, Option<String>>(21)?,  // group_icon
-                row.get::<_, Option<bool>>(22)?,  // is_group_expanded
-            ))
-        })?
-        .collect::<Result<Vec<_>>>()?;
+        let projects_without_links = stmt
+            .query_map(params![search_pattern], row_to_project)?
+            .collect::<Result<Vec<_>>>()?;
 
-        // Para cada proyecto, obtener sus enlaces
-        for (id, name, description, local_path, documentation_url, ai_documentation_url, drive_link, notes, image_data, created_at, updated_at, last_opened_at, opened_count, total_time_seconds, status, status_changed_at, is_pinned, pinned_order, display_order, parent_id, group_color, group_icon, is_group_expanded) in project_rows {
-            let links = self.get_project_links_internal(id, &conn).unwrap_or_else(|_| Vec::new());
+        // Los enlaces de TODA la lista en una sola consulta. Antes era una
+        // consulta por proyecto, y encima con `unwrap_or_else(|_| Vec::new())`:
+        // un fallo al cargar enlaces se tragaba en silencio y el proyecto
+        // aparecía sin enlaces sin que nadie se enterara. Ahora el error sube.
+        let ids: Vec<i64> = projects_without_links.iter().map(|p| p.id).collect();
+        let mut links_by_project = self.get_links_for_projects(&ids, &conn)?;
 
-            projects.push(Project {
-                id,
-                name,
-                description,
-                local_path,
-                documentation_url,
-                ai_documentation_url,
-                drive_link,
-                notes,
-                image_data,
-                links: Some(links),
-                created_at,
-                updated_at,
-                last_opened_at,
-                opened_count,
-                total_time_seconds,
-                status,
-                status_changed_at,
-                is_pinned,
-                pinned_order,
-                display_order,
-                parent_id,
-                group_color,
-                group_icon,
-                is_group_expanded,
-            });
-        }
+        let projects: Vec<Project> = projects_without_links
+            .into_iter()
+            .map(|mut project| {
+                project.links =
+                    Some(links_by_project.remove(&project.id).unwrap_or_default());
+                project
+            })
+            .collect();
 
         Ok(projects)
     }
 
     // Métodos para manejar enlaces de proyectos
     pub fn create_link(&self, link: CreateLinkDTO) -> Result<ProjectLink> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         conn.execute(
             "INSERT INTO project_links (project_id, link_type, title, url)
@@ -957,8 +925,68 @@ impl Database {
     }
 
     pub fn get_project_links(&self, project_id: i64) -> Result<Vec<ProjectLink>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
         self.get_project_links_internal(project_id, &conn)
+    }
+
+    /// Enlaces de varios proyectos en UNA sola consulta.
+    ///
+    /// Reemplaza al N+1 que tenían `get_all_projects`, `search_projects`,
+    /// `get_root_projects` y `get_subprojects`: los cuatro llamaban a
+    /// `get_project_links_internal` una vez POR PROYECTO de la lista. Con la base
+    /// local y el Mutex ya tomado el costo por consulta es bajo y con decenas de
+    /// proyectos no se nota, pero con cientos sí.
+    ///
+    /// Un proyecto sin enlaces NO aparece en el mapa; el consumidor usa
+    /// `unwrap_or_default()` y obtiene la lista vacía, que es lo que devolvía el
+    /// camino viejo.
+    ///
+    /// El batcheo no es adorno: SQLite tiene un tope de parámetros por statement
+    /// (`SQLITE_MAX_VARIABLE_NUMBER`, 32766 en versiones recientes) y pasarlo hace
+    /// fallar la query entera. Se usa un tamaño conservador.
+    fn get_links_for_projects(
+        &self,
+        ids: &[i64],
+        conn: &Connection,
+    ) -> Result<HashMap<i64, Vec<ProjectLink>>> {
+        const BATCH_SIZE: usize = 500;
+
+        let mut by_project: HashMap<i64, Vec<ProjectLink>> = HashMap::new();
+        if ids.is_empty() {
+            return Ok(by_project);
+        }
+
+        for chunk in ids.chunks(BATCH_SIZE) {
+            let placeholders = vec!["?"; chunk.len()].join(", ");
+            let mut stmt = conn.prepare(&format!(
+                "SELECT id, project_id, link_type, title, url, created_at FROM project_links
+                 WHERE project_id IN ({})
+                 ORDER BY created_at DESC",
+                placeholders
+            ))?;
+
+            let params: Vec<&dyn rusqlite::ToSql> =
+                chunk.iter().map(|id| id as &dyn rusqlite::ToSql).collect();
+
+            let links = stmt
+                .query_map(params.as_slice(), |row| {
+                    Ok(ProjectLink {
+                        id: row.get(0)?,
+                        project_id: row.get(1)?,
+                        link_type: row.get(2)?,
+                        title: row.get(3)?,
+                        url: row.get(4)?,
+                        created_at: row.get(5)?,
+                    })
+                })?
+                .collect::<Result<Vec<_>>>()?;
+
+            for link in links {
+                by_project.entry(link.project_id).or_default().push(link);
+            }
+        }
+
+        Ok(by_project)
     }
 
     fn get_project_links_internal(&self, project_id: i64, conn: &Connection) -> Result<Vec<ProjectLink>> {
@@ -984,7 +1012,7 @@ impl Database {
     }
 
     pub fn update_link(&self, id: i64, link: UpdateLinkDTO) -> Result<ProjectLink> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         // Construir la query dinámicamente basada en los campos proporcionados
         let mut set_clauses = Vec::new();
@@ -1042,14 +1070,14 @@ impl Database {
     }
 
     pub fn delete_link(&self, id: i64) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
         conn.execute("DELETE FROM project_links WHERE id = ?1", params![id])?;
         Ok(())
     }
 
     // Métodos para tracking y analytics
     pub fn track_project_open(&self, id: i64) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         conn.execute(
             "UPDATE projects
@@ -1070,7 +1098,7 @@ impl Database {
     }
 
     pub fn add_project_time(&self, id: i64, seconds: i64) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         conn.execute(
             "UPDATE projects
@@ -1085,7 +1113,7 @@ impl Database {
     pub fn get_project_stats(&self) -> Result<crate::models::project::ProjectStats> {
         use crate::models::project::{ProjectStats, ProjectActivity};
 
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         // Total de proyectos
         let total_projects: i64 = conn.query_row(
@@ -1151,7 +1179,7 @@ impl Database {
     pub fn get_project_activities(&self, project_id: i64, limit: i64) -> Result<Vec<crate::models::project::ProjectActivity>> {
         use crate::models::project::ProjectActivity;
 
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         let mut stmt = conn.prepare(
             "SELECT id, project_id, activity_type, description, duration_seconds, created_at
@@ -1184,11 +1212,11 @@ impl Database {
         // Validar tamaño
         if attachment.file_size > MAX_FILE_SIZE {
             return Err(rusqlite::Error::InvalidParameterName(
-                "File size exceeds 5MB limit".to_string(),
+                "El archivo supera el límite de 5 MB. Elegí uno más chico.".to_string(),
             ));
         }
 
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         conn.execute(
             "INSERT INTO project_attachments (project_id, filename, file_data, file_size, mime_type)
@@ -1225,7 +1253,7 @@ impl Database {
     }
 
     pub fn get_attachments(&self, project_id: i64) -> Result<Vec<ProjectAttachment>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         let mut stmt = conn.prepare(
             "SELECT id, project_id, filename, file_data, file_size, mime_type, created_at
@@ -1250,7 +1278,7 @@ impl Database {
     }
 
     pub fn delete_attachment(&self, id: i64) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         conn.execute("DELETE FROM project_attachments WHERE id = ?1", params![id])?;
 
@@ -1260,7 +1288,7 @@ impl Database {
     // ==================== MÉTODOS PARA PROJECT JOURNAL ====================
 
     pub fn create_journal_entry(&self, entry: CreateJournalEntryDTO) -> Result<JournalEntry> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         conn.execute(
             "INSERT INTO project_journal (project_id, content, tags)
@@ -1290,7 +1318,7 @@ impl Database {
     }
 
     pub fn get_journal_entries(&self, project_id: i64) -> Result<Vec<JournalEntry>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         let mut stmt = conn.prepare(
             "SELECT id, project_id, content, tags, created_at, updated_at
@@ -1316,7 +1344,7 @@ impl Database {
     }
 
     pub fn update_journal_entry(&self, id: i64, updates: UpdateJournalEntryDTO) -> Result<JournalEntry> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         let mut set_clauses = Vec::new();
         let mut params: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
@@ -1367,7 +1395,7 @@ impl Database {
     }
 
     pub fn delete_journal_entry(&self, id: i64) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         conn.execute("DELETE FROM project_journal WHERE id = ?1", params![id])?;
 
@@ -1377,7 +1405,7 @@ impl Database {
     // ==================== MÉTODOS PARA PROJECT TODOS ====================
 
     pub fn create_todo(&self, todo: CreateTodoDTO) -> Result<ProjectTodo> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         conn.execute(
             "INSERT INTO project_todos (project_id, content)
@@ -1407,7 +1435,7 @@ impl Database {
     }
 
     pub fn get_project_todos(&self, project_id: i64) -> Result<Vec<ProjectTodo>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         let mut stmt = conn.prepare(
             "SELECT id, project_id, content, is_completed, created_at, completed_at
@@ -1433,7 +1461,7 @@ impl Database {
     }
 
     pub fn update_todo(&self, id: i64, updates: UpdateTodoDTO) -> Result<ProjectTodo> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         let mut set_clauses = Vec::new();
         let mut params: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
@@ -1490,7 +1518,7 @@ impl Database {
     }
 
     pub fn delete_todo(&self, id: i64) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         conn.execute("DELETE FROM project_todos WHERE id = ?1", params![id])?;
 
@@ -1500,7 +1528,7 @@ impl Database {
     // ==================== MÉTODOS PARA ESTADOS Y FAVORITOS ====================
 
     pub fn update_project_status(&self, id: i64, status: String) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         conn.execute(
             "UPDATE projects
@@ -1513,7 +1541,7 @@ impl Database {
     }
 
     pub fn toggle_pin_project(&self, id: i64) -> Result<bool> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         // Obtener estado actual
         let is_pinned: bool = conn.query_row(
@@ -1551,23 +1579,41 @@ impl Database {
         Ok(new_pinned)
     }
 
+    /// Reordenar los proyectos fijados. TODO o NADA.
+    ///
+    /// Antes era un `UPDATE` por proyecto suelto dentro del `for`: si uno fallaba a
+    /// mitad, los anteriores ya habían quedado escritos y el orden terminaba con
+    /// `pinned_order` duplicados o con huecos. Ahora va en una transacción.
+    ///
+    /// Un id inexistente en la lista ABORTA el reordenamiento entero. Es deliberado:
+    /// una lista con un id fantasma significa que el frontend está desincronizado con
+    /// la DB, y un reordenamiento a medias es peor que ninguno —deja un orden que el
+    /// usuario no pidió y que nadie puede explicar—. Fallar fuerte hace que el front
+    /// recargue y el usuario vuelva a arrastrar sobre datos reales.
     pub fn reorder_pinned_projects(&self, project_ids: Vec<i64>) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
+        let tx = conn.unchecked_transaction()?;
 
         for (index, project_id) in project_ids.iter().enumerate() {
-            conn.execute(
+            let rows = tx.execute(
                 "UPDATE projects
                  SET pinned_order = ?1
                  WHERE id = ?2",
                 params![index as i64 + 1, project_id],
             )?;
+
+            if rows == 0 {
+                // Sale sin commit: el Drop de `tx` hace rollback de lo ya escrito.
+                return Err(rusqlite::Error::QueryReturnedNoRows);
+            }
         }
 
+        tx.commit()?;
         Ok(())
     }
 
     pub fn update_project_order(&self, id: i64, new_order: i64) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         conn.execute(
             "UPDATE projects
@@ -1582,46 +1628,17 @@ impl Database {
     // ==================== DASHBOARD METHODS ====================
 
     pub fn get_recent_projects(&self) -> Result<Vec<Project>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
         let mut stmt = conn.prepare(
-            "SELECT id, name, description, local_path, documentation_url, ai_documentation_url, drive_link, notes, image_data,
-                    created_at, updated_at, last_opened_at, opened_count, total_time_seconds,
-                    status, status_changed_at, is_pinned, pinned_order, display_order,
-                    parent_id, group_color, group_icon, is_group_expanded
+            &format!("SELECT {}
              FROM projects
              WHERE last_opened_at IS NOT NULL AND deleted_at IS NULL
              ORDER BY last_opened_at DESC
-             LIMIT 5"
+             LIMIT 5", PROJECT_COLUMNS)
         )?;
 
-        let projects_iter = stmt.query_map([], |row| {
-            Ok(Project {
-                id: row.get(0)?,
-                name: row.get(1)?,
-                description: row.get(2)?,
-                local_path: row.get(3)?,
-                documentation_url: row.get(4)?,
-                ai_documentation_url: row.get(5)?,
-                drive_link: row.get(6)?,
-                notes: row.get(7)?,
-                image_data: row.get(8)?,
-                links: None, // Links can be loaded separately if needed on dashboard
-                created_at: row.get(9)?,
-                updated_at: row.get(10)?,
-                last_opened_at: row.get(11)?,
-                opened_count: row.get(12)?,
-                total_time_seconds: row.get(13)?,
-                status: row.get(14)?,
-                status_changed_at: row.get(15)?,
-                is_pinned: row.get(16)?,
-                pinned_order: row.get(17)?,
-                display_order: row.get(18)?,
-                parent_id: row.get(19)?,
-                group_color: row.get(20)?,
-                group_icon: row.get(21)?,
-                is_group_expanded: row.get(22)?,
-            })
-        })?;
+        // `links` queda en None, igual que antes: el dashboard no los muestra.
+        let projects_iter = stmt.query_map([], row_to_project)?;
 
         let mut projects = Vec::new();
         for project in projects_iter {
@@ -1632,7 +1649,7 @@ impl Database {
 
     pub fn get_all_pending_todos(&self) -> Result<Vec<crate::models::project::DashboardTodo>> {
         use crate::models::project::{DashboardTodo, ProjectTodo};
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
         let mut stmt = conn.prepare(
             "SELECT
                 pt.id, pt.project_id, pt.content, pt.is_completed, pt.created_at, pt.completed_at,
@@ -1666,7 +1683,7 @@ impl Database {
 
     pub fn get_recent_journal_entries(&self) -> Result<Vec<crate::models::project::DashboardJournalEntry>> {
         use crate::models::project::{DashboardJournalEntry, JournalEntry};
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
         let mut stmt = conn.prepare(
             "SELECT
                 pj.id, pj.project_id, pj.content, pj.tags, pj.created_at, pj.updated_at,
@@ -1703,156 +1720,68 @@ impl Database {
 
     /// Obtener solo proyectos raíz (sin parent_id, grupos principales)
     pub fn get_root_projects(&self) -> Result<Vec<Project>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         let mut stmt = conn.prepare(
-            "SELECT id, name, description, local_path, documentation_url, ai_documentation_url, drive_link, notes, image_data,
-                    created_at, updated_at, last_opened_at, opened_count, total_time_seconds,
-                    status, status_changed_at, is_pinned, pinned_order, display_order,
-                    parent_id, group_color, group_icon, is_group_expanded
+            &format!("SELECT {}
              FROM projects
              WHERE parent_id IS NULL AND deleted_at IS NULL
-             ORDER BY display_order ASC, is_pinned DESC, pinned_order ASC, updated_at DESC"
+             ORDER BY display_order ASC, is_pinned DESC, pinned_order ASC, updated_at DESC", PROJECT_COLUMNS)
         )?;
 
-        let mut projects = Vec::new();
-        let project_rows = stmt.query_map([], |row| {
-            Ok((
-                row.get::<_, i64>(0)?,
-                row.get::<_, String>(1)?,
-                row.get::<_, String>(2)?,
-                row.get::<_, String>(3)?,
-                row.get::<_, Option<String>>(4)?,
-                row.get::<_, Option<String>>(5)?,
-                row.get::<_, Option<String>>(6)?,
-                row.get::<_, Option<String>>(7)?,
-                row.get::<_, Option<String>>(8)?,
-                row.get::<_, String>(9)?,
-                row.get::<_, String>(10)?,
-                row.get::<_, Option<String>>(11)?,
-                row.get::<_, Option<i64>>(12)?,
-                row.get::<_, Option<i64>>(13)?,
-                row.get::<_, Option<String>>(14)?,
-                row.get::<_, Option<String>>(15)?,
-                row.get::<_, Option<bool>>(16)?,
-                row.get::<_, Option<i64>>(17)?,
-                row.get::<_, Option<i64>>(18)?,
-                row.get::<_, Option<i64>>(19)?,
-                row.get::<_, Option<String>>(20)?,
-                row.get::<_, Option<String>>(21)?,
-                row.get::<_, Option<bool>>(22)?,
-            ))
-        })?
-        .collect::<Result<Vec<_>>>()?;
+        let projects_without_links = stmt
+            .query_map([], row_to_project)?
+            .collect::<Result<Vec<_>>>()?;
 
-        for (id, name, description, local_path, documentation_url, ai_documentation_url, drive_link, notes, image_data, created_at, updated_at, last_opened_at, opened_count, total_time_seconds, status, status_changed_at, is_pinned, pinned_order, display_order, parent_id, group_color, group_icon, is_group_expanded) in project_rows {
-            let links = self.get_project_links_internal(id, &conn).unwrap_or_else(|_| Vec::new());
+        // Los enlaces de TODA la lista en una sola consulta. Antes era una
+        // consulta por proyecto, y encima con `unwrap_or_else(|_| Vec::new())`:
+        // un fallo al cargar enlaces se tragaba en silencio y el proyecto
+        // aparecía sin enlaces sin que nadie se enterara. Ahora el error sube.
+        let ids: Vec<i64> = projects_without_links.iter().map(|p| p.id).collect();
+        let mut links_by_project = self.get_links_for_projects(&ids, &conn)?;
 
-            projects.push(Project {
-                id,
-                name,
-                description,
-                local_path,
-                documentation_url,
-                ai_documentation_url,
-                drive_link,
-                notes,
-                image_data,
-                links: Some(links),
-                created_at,
-                updated_at,
-                last_opened_at,
-                opened_count,
-                total_time_seconds,
-                status,
-                status_changed_at,
-                is_pinned,
-                pinned_order,
-                display_order,
-                parent_id,
-                group_color,
-                group_icon,
-                is_group_expanded,
-            });
-        }
+        let projects: Vec<Project> = projects_without_links
+            .into_iter()
+            .map(|mut project| {
+                project.links =
+                    Some(links_by_project.remove(&project.id).unwrap_or_default());
+                project
+            })
+            .collect();
 
         Ok(projects)
     }
 
     /// Obtener subproyectos de un grupo (parent_id = id)
     pub fn get_subprojects(&self, parent_id: i64) -> Result<Vec<Project>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         let mut stmt = conn.prepare(
-            "SELECT id, name, description, local_path, documentation_url, ai_documentation_url, drive_link, notes, image_data,
-                    created_at, updated_at, last_opened_at, opened_count, total_time_seconds,
-                    status, status_changed_at, is_pinned, pinned_order, display_order,
-                    parent_id, group_color, group_icon, is_group_expanded
+            &format!("SELECT {}
              FROM projects
              WHERE parent_id = ?1 AND deleted_at IS NULL
-             ORDER BY display_order ASC, name ASC"
+             ORDER BY display_order ASC, name ASC", PROJECT_COLUMNS)
         )?;
 
-        let mut projects = Vec::new();
-        let project_rows = stmt.query_map([parent_id], |row| {
-            Ok((
-                row.get::<_, i64>(0)?,
-                row.get::<_, String>(1)?,
-                row.get::<_, String>(2)?,
-                row.get::<_, String>(3)?,
-                row.get::<_, Option<String>>(4)?,
-                row.get::<_, Option<String>>(5)?,
-                row.get::<_, Option<String>>(6)?,
-                row.get::<_, Option<String>>(7)?,
-                row.get::<_, Option<String>>(8)?,
-                row.get::<_, String>(9)?,
-                row.get::<_, String>(10)?,
-                row.get::<_, Option<String>>(11)?,
-                row.get::<_, Option<i64>>(12)?,
-                row.get::<_, Option<i64>>(13)?,
-                row.get::<_, Option<String>>(14)?,
-                row.get::<_, Option<String>>(15)?,
-                row.get::<_, Option<bool>>(16)?,
-                row.get::<_, Option<i64>>(17)?,
-                row.get::<_, Option<i64>>(18)?,
-                row.get::<_, Option<i64>>(19)?,
-                row.get::<_, Option<String>>(20)?,
-                row.get::<_, Option<String>>(21)?,
-                row.get::<_, Option<bool>>(22)?,
-            ))
-        })?
-        .collect::<Result<Vec<_>>>()?;
+        let projects_without_links = stmt
+            .query_map([parent_id], row_to_project)?
+            .collect::<Result<Vec<_>>>()?;
 
-        for (id, name, description, local_path, documentation_url, ai_documentation_url, drive_link, notes, image_data, created_at, updated_at, last_opened_at, opened_count, total_time_seconds, status, status_changed_at, is_pinned, pinned_order, display_order, parent_id, group_color, group_icon, is_group_expanded) in project_rows {
-            let links = self.get_project_links_internal(id, &conn).unwrap_or_else(|_| Vec::new());
+        // Los enlaces de TODA la lista en una sola consulta. Antes era una
+        // consulta por proyecto, y encima con `unwrap_or_else(|_| Vec::new())`:
+        // un fallo al cargar enlaces se tragaba en silencio y el proyecto
+        // aparecía sin enlaces sin que nadie se enterara. Ahora el error sube.
+        let ids: Vec<i64> = projects_without_links.iter().map(|p| p.id).collect();
+        let mut links_by_project = self.get_links_for_projects(&ids, &conn)?;
 
-            projects.push(Project {
-                id,
-                name,
-                description,
-                local_path,
-                documentation_url,
-                ai_documentation_url,
-                drive_link,
-                notes,
-                image_data,
-                links: Some(links),
-                created_at,
-                updated_at,
-                last_opened_at,
-                opened_count,
-                total_time_seconds,
-                status,
-                status_changed_at,
-                is_pinned,
-                pinned_order,
-                display_order,
-                parent_id,
-                group_color,
-                group_icon,
-                is_group_expanded,
-            });
-        }
+        let projects: Vec<Project> = projects_without_links
+            .into_iter()
+            .map(|mut project| {
+                project.links =
+                    Some(links_by_project.remove(&project.id).unwrap_or_default());
+                project
+            })
+            .collect();
 
         Ok(projects)
     }
@@ -1872,7 +1801,7 @@ impl Database {
 
     /// Contar subproyectos de un grupo
     pub fn count_subprojects(&self, parent_id: i64) -> Result<i64> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         let count: i64 = conn.query_row(
             "SELECT COUNT(*) FROM projects WHERE parent_id = ?1 AND deleted_at IS NULL",
@@ -1928,7 +1857,7 @@ impl Database {
         child_id: i64,
         new_parent_id: Option<i64>,
     ) -> std::result::Result<(), String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         if let Some(parent_id) = new_parent_id {
             // 1) Un proyecto no puede ser su propio grupo padre
@@ -1968,7 +1897,7 @@ impl Database {
 
     /// Crear una nueva sesión de tracking
     pub fn create_tracking_session(&self, project_id: i64, source: &str) -> Result<i64> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         conn.execute(
             "INSERT INTO time_tracking_sessions (project_id, started_at, source)
@@ -1979,11 +1908,16 @@ impl Database {
         Ok(conn.last_insert_rowid())
     }
 
-    /// Terminar una sesión de tracking
+    /// Terminar una sesión de tracking: cerrarla y acreditar su duración al proyecto.
+    ///
+    /// Los dos UPDATE van en UNA transacción. Antes eran dos `execute` sueltos bajo el
+    /// mismo lock: si el segundo fallaba, la sesión quedaba cerrada y el tiempo
+    /// trabajado se perdía en silencio, sin error y sin forma de recuperarlo.
     pub fn end_tracking_session(&self, session_id: i64, duration_seconds: i64) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
+        let tx = conn.unchecked_transaction()?;
 
-        conn.execute(
+        tx.execute(
             "UPDATE time_tracking_sessions
              SET ended_at = CURRENT_TIMESTAMP, duration_seconds = ?1
              WHERE id = ?2",
@@ -1991,13 +1925,14 @@ impl Database {
         )?;
 
         // También actualizar el tiempo total del proyecto
-        conn.execute(
+        tx.execute(
             "UPDATE projects
              SET total_time_seconds = COALESCE(total_time_seconds, 0) + ?1
              WHERE id = (SELECT project_id FROM time_tracking_sessions WHERE id = ?2)",
             params![duration_seconds, session_id],
         )?;
 
+        tx.commit()?;
         Ok(())
     }
 
@@ -2005,7 +1940,7 @@ impl Database {
     pub fn get_tracking_sessions(&self, project_id: i64, limit: i64) -> Result<Vec<crate::tracking::aggregator::TimeTrackingSession>> {
         use crate::tracking::aggregator::TimeTrackingSession;
 
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         let mut stmt = conn.prepare(
             "SELECT id, project_id, started_at, ended_at, duration_seconds, source
@@ -2034,7 +1969,7 @@ impl Database {
     pub fn get_time_stats(&self, project_id: i64) -> Result<crate::tracking::aggregator::TimeStats> {
         use crate::tracking::aggregator::TimeStats;
 
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         // Tiempo total y número de sesiones
         let (total_seconds, session_count): (i64, i64) = conn.query_row(
@@ -2098,6 +2033,307 @@ mod tests {
 
     fn test_db() -> Database {
         Database::new(PathBuf::from(":memory:")).expect("Failed to create in-memory database")
+    }
+
+    fn seed_project_at(db: &Database, name: &str, local_path: &str) -> i64 {
+        db.create_project(CreateProjectDTO {
+            name: name.to_string(),
+            description: "desc".to_string(),
+            local_path: local_path.to_string(),
+            documentation_url: None,
+            ai_documentation_url: None,
+            drive_link: None,
+            notes: None,
+            image_data: None,
+            parent_id: None,
+            group_color: None,
+            group_icon: None,
+        })
+        .expect("no se pudo sembrar el proyecto")
+        .id
+    }
+
+    fn seed_link(db: &Database, project_id: i64, title: &str) {
+        db.create_link(CreateLinkDTO {
+            project_id,
+            link_type: "docs".to_string(),
+            title: title.to_string(),
+            url: format!("https://example.com/{}", title),
+        })
+        .expect("no se pudo sembrar el enlace");
+    }
+
+    fn link_titles(project: &Project) -> Vec<String> {
+        let mut titles: Vec<String> = project
+            .links
+            .as_ref()
+            .expect("links nunca debe ser None en un listado")
+            .iter()
+            .map(|link| link.title.clone())
+            .collect();
+        titles.sort();
+        titles
+    }
+
+    // ============ B15: el envenenamiento del mutex no mata la app ============
+
+    #[test]
+    fn la_base_sigue_operando_despues_de_un_panic_con_el_lock_tomado() {
+        let db = test_db();
+        seed_project_at(&db, "Antes del panic", "/tmp/antes");
+
+        // Envenenar el mutex a mano: un hilo toma el lock y entra en panic. Es
+        // exactamente lo que pasa cuando cualquier camino de la app panickea con
+        // la conexión tomada, y es la ÚNICA forma de que `Mutex::lock()` devuelva
+        // Err.
+        let panicked = std::thread::scope(|scope| {
+            scope
+                .spawn(|| {
+                    let _guard = db.conn.lock().expect("el mutex arranca sano");
+                    panic!("panic deliberado con el lock de la conexión tomado");
+                })
+                .join()
+        });
+        assert!(panicked.is_err(), "el hilo tenía que entrar en panic");
+
+        // Con `lock().unwrap()` esta línea era un panic, y con ella TODA operación
+        // de base posterior: un fallo aislado en un camino cualquiera dejaba la
+        // app muerta hasta el reinicio. Este test fallaba con el código anterior.
+        let projects = db
+            .get_all_projects()
+            .expect("la base tiene que seguir operando después del envenenamiento");
+        assert_eq!(projects.len(), 1);
+
+        // Y no es solo leer: escribir también.
+        seed_project_at(&db, "Después del panic", "/tmp/despues");
+        assert_eq!(db.get_all_projects().unwrap().len(), 2);
+    }
+
+    // ==================== B16: los enlaces se cargan en lote ====================
+
+    #[test]
+    fn los_tres_listados_devuelven_los_enlaces_completos_de_un_proyecto() {
+        let db = test_db();
+        let id = seed_project_at(&db, "Con enlaces", "/tmp/con-enlaces");
+        seed_link(&db, id, "alfa");
+        seed_link(&db, id, "beta");
+        seed_link(&db, id, "gamma");
+
+        let esperado = vec![
+            "alfa".to_string(),
+            "beta".to_string(),
+            "gamma".to_string(),
+        ];
+
+        // Los tres caminos de lectura comparten el mismo batch: si el agrupado por
+        // project_id se rompe, se rompe en los tres.
+        let todos = db.get_all_projects().unwrap();
+        assert_eq!(link_titles(&todos[0]), esperado, "get_all_projects");
+
+        let raices = db.get_root_projects().unwrap();
+        assert_eq!(link_titles(&raices[0]), esperado, "get_root_projects");
+
+        let encontrados = db.search_projects("Con enlaces").unwrap();
+        assert_eq!(link_titles(&encontrados[0]), esperado, "search_projects");
+    }
+
+    #[test]
+    fn un_proyecto_sin_enlaces_trae_lista_vacia_y_no_none() {
+        let db = test_db();
+        seed_project_at(&db, "Sin enlaces", "/tmp/sin-enlaces");
+
+        let todos = db.get_all_projects().unwrap();
+        // La distinción importa: el frontend hace `project.links.length` y un `None`
+        // que serializa a `null` lo rompe. El batch omite del mapa a los proyectos
+        // sin enlaces, así que este es el caso que verifica el `unwrap_or_default`.
+        let links = todos[0]
+            .links
+            .as_ref()
+            .expect("links debe ser Some(vec![]), no None");
+        assert!(links.is_empty(), "un proyecto sin enlaces no debe traer ninguno");
+    }
+
+    #[test]
+    fn con_dos_proyectos_los_enlaces_no_se_le_atribuyen_al_equivocado() {
+        let db = test_db();
+        let con = seed_project_at(&db, "Con enlaces", "/tmp/con");
+        let sin = seed_project_at(&db, "Sin enlaces", "/tmp/sin");
+        seed_link(&db, con, "alfa");
+        seed_link(&db, con, "beta");
+
+        let todos = db.get_all_projects().unwrap();
+        let del_con = todos.iter().find(|p| p.id == con).unwrap();
+        let del_sin = todos.iter().find(|p| p.id == sin).unwrap();
+
+        // Este es el test que detecta un error de agrupación en el HashMap: con una
+        // sola consulta para toda la lista, un `entry()` mal armado le cuelga los dos
+        // enlaces al proyecto equivocado, o se los cuelga a los dos.
+        assert_eq!(link_titles(del_con), vec!["alfa".to_string(), "beta".to_string()]);
+        assert_eq!(link_titles(del_sin), Vec::<String>::new());
+    }
+
+    #[test]
+    fn los_subproyectos_tambien_traen_sus_enlaces() {
+        let db = test_db();
+        let padre = seed_project_at(&db, "Padre", "/tmp/padre");
+        let hijo = db
+            .create_project(CreateProjectDTO {
+                name: "Hijo".to_string(),
+                description: "desc".to_string(),
+                local_path: "/tmp/hijo".to_string(),
+                documentation_url: None,
+                ai_documentation_url: None,
+                drive_link: None,
+                notes: None,
+                image_data: None,
+                parent_id: Some(padre),
+                group_color: None,
+                group_icon: None,
+            })
+            .unwrap();
+        seed_link(&db, hijo.id, "manual");
+
+        let hijos = db.get_subprojects(padre).unwrap();
+        assert_eq!(link_titles(&hijos[0]), vec!["manual".to_string()]);
+    }
+
+    // ==================== B4: get_project filtra la papelera ====================
+
+    #[test]
+    fn test_get_project_returns_active_project() {
+        let db = test_db();
+        let created = db.create_project(test_project_dto()).unwrap();
+
+        let fetched = db.get_project(created.id).expect("un proyecto activo debe leerse");
+        assert_eq!(fetched.id, created.id);
+    }
+
+    #[test]
+    fn test_get_project_rejects_trashed_project() {
+        let db = test_db();
+        let created = db.create_project(test_project_dto()).unwrap();
+        db.delete_project(created.id).unwrap();
+
+        let err = db
+            .get_project(created.id)
+            .expect_err("un proyecto en papelera no debe leerse");
+        assert!(
+            matches!(err, rusqlite::Error::QueryReturnedNoRows),
+            "debe ser QueryReturnedNoRows, fue: {err:?}"
+        );
+    }
+
+    /// `get_project_with_children` compone `get_project`, así que hereda el filtro.
+    #[test]
+    fn test_get_project_with_children_rejects_trashed_parent() {
+        let db = test_db();
+        let parent = db.create_project(test_project_dto()).unwrap();
+        db.delete_project(parent.id).unwrap();
+
+        assert!(
+            db.get_project_with_children(parent.id).is_err(),
+            "un grupo en papelera no debe leerse con get_project_with_children"
+        );
+    }
+
+    /// EL test de regresión que importa: el filtro NO rompió la restauración.
+    /// `restore_project` no compone `get_project` —hace su propio SELECT y exige que el
+    /// proyecto SÍ esté en papelera—, así que el camino de vuelta sigue intacto.
+    #[test]
+    fn test_restore_project_still_works_after_trash_filter() {
+        let db = test_db();
+        let created = db.create_project(test_project_dto()).unwrap();
+        db.delete_project(created.id).unwrap();
+
+        // Invisible mientras está en papelera...
+        assert!(db.get_project(created.id).is_err());
+
+        // ...pero restaurable, y después visible de nuevo.
+        db.restore_project(created.id)
+            .expect("restore_project debe seguir funcionando sobre un proyecto en papelera");
+        assert!(
+            db.get_project(created.id).is_ok(),
+            "tras restaurar, get_project debe volver a devolverlo"
+        );
+    }
+
+    /// `purge_project` tampoco compone `get_project`: sigue exigiendo papelera.
+    #[test]
+    fn test_purge_project_still_works_after_trash_filter() {
+        let db = test_db();
+        let created = db.create_project(test_project_dto()).unwrap();
+        db.delete_project(created.id).unwrap();
+        assert!(db.get_project(created.id).is_err());
+
+        db.purge_project(created.id)
+            .expect("purge_project debe seguir funcionando sobre un proyecto en papelera");
+        assert!(db.list_trash().unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_is_registered_project_path_true_for_registered() {
+        let db = test_db();
+        seed_project_at(&db, "Alpha", "/home/user/alpha");
+
+        assert!(db.is_registered_project_path("/home/user/alpha").unwrap());
+    }
+
+    #[test]
+    fn test_is_registered_project_path_false_for_unregistered() {
+        let db = test_db();
+        seed_project_at(&db, "Alpha", "/home/user/alpha");
+
+        assert!(!db.is_registered_project_path("/home/user/ajeno").unwrap());
+        assert!(!db.is_registered_project_path("").unwrap());
+    }
+
+    /// EL test que importa: mandar un proyecto a la papelera REVOCA el permiso git
+    /// sobre su carpeta. Si `deleted_at IS NULL` se cayera de la query, esto pasa a
+    /// verde en falso y un proyecto borrado seguiría habilitando git.
+    #[test]
+    fn test_is_registered_project_path_false_for_trashed_project() {
+        let db = test_db();
+        let id = seed_project_at(&db, "Alpha", "/home/user/alpha");
+        assert!(db.is_registered_project_path("/home/user/alpha").unwrap());
+
+        db.delete_project(id).expect("no se pudo borrar");
+
+        assert!(
+            !db.is_registered_project_path("/home/user/alpha").unwrap(),
+            "un proyecto en papelera no debe seguir registrado para git"
+        );
+
+        // Y restaurarlo vuelve a habilitarlo.
+        db.restore_project(id).expect("no se pudo restaurar");
+        assert!(db.is_registered_project_path("/home/user/alpha").unwrap());
+    }
+
+    /// `is_registered_project_path` compara el string TAL CUAL: la barra final y el
+    /// './' intermedio son un miss acá a propósito. Normalizarlos es responsabilidad
+    /// del guard (`commands::guards`), que canonicaliza ambos lados contra el disco.
+    #[test]
+    fn test_is_registered_project_path_is_an_exact_string_match() {
+        let db = test_db();
+        seed_project_at(&db, "Alpha", "/home/user/alpha");
+
+        assert!(!db.is_registered_project_path("/home/user/alpha/").unwrap());
+        assert!(!db.is_registered_project_path("/home/user/./alpha").unwrap());
+        assert!(!db.is_registered_project_path("/home/user/alpha/sub").unwrap());
+    }
+
+    #[test]
+    fn test_active_project_paths_excludes_trashed() {
+        let db = test_db();
+        seed_project_at(&db, "Alpha", "/home/user/alpha");
+        let beta = seed_project_at(&db, "Beta", "/home/user/beta");
+
+        let mut paths = db.active_project_paths().unwrap();
+        paths.sort();
+        assert_eq!(paths, vec!["/home/user/alpha", "/home/user/beta"]);
+
+        db.delete_project(beta).expect("no se pudo borrar");
+
+        assert_eq!(db.active_project_paths().unwrap(), vec!["/home/user/alpha"]);
     }
 
     /// Siembra UNA fila en cada una de las 6 tablas hijas de `project_id`. Usado para
@@ -2415,8 +2651,16 @@ mod tests {
         assert!(db.get_root_projects().unwrap().iter().all(|p| p.id != created.id));
         // ...pero SÍ está en la papelera...
         assert!(db.list_trash().unwrap().iter().any(|p| p.id == created.id));
-        // ...y el lookup por id sigue funcionando (lo necesita restaurar).
-        assert!(db.get_project(created.id).is_ok());
+        // ...y get_project YA NO lo devuelve (B4).
+        //
+        // El comentario anterior acá decía "el lookup por id sigue funcionando (lo
+        // necesita restaurar)". Era FALSO: `restore_project` no compone `get_project`,
+        // hace su propio `SELECT deleted_at FROM projects WHERE id = ?1`. Ver
+        // `test_restore_project_still_works_after_trash_filter`.
+        assert!(
+            db.get_project(created.id).is_err(),
+            "un proyecto en papelera no debe ser legible con get_project"
+        );
     }
 
     #[test]
@@ -3154,6 +3398,46 @@ mod tests {
         assert_eq!(f2.pinned_order, Some(3));
     }
 
+    /// B8: un id fantasma en la lista ABORTA todo el reordenamiento y no deja ni un
+    /// `pinned_order` escrito. Sin la transacción, los ids anteriores al fantasma ya
+    /// habrían quedado renumerados y el orden terminaba inconsistente.
+    #[test]
+    fn test_reorder_pinned_projects_aborts_on_unknown_id_without_partial_write() {
+        let db = test_db();
+        let mut ids = vec![];
+        for i in 0..3 {
+            let mut dto = test_project_dto();
+            dto.name = format!("P{}", i);
+            let p = db.create_project(dto).unwrap();
+            db.toggle_pin_project(p.id).unwrap();
+            ids.push(p.id);
+        }
+        let orden_previo: Vec<Option<i64>> = ids
+            .iter()
+            .map(|id| db.get_project(*id).unwrap().pinned_order)
+            .collect();
+
+        // El fantasma va ÚLTIMO a propósito: los dos primeros UPDATE ya corrieron y
+        // tienen que revertirse. Si el test pusiera el fantasma primero, pasaría en
+        // verde incluso sin transacción y no probaría nada.
+        let err = db
+            .reorder_pinned_projects(vec![ids[2], ids[0], 999_999])
+            .expect_err("un id inexistente debe abortar el reordenamiento");
+        assert!(
+            matches!(err, rusqlite::Error::QueryReturnedNoRows),
+            "debe ser QueryReturnedNoRows, fue: {err:?}"
+        );
+
+        let orden_posterior: Vec<Option<i64>> = ids
+            .iter()
+            .map(|id| db.get_project(*id).unwrap().pinned_order)
+            .collect();
+        assert_eq!(
+            orden_previo, orden_posterior,
+            "el rollback debe dejar el pinned_order exactamente como estaba"
+        );
+    }
+
     // --- Groups ---
 
     #[test]
@@ -3342,6 +3626,30 @@ mod tests {
         // Verify total_time updated on project
         let fetched = db.get_project(p.id).unwrap();
         assert_eq!(fetched.total_time_seconds, Some(300));
+    }
+
+    /// B8: cerrar una sesión inexistente no debe acreditarle tiempo a NINGÚN proyecto.
+    /// El segundo UPDATE resuelve su `WHERE id = (SELECT project_id ...)` a NULL y no
+    /// matchea nada; este test lo fija para que un refactor del subquery no empiece a
+    /// repartir tiempo fantasma.
+    #[test]
+    fn test_end_tracking_session_with_unknown_id_credits_no_project() {
+        let db = test_db();
+        let p = db.create_project(test_project_dto()).unwrap();
+        let session_id = db.create_tracking_session(p.id, "test").unwrap();
+        db.end_tracking_session(session_id, 300).unwrap();
+        assert_eq!(db.get_project(p.id).unwrap().total_time_seconds, Some(300));
+
+        // Sesión que no existe: no explota y no toca el total.
+        db.end_tracking_session(999_999, 5_000)
+            .expect("cerrar una sesión inexistente no debe ser un error duro");
+
+        assert_eq!(
+            db.get_project(p.id).unwrap().total_time_seconds,
+            Some(300),
+            "una sesión inexistente no debe sumar tiempo a ningún proyecto"
+        );
+        assert_eq!(db.get_tracking_sessions(p.id, 10).unwrap().len(), 1);
     }
 
     #[test]

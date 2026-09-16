@@ -50,9 +50,14 @@ describe('ProjectStore', () => {
     });
   });
 
+  // OJO con los rechazos de estos mocks: en Tauri v2 un comando que devuelve
+  // `Err(String)` rechaza la promesa con un STRING PLANO, no con un `Error`.
+  // Mockear con `new Error(...)` hacía pasar al patrón roto
+  // `err instanceof Error ? err.message : 'Error desconocido'` y por eso el bug
+  // sobrevivió. Los rechazos de acá imitan lo que hace Tauri de verdad.
   it('should handle loading error', async () => {
     const errorMessage = 'Failed to load';
-    vi.mocked(api.getAllProjects).mockRejectedValue(new Error(errorMessage));
+    vi.mocked(api.getAllProjects).mockRejectedValue(errorMessage);
 
     await createRoot(async (dispose) => {
       const store = createProjectStore();
@@ -243,7 +248,7 @@ describe('ProjectStore', () => {
     });
 
     it('should set error when loadSubprojects fails', async () => {
-      vi.mocked(api.getSubprojects).mockRejectedValue(new Error('DB error'));
+      vi.mocked(api.getSubprojects).mockRejectedValue('DB error');
 
       await createRoot(async (dispose) => {
         const store = createProjectStore();
@@ -315,6 +320,113 @@ describe('ProjectStore', () => {
 
         expect(api.deleteProject).toHaveBeenCalledWith(1);
         expect(api.getRootProjects).toHaveBeenCalled();
+
+        dispose();
+      });
+    });
+  });
+
+  // ==================== MENSAJES DEL BACKEND (Tauri v2) ====================
+
+  describe('Propagación de mensajes del backend', () => {
+    // En Tauri v2, `Err(String)` del lado Rust llega al front como un string plano.
+    // El backend escribe estas validaciones en español PARA EL USUARIO, así que el
+    // store tiene que dejarlas pasar tal cual: si aparece "Error desconocido",
+    // alguien volvió a meter `err instanceof Error ? err.message : '...'`.
+    const backendMessage =
+      'No podés asignar un proyecto como su propio grupo padre.';
+
+    it('conserva el texto original en loadProjects', async () => {
+      vi.mocked(api.getAllProjects).mockRejectedValue(backendMessage);
+
+      await createRoot(async (dispose) => {
+        const store = createProjectStore();
+        await store.loadProjects();
+
+        expect(store.error()).toBe(backendMessage);
+        expect(store.error()).not.toBe('Error desconocido');
+
+        dispose();
+      });
+    });
+
+    it('conserva el texto original en updateProject', async () => {
+      vi.mocked(api.updateProject).mockRejectedValue(backendMessage);
+
+      await createRoot(async (dispose) => {
+        const store = createProjectStore();
+        await expect(store.updateProject(1, { name: 'X' })).rejects.toBe(
+          backendMessage
+        );
+
+        expect(store.error()).toBe(backendMessage);
+
+        dispose();
+      });
+    });
+
+    it('conserva el texto original en searchProjects', async () => {
+      vi.mocked(api.searchProjects).mockRejectedValue(backendMessage);
+
+      await createRoot(async (dispose) => {
+        const store = createProjectStore();
+        await store.searchProjects('algo');
+
+        expect(store.error()).toBe(backendMessage);
+
+        dispose();
+      });
+    });
+
+    it('conserva el texto original en loadRootProjects', async () => {
+      vi.mocked(api.getRootProjects).mockRejectedValue(backendMessage);
+
+      await createRoot(async (dispose) => {
+        const store = createProjectStore();
+        await store.loadRootProjects();
+
+        expect(store.error()).toBe(backendMessage);
+
+        dispose();
+      });
+    });
+
+    it('conserva el texto original en assignToGroup', async () => {
+      vi.mocked(api.assignProjectToGroup).mockRejectedValue(backendMessage);
+
+      await createRoot(async (dispose) => {
+        const store = createProjectStore();
+        await expect(store.assignToGroup(1, 1)).rejects.toBe(backendMessage);
+
+        expect(store.error()).toBe(backendMessage);
+
+        dispose();
+      });
+    });
+
+    it('conserva el texto original en openTerminal', async () => {
+      const terminalMessage = 'Ruta de terminal personalizado no configurada';
+      vi.mocked(api.openTerminal).mockRejectedValue(terminalMessage);
+
+      await createRoot(async (dispose) => {
+        const store = createProjectStore();
+        await expect(store.openTerminal('/tmp')).rejects.toBe(terminalMessage);
+
+        expect(store.error()).toBe(terminalMessage);
+        expect(store.error()).not.toBe('Error al abrir terminal');
+
+        dispose();
+      });
+    });
+
+    it('cae en "Error desconocido" solo si el rechazo no es string ni Error', async () => {
+      vi.mocked(api.getAllProjects).mockRejectedValue({ code: 500 });
+
+      await createRoot(async (dispose) => {
+        const store = createProjectStore();
+        await store.loadProjects();
+
+        expect(store.error()).toBe('Error desconocido');
 
         dispose();
       });

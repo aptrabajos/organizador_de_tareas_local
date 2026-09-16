@@ -34,6 +34,7 @@ import {
 import { open } from '@tauri-apps/plugin-dialog';
 import { writeTextFile } from '@tauri-apps/plugin-fs';
 import { join, normalize, sep } from '@tauri-apps/api/path';
+import { logger } from '../utils/logger';
 
 // Configurar marked para soportar GFM y checkboxes
 marked.use({
@@ -86,10 +87,17 @@ const ProjectList: Component<ProjectListProps> = (props) => {
   const [statusFilter, setStatusFilter] = createSignal<string>('all');
   const [showPinnedOnly, setShowPinnedOnly] = createSignal(false);
 
-  // Estado para rastrear qué proyectos son grupos (v0.4.0)
-  const [projectGroups, setProjectGroups] = createSignal<Set<number>>(
-    new Set()
-  );
+  // Conteo de subproyectos por id (v0.4.0). Antes era un `Set` con los ids que
+  // tenían hijos, y el número en sí se tiraba: por eso cada GroupCard renderizada
+  // tenía que volver a pedirle el conteo al backend en su propio `onMount`, una
+  // llamada por tarjeta, para un dato que acá ya estaba. Guardando el número se
+  // lo podemos pasar por prop y esa segunda ronda desaparece.
+  const [subprojectCounts, setSubprojectCounts] = createSignal<
+    Map<number, number>
+  >(new Map());
+
+  /** Un proyecto es "grupo" si tiene al menos un hijo. */
+  const isGroupId = (id: number) => (subprojectCounts().get(id) ?? 0) > 0;
 
   // Token de ejecución del efecto de abajo: si una corrida vieja (IIFE async) resuelve
   // después de que ya arrancó una más nueva, su resultado se descarta. Sin esto una
@@ -104,25 +112,32 @@ const ProjectList: Component<ProjectListProps> = (props) => {
       const token = ++projectGroupsToken;
       const currentProjects = props.projects;
       (async () => {
-        const groupIds = new Set<number>();
-        for (const project of currentProjects) {
-          try {
-            const count = await countSubprojects(project.id);
-            if (count > 0) {
-              groupIds.add(project.id);
+        // En paralelo, no en serie. Este bucle era un `for` con `await` adentro:
+        // con N proyectos en vista eran N viajes de IPC ENCADENADOS antes de que
+        // la grilla supiera qué tarjeta es un grupo. Son independientes entre sí,
+        // así que no hay ninguna razón para esperar uno para pedir el siguiente.
+        //
+        // El fallo se maneja por proyecto y no con un `Promise.all` pelado a
+        // propósito: si una sola llamada se rompe, `Promise.all` descarta TODAS
+        // las demás y la vista se queda sin ningún grupo detectado.
+        const entries = await Promise.all(
+          currentProjects.map(async (project): Promise<[number, number]> => {
+            try {
+              return [project.id, await countSubprojects(project.id)];
+            } catch (err) {
+              logger.error('Error contando subproyectos:', err);
+              return [project.id, 0];
             }
-          } catch (err) {
-            console.error('Error contando subproyectos:', err);
-          }
-        }
+          })
+        );
         if (token !== projectGroupsToken) return; // corrida obsoleta, descartar
-        setProjectGroups(groupIds);
+        setSubprojectCounts(new Map(entries));
       })();
     } else {
       // En vista de subproyectos (sin búsqueda), ninguno es grupo (nivel único).
       // Invalida cualquier corrida async pendiente del bloque anterior.
       projectGroupsToken++;
-      setProjectGroups(new Set<number>());
+      setSubprojectCounts(new Map());
     }
   });
 
@@ -178,7 +193,7 @@ const ProjectList: Component<ProjectListProps> = (props) => {
 
       // Iniciar sesión de trabajo (tracking automático de tiempo)
       const session = await startWorkSession(project.id);
-      console.log(`🕒 Sesión de trabajo iniciada: ${session.project_name}`);
+      logger.debug(`🕒 Sesión de trabajo iniciada: ${session.project_name}`);
 
       if (session.tracking_initialized) {
         toast.success(`📁 Tracking activado para ${project.name}`, {
@@ -192,7 +207,7 @@ const ProjectList: Component<ProjectListProps> = (props) => {
       // Abrir terminal
       await props.onOpenTerminal(project);
     } catch (error) {
-      console.error('Error al abrir proyecto:', error);
+      logger.error('Error al abrir proyecto:', error);
       // Aunque falle el tracking, abrimos el terminal igual
       await props.onOpenTerminal(project);
     }
@@ -211,7 +226,7 @@ const ProjectList: Component<ProjectListProps> = (props) => {
         props.onProjectsChanged();
       }
     } catch (error) {
-      console.error('Error al cambiar pin:', error);
+      logger.error('Error al cambiar pin:', error);
       toast.error('Error al cambiar favorito');
     }
   };
@@ -226,7 +241,7 @@ const ProjectList: Component<ProjectListProps> = (props) => {
         props.onProjectsChanged();
       }
     } catch (error) {
-      console.error('Error al cambiar estado:', error);
+      logger.error('Error al cambiar estado:', error);
       toast.error('Error al cambiar estado');
     }
   };
@@ -247,17 +262,18 @@ const ProjectList: Component<ProjectListProps> = (props) => {
         duration: 3000,
       });
 
-      // Actualizar el set de grupos inmediatamente para feedback visual
-      const currentGroups = new Set(projectGroups());
-      currentGroups.add(groupId);
-      setProjectGroups(currentGroups);
+      // Actualizar el conteo inmediatamente para feedback visual: el proyecto que
+      // se acaba de soltar es un hijo más. `onProjectsChanged` recarga después.
+      const counts = new Map(subprojectCounts());
+      counts.set(groupId, (counts.get(groupId) ?? 0) + 1);
+      setSubprojectCounts(counts);
 
       // Refrescar lista de proyectos (esto recargará desde la BD)
       if (props.onProjectsChanged) {
         props.onProjectsChanged();
       }
     } catch (error) {
-      console.error('Error al asignar proyecto a grupo:', error);
+      logger.error('Error al asignar proyecto a grupo:', error);
       // Surfacea el mensaje del backend (ej. validación de ciclo en español)
       toast.error(getErrorMessage(error));
       throw error;
@@ -280,7 +296,7 @@ const ProjectList: Component<ProjectListProps> = (props) => {
         props.onProjectsChanged();
       }
     } catch (error) {
-      console.error('Error al remover proyecto del grupo:', error);
+      logger.error('Error al remover proyecto del grupo:', error);
       toast.error('Error al remover proyecto del grupo');
     }
   };
@@ -301,7 +317,7 @@ const ProjectList: Component<ProjectListProps> = (props) => {
     if (!draggedProject || !targetProject) return;
 
     // v0.4.0 - Detectar si el target es un grupo (tiene hijos)
-    const isTargetGroup = projectGroups().has(overId);
+    const isTargetGroup = isGroupId(overId);
 
     if (isTargetGroup && props.viewMode === 'groups') {
       // Caso: Arrastrar proyecto sobre un GroupCard para convertirlo en subproyecto
@@ -310,7 +326,7 @@ const ProjectList: Component<ProjectListProps> = (props) => {
       } catch (error) {
         // handleDropOnGroup ya mostró el toast de error (con el mensaje específico
         // del backend); acá solo logueamos para no duplicarlo.
-        console.error('Error al asignar proyecto a grupo:', error);
+        logger.error('Error al asignar proyecto a grupo:', error);
       }
       return;
     }
@@ -341,7 +357,7 @@ const ProjectList: Component<ProjectListProps> = (props) => {
       );
 
       if (failures.length > 0) {
-        console.error('Error al actualizar orden (parcial):', failures);
+        logger.error('Error al actualizar orden (parcial):', failures);
         toast.error(
           'Error al actualizar el orden; se resincronizó la lista con la base de datos'
         );
@@ -361,7 +377,7 @@ const ProjectList: Component<ProjectListProps> = (props) => {
         props.onProjectsChanged();
       }
     } catch (error) {
-      console.error('Error al actualizar orden:', error);
+      logger.error('Error al actualizar orden:', error);
       toast.error('Error al actualizar orden');
       // También resincronizamos ante un fallo inesperado antes de llegar al
       // Promise.allSettled (p.ej. el propio armado del array reordenado).
@@ -413,11 +429,11 @@ const ProjectList: Component<ProjectListProps> = (props) => {
           duration: 5000,
         });
       } catch (error) {
-        console.error('Error al crear backup:', error);
+        logger.error('Error al crear backup:', error);
         toast.error(`Error al crear backup: ${error}`, { id: toastId });
       }
     } catch (error) {
-      console.error('Error abriendo selector:', error);
+      logger.error('Error abriendo selector:', error);
       toast.error(`Error al abrir selector de carpetas: ${error}`);
     }
   };
@@ -431,7 +447,7 @@ const ProjectList: Component<ProjectListProps> = (props) => {
         duration: 6000,
       });
     } catch (error) {
-      console.error('Error al exportar PDF:', error);
+      logger.error('Error al exportar PDF:', error);
       toast.error(`❌ Error al exportar PDF: ${error}`, { id: toastId });
     }
   };
@@ -453,11 +469,11 @@ const ProjectList: Component<ProjectListProps> = (props) => {
           duration: 5000,
         });
       } catch (error) {
-        console.error('Error al sincronizar con rsync:', error);
+        logger.error('Error al sincronizar con rsync:', error);
         toast.error(`Error al sincronizar: ${error}`, { id: toastId });
       }
     } catch (error) {
-      console.error('Error:', error);
+      logger.error('Error:', error);
       toast.error(`Error: ${error}`);
     }
   };
@@ -473,7 +489,7 @@ const ProjectList: Component<ProjectListProps> = (props) => {
     variant: 'grid' | 'self-group' = 'grid'
   ) => {
     const isGrid = variant === 'grid';
-    const isGroup = () => projectGroups().has(project.id);
+    const isGroup = () => isGroupId(project.id);
 
     // El sortable solo existe en la grilla; la cabecera del propio grupo no se arrastra
     const sortable = isGrid ? createSortable(project.id) : null;
@@ -1101,7 +1117,7 @@ const ProjectList: Component<ProjectListProps> = (props) => {
                 <For each={filteredProjects()}>
                   {(project) => {
                     // Determinar si este proyecto es un grupo (tiene hijos)
-                    const isGroup = () => projectGroups().has(project.id);
+                    const isGroup = () => isGroupId(project.id);
 
                     // Si es un grupo y estamos en vista de grupos (sin búsqueda), usar GroupCard
                     return (
@@ -1115,6 +1131,9 @@ const ProjectList: Component<ProjectListProps> = (props) => {
                         {/* Render GroupCard para proyectos que son grupos */}
                         <GroupCard
                           project={project}
+                          subprojectCount={
+                            subprojectCounts().get(project.id) ?? 0
+                          }
                           onViewProjects={(group) => {
                             if (props.onViewGroup) {
                               props.onViewGroup(group);

@@ -49,6 +49,38 @@ export default [
         { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
       ],
       '@typescript-eslint/no-explicit-any': 'warn',
+      // Sin esta regla las 104 llamadas a `console.*` que el B23 acaba de sacar
+      // vuelven de a una, en el próximo PR, sin que nadie lo note. `allow: []`
+      // es a propósito: no hay método de console que esté bien en producción,
+      // porque en el build con devtools apagadas nadie puede leer esa consola.
+      // El único lugar autorizado a tocar `console` es src/utils/logger.ts, que
+      // está exceptuado abajo.
+      //
+      // Se escribe pelada y no como `['error', { allow: [] }]`: el schema de la
+      // regla exige que `allow` tenga al menos un elemento, así que la lista
+      // vacía no valida. La forma corta es exactamente el mismo comportamiento
+      // —ningún método permitido— y sí arranca.
+      'no-console': 'error',
+      // En Tauri v2 un comando que devuelve `Err(String)` rechaza la promesa con
+      // un STRING plano, no con un `Error`. Chequear `err instanceof Error` tira
+      // a la basura el mensaje del backend y termina mostrando "Error desconocido".
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            'BinaryExpression[operator="instanceof"][right.name="Error"]',
+          message:
+            'No uses `err instanceof Error`: en Tauri v2 los errores del backend llegan como string plano y se pierde el mensaje real. Usá getErrorMessage(err) de src/utils/errors.ts.',
+        },
+      ],
+    },
+  },
+  {
+    // El helper de logging ES el envoltorio de `console`: prohibírselo sería
+    // pedirle que no haga su trabajo. Los tests también lo espían legítimamente.
+    files: ['src/utils/logger.ts', '**/*.test.{ts,tsx}', 'src/test-setup.ts'],
+    rules: {
+      'no-console': 'off',
     },
   },
   {
@@ -58,7 +90,11 @@ export default [
       'src-tauri/**',
       '.vite/**',
       'tailwind.config.js',
+      // El snapshot histórico vive en docs/historico/win10/**, así que el patrón
+      // 'win10/**' (relativo al cwd) nunca lo agarraba y ESLint terminaba
+      // linteando código archivado que nadie va a arreglar.
       'win10/**',
+      'docs/**',
     ],
   },
 ];

@@ -1,10 +1,18 @@
-import { Component, createSignal, onMount, For, Show } from 'solid-js';
+import { Component, createSignal, For, Show } from 'solid-js';
 import { createDroppable } from '@thisbeyond/solid-dnd';
 import type { Project } from '../types/project';
-import { countSubprojects, getSubprojects } from '../services/api';
+import { getSubprojects } from '../services/api';
+import { logger } from '../utils/logger';
 
 interface GroupCardProps {
   project: Project;
+  /**
+   * Cuántos hijos tiene el grupo. Llega por prop desde ProjectList, que ya lo
+   * pidió para decidir que este proyecto ES un grupo. Antes cada tarjeta lo
+   * volvía a pedir en su propio `onMount`: una llamada extra al backend por
+   * grupo renderizado, para un número que el padre ya tenía en la mano.
+   */
+  subprojectCount: number;
   onViewProjects: (project: Project) => void;
   onEdit: (project: Project) => void;
   onDelete: (project: Project) => void;
@@ -37,7 +45,6 @@ const GroupCard: Component<GroupCardProps> = (props) => {
   // Capturar valores inmutables de props (id no cambia durante el lifecycle)
   const projectId = props.project.id;
 
-  const [subprojectCount, setSubprojectCount] = createSignal(0);
   const [showSubprojects, setShowSubprojects] = createSignal(false);
   const [subprojects, setSubprojects] = createSignal<Project[]>([]);
   const [loadingSubprojects, setLoadingSubprojects] = createSignal(false);
@@ -47,17 +54,8 @@ const GroupCard: Component<GroupCardProps> = (props) => {
 
   // Computed values para lógica reutilizable
   const borderColor = () => props.project.group_color || DEFAULT_GROUP_COLOR;
-  const hasSubprojects = () => subprojectCount() > 0;
+  const hasSubprojects = () => props.subprojectCount > 0;
   const badgeBackgroundColor = () => `${borderColor()}${COLOR_OPACITY}`;
-
-  onMount(async () => {
-    try {
-      const count = await countSubprojects(props.project.id);
-      setSubprojectCount(count);
-    } catch (err) {
-      console.error('Error counting subprojects:', err);
-    }
-  });
 
   // Cargar subproyectos cuando se expande la lista
   const toggleSubprojects = async () => {
@@ -68,7 +66,7 @@ const GroupCard: Component<GroupCardProps> = (props) => {
         const projects = await getSubprojects(props.project.id);
         setSubprojects(projects);
       } catch (err) {
-        console.error('Error loading subprojects:', err);
+        logger.error('Error loading subprojects:', err);
       } finally {
         setLoadingSubprojects(false);
       }
@@ -165,8 +163,8 @@ const GroupCard: Component<GroupCardProps> = (props) => {
                 : 'Mostrar subproyectos'
             }
           >
-            {showSubprojects() ? '▼' : '▶'} 📊 {subprojectCount()}{' '}
-            {subprojectCount() === 1 ? 'proyecto' : 'proyectos'}
+            {showSubprojects() ? '▼' : '▶'} 📊 {props.subprojectCount}{' '}
+            {props.subprojectCount === 1 ? 'proyecto' : 'proyectos'}
           </button>
         </Show>
       </div>

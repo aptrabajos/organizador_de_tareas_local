@@ -1,3 +1,5 @@
+use log::{debug, info, warn};
+
 use super::schema::*;
 use super::defaults::get_os_defaults;
 use std::fs;
@@ -67,7 +69,7 @@ impl ConfigManager {
             Ok(Self::load_from_file(path))
         } else {
             // Crear configuración nueva con defaults del OS
-            println!("🎉 Primera ejecución - Creando configuración predeterminada");
+            info!("🎉 Primera ejecución - Creando configuración predeterminada");
             let config = get_os_defaults();
             Self::save_to_file(path, &config)?;
             Ok(config)
@@ -80,11 +82,11 @@ impl ConfigManager {
     fn load_from_file(path: &PathBuf) -> AppConfig {
         match Self::try_load_from_file(path) {
             Ok(config) => {
-                println!("✅ Configuración cargada desde: {}", path.display());
+                debug!("✅ Configuración cargada desde: {}", path.display());
                 config
             }
             Err(e) => {
-                eprintln!(
+                warn!(
                     "⚠️ [CONFIG] No se pudo cargar la configuración desde {}: {}. Se usarán valores predeterminados.",
                     path.display(),
                     e
@@ -119,11 +121,11 @@ impl ConfigManager {
         let backup_path = PathBuf::from(backup_name);
 
         match fs::rename(path, &backup_path) {
-            Ok(_) => eprintln!(
+            Ok(_) => warn!(
                 "📦 [CONFIG] Archivo corrupto respaldado en: {}",
                 backup_path.display()
             ),
-            Err(e) => eprintln!(
+            Err(e) => warn!(
                 "⚠️ [CONFIG] No se pudo respaldar el archivo corrupto ({}): {}",
                 path.display(),
                 e
@@ -150,7 +152,7 @@ impl ConfigManager {
         fs::rename(&tmp_path, path)
             .map_err(|e| format!("Error al reemplazar archivo de configuración: {}", e))?;
 
-        println!("💾 Configuración guardada en: {}", path.display());
+        debug!("💾 Configuración guardada en: {}", path.display());
         Ok(())
     }
 
@@ -178,6 +180,11 @@ impl ConfigManager {
         // Guardar en disco
         Self::save_to_file(&self.config_path, &new_config)?;
 
+        // El nivel de log se aplica EN EL ACTO, no en el próximo arranque: mover la
+        // perilla en Settings y tener que reiniciar la app para que surta efecto es
+        // justo el tipo de perilla que la gente concluye que no funciona.
+        crate::logging::apply_level(new_config.advanced.log_level);
+
         Ok(())
     }
 
@@ -185,7 +192,7 @@ impl ConfigManager {
     pub fn reset_config(&self) -> Result<AppConfig, String> {
         let default_config = get_os_defaults();
         self.update_config(default_config.clone())?;
-        println!("🔄 Configuración reseteada a valores predeterminados");
+        info!("🔄 Configuración reseteada a valores predeterminados");
         Ok(default_config)
     }
 
@@ -198,7 +205,7 @@ impl ConfigManager {
         if config.platform.terminal.mode == ProgramMode::Custom {
             if let Some(ref path) = config.platform.terminal.custom_path {
                 if !PathBuf::from(path).exists() {
-                    eprintln!("⚠️ [CONFIG] Ruta de terminal personalizada no existe: {}", path);
+                    warn!("⚠️ [CONFIG] Ruta de terminal personalizada no existe: {}", path);
                 }
             }
         }
@@ -224,8 +231,8 @@ impl ConfigManager {
         // Por ahora solo tenemos la versión 0.2.0
         // En el futuro aquí iría la lógica de migración
         if config.version != "0.2.0" {
-            println!("⚠️ Versión de configuración desconocida: {}", config.version);
-            println!("💡 Considera resetear la configuración si hay problemas");
+            warn!("⚠️ Versión de configuración desconocida: {}", config.version);
+            debug!("💡 Considera resetear la configuración si hay problemas");
         }
 
         Ok(())

@@ -6,7 +6,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Gestor de Proyectos** - Aplicación de escritorio nativa (Tauri 2.x) para gestionar proyectos locales. Versión actual: **0.4.3**
+**Gestor de Proyectos** - Aplicación de escritorio nativa (Tauri 2.x) para gestionar proyectos locales.
+
+> **Versión:** ver `package.json` (única fuente de verdad). `src-tauri/Cargo.toml` y
+> `src-tauri/tauri.conf.json` deben acompañar ese número. No repetirlo en la
+> documentación: siempre se desincroniza.
 
 ### Importante: Es una aplicación de escritorio, NO web
 
@@ -108,19 +112,24 @@ src-tauri/src/
 │   ├── linux.rs            # Implementación Linux
 │   ├── windows.rs          # Implementación Windows
 │   └── detection.rs        # Detección de programas instalados
-├── tracking/               # Sistema de time tracking automático
+├── tracking/               # Sistema de time tracking
 │   ├── mod.rs              # API pública del módulo de tracking
-│   ├── config.rs           # Configuración del tracking
-│   ├── session.rs          # Modelo de sesión de trabajo (start/stop)
-│   ├── socket.rs           # IPC vía socket para tracking en background
-│   └── aggregator.rs       # Agregación de tiempo por proyecto
+│   ├── config.rs           # Carpeta .gestor/ por proyecto
+│   └── aggregator.rs       # Tipos TimeTrackingSession / TimeStats
 └── pdf_export/mod.rs       # Generación de PDFs (printpdf)
 ```
 
-**Time tracking:** El módulo `tracking/` registra el tiempo de trabajo por proyecto de
-forma automática. Usa un socket para comunicar el estado de la sesión y un agregador
-que consolida los tiempos. Se inyecta como `State<'_, ActiveSession>` en los comandos
-(`start_work_session`, `stop_work_session`, `get_work_session_status`, etc.).
+**Time tracking:** El tiempo se registra por el camino de `work_session`, y es el
+único: el botón "Trabajar" llama a `start_work_session`, el backend mide la duración
+con `Instant` y cierra la sesión al abrir otra o al cerrar la ventana. El estado vive
+en un `ActiveSession` que se inyecta como `State<'_, ActiveSession>` en
+`start_work_session`, `stop_work_session` y `get_work_session_status`. El módulo
+`tracking/` aporta la carpeta `.gestor/` por proyecto (`config.rs`) y los tipos de
+datos (`aggregator.rs`).
+
+El socket de tracking automático por shell hooks (`SocketServer`, `SessionManager`,
+`TimeAggregator` y los scripts `gestor-track.*`) se eliminó en el B17: estaba escrito
+y testeado pero nunca se arrancaba en producción. Detalle en `ARQUITECTURA.md`.
 
 **Patrón de comandos Tauri:**
 
@@ -132,7 +141,7 @@ pub async fn get_project(db: State<'_, Database>, id: i64) -> Result<Project, St
 }
 ```
 
-**Volumen y dominios:** Hay ~77 comandos registrados en `main.rs` vía
+**Volumen y dominios:** Hay 79 comandos registrados en `main.rs` vía
 `tauri::generate_handler![]`, agrupados por dominio: CRUD de proyectos, links,
 attachments, journal, todos, grupos jerárquicos, dashboard, config, time tracking
 y operaciones de sistema (abrir terminal/editor/explorador).
@@ -172,6 +181,44 @@ el directorio del proyecto: `get_git_branch`, `get_git_status`, `get_recent_comm
 
 - `Database` y `ConfigManager` se inyectan como `State<>` en comandos
 - Los comandos retornan `Result<T, String>` para manejo de errores
+
+### Mensajes de error
+
+Los comandos devuelven `Result<T, String>` con texto libre, sin tipo estructurado ni
+códigos, y ese texto **llega tal cual a la UI** (el store lo propaga con
+`getErrorMessage`). Hasta que exista un tipo de error con código + i18n, el idioma se
+decide **mensaje por mensaje** con este criterio:
+
+| El mensaje… | Idioma | Por qué |
+| --- | --- | --- |
+| Responde a una acción del usuario **y describe algo que él puede corregir** | **Español rioplatense** | Lo va a leer una persona que necesita saber qué hacer |
+| Describe un fallo de sistema (spawn de proceso, I/O, mutex envenenado) | Inglés | Es una línea de log; no hay acción posible del otro lado |
+
+Ejemplos reales del repo:
+
+```rust
+// ESPAÑOL: el usuario puede inicializar el repo o elegir otro proyecto
+Err("La carpeta del proyecto no es un repositorio git.".to_string())
+
+// ESPAÑOL: el usuario puede elegir otro archivo
+"El archivo supera el límite de 5 MB. Elegí uno más chico."
+
+// INGLÉS: falló el spawn del proceso, no hay nada que el usuario pueda hacer
+.map_err(|e| format!("Failed to execute git command: {}", e))?
+```
+
+Reglas de redacción para los de español:
+
+- **Voseo y directo**: "No podés asignar un proyecto como su propio grupo padre."
+- **Accionable**: decí qué hacer, no solo qué falló. Comparar
+  `"Nombre de proyecto no válido"` con
+  `"El archivo supera el límite de 5 MB. Elegí uno más chico."`
+- **Cuidado con los wrappers `map_err`**: si el prefijo está en inglés y envuelve una
+  validación de dominio en español, el usuario recibe un híbrido
+  (`"Error creating project: El grupo padre no existe."`). Si el wrapper transporta un
+  mensaje que el usuario puede accionar, el prefijo va en español.
+- Un `map_err` que solo envuelve un error de rusqlite/IO **no** es un mensaje de
+  usuario: no hace falta traducirlo, y traducir solo el prefijo deja un híbrido peor.
 
 ### Testing
 

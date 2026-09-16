@@ -11,7 +11,7 @@ Esta es una **aplicación de escritorio nativa**, **NO una aplicación web**:
 - [ ] ❌ **NO acceder** a `http://localhost:1420` desde el navegador
 - [ ] 📝 Ver logs en la **terminal** donde ejecutaste el comando
 
-**Para más detalles de desarrollo, ver:** [`GUIA-DESARROLLO.md`](./GUIA-DESARROLLO.md)
+**Para más detalles de desarrollo, ver:** [`docs/GUIA-DESARROLLO.md`](./docs/GUIA-DESARROLLO.md)
 
 ## ✨ Características
 
@@ -52,7 +52,13 @@ sudo pacman -S --needed webkit2gtk base-devel curl wget openssl \
 
 # Node.js (si no está instalado)
 sudo pacman -S nodejs npm
+
+# pnpm: es el UNICO gestor de paquetes de este repo (no usar npm ni yarn)
+npm install -g pnpm
 ```
+
+> **Gestor de paquetes:** este repo usa **pnpm** exclusivamente. El único
+> lockfile versionado es `pnpm-lock.yaml`. `package-lock.json` está ignorado.
 
 ### Emuladores de terminal soportados
 
@@ -115,13 +121,13 @@ pnpm run lint
 pnpm run format
 ```
 
-**📖 Para guía detallada de desarrollo, ver:** [`GUIA-DESARROLLO.md`](./GUIA-DESARROLLO.md)
+**📖 Para guía detallada de desarrollo, ver:** [`docs/GUIA-DESARROLLO.md`](./docs/GUIA-DESARROLLO.md)
 
 ## 📦 Build y Distribución
 
 ```bash
 # Build optimizado para producción
-npm run tauri build
+pnpm run tauri:build
 
 # Genera automáticamente:
 # - .deb (Debian/Ubuntu/Manjaro)
@@ -191,11 +197,15 @@ _(Agregar screenshots cuando la UI esté lista)_
 
 ## 📚 Documentación Adicional
 
-- [`ARQUITECTURA.md`](./ARQUITECTURA.md) - **Arquitectura completa del proyecto** (¿Qué es Vite? ¿Cómo funciona todo?)
-- [`GUIA-DESARROLLO.md`](./GUIA-DESARROLLO.md) - Guía completa de desarrollo
-- [`LOGS-CAPTURADOS.md`](./LOGS-CAPTURADOS.md) - Logs de verificación y debugging
+**📇 Índice completo de toda la documentación:** [`docs/INDEX.md`](./docs/INDEX.md)
+
+- [`ARQUITECTURA.md`](./ARQUITECTURA.md) - **Arquitectura completa del proyecto** (¿Qué es Vite? ¿Cómo funciona todo? ¿Qué hace cada módulo Rust?)
+- [`docs/GUIA-DESARROLLO.md`](./docs/GUIA-DESARROLLO.md) - Guía completa de desarrollo
+- [`docs/ESTADO-FUNCIONALIDADES.md`](./docs/ESTADO-FUNCIONALIDADES.md) - Qué está implementado y qué falta
 - [`TROUBLESHOOTING.md`](./TROUBLESHOOTING.md) - Problemas conocidos y soluciones
 - [`CLAUDE.md`](./CLAUDE.md) - Guía para desarrollo con Claude
+- [`docs/sesiones/`](./docs/sesiones/) - Bitácoras de sesiones de trabajo (histórico)
+- [`docs/historico/`](./docs/historico/) - Documentación congelada del ciclo de Windows v0.1.0–v0.3.0
 - [`start-app.sh`](./start-app.sh) - Script helper para iniciar la app
 
 ---

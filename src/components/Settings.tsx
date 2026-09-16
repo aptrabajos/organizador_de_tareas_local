@@ -19,10 +19,14 @@ import {
   restoreBackup,
 } from '../services/api';
 import { getErrorMessage } from '../utils/errors';
+import { useTheme } from '../contexts/ThemeContext';
+import { SHORTCUT_METADATA, type ThemeMode } from '../types/config';
+import { logger } from '../utils/logger';
 
 type Tab = 'programs' | 'backup' | 'ui' | 'shortcuts' | 'advanced';
 
 export default function Settings(props: { onClose: () => void }) {
+  const { setThemeMode } = useTheme();
   const [activeTab, setActiveTab] = createSignal<Tab>('programs');
   const [config, setConfig] = createSignal<AppConfig | null>(null);
   const [detectedPrograms, setDetectedPrograms] =
@@ -61,7 +65,7 @@ export default function Settings(props: { onClose: () => void }) {
       setBackupList(list);
     } catch (err) {
       // No bloquea la pantalla: solo se loguea
-      console.error('Error al listar backups:', getErrorMessage(err));
+      logger.error('Error al listar backups:', getErrorMessage(err));
     }
   };
 
@@ -150,7 +154,7 @@ export default function Settings(props: { onClose: () => void }) {
       const cfg = await getConfig();
       setConfig(cfg);
     } catch (err) {
-      setError(`Error al cargar configuración: ${err}`);
+      setError(`Error al cargar configuración: ${getErrorMessage(err)}`);
     } finally {
       setIsLoading(false);
     }
@@ -161,7 +165,7 @@ export default function Settings(props: { onClose: () => void }) {
       const programs = await detectPrograms();
       setDetectedPrograms(programs);
     } catch (err) {
-      console.error('Error detectando programas:', err);
+      logger.error('Error detectando programas:', err);
     }
   };
 
@@ -177,7 +181,7 @@ export default function Settings(props: { onClose: () => void }) {
       setSuccessMessage('✅ Configuración guardada exitosamente');
       window.setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err) {
-      setError(`Error al guardar: ${err}`);
+      setError(`Error al guardar: ${getErrorMessage(err)}`);
     } finally {
       setIsSaving(false);
     }
@@ -199,7 +203,7 @@ export default function Settings(props: { onClose: () => void }) {
       setSuccessMessage('✅ Configuración reseteada');
       window.setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err) {
-      setError(`Error al resetear: ${err}`);
+      setError(`Error al resetear: ${getErrorMessage(err)}`);
     } finally {
       setIsLoading(false);
     }
@@ -903,18 +907,14 @@ export default function Settings(props: { onClose: () => void }) {
                       class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                       value={config()?.ui.theme || 'auto'}
                       onChange={(e) => {
+                        const mode = e.currentTarget.value as ThemeMode;
+                        // El tema se aplica y persiste EN EL ACTO vía el contexto:
+                        // antes solo se guardaba en la config y no lo leía nadie,
+                        // así que elegir "Oscuro" acá no cambiaba nada en pantalla.
+                        setThemeMode(mode);
                         const cfg = config();
                         if (cfg) {
-                          setConfig({
-                            ...cfg,
-                            ui: {
-                              ...cfg.ui,
-                              theme: e.currentTarget.value as
-                                | 'light'
-                                | 'dark'
-                                | 'auto',
-                            },
-                          });
+                          setConfig({ ...cfg, ui: { ...cfg.ui, theme: mode } });
                         }
                       }}
                     >
@@ -973,7 +973,8 @@ export default function Settings(props: { onClose: () => void }) {
                         Confirmar antes de eliminar
                       </p>
                       <p class="text-sm text-gray-600 dark:text-gray-400">
-                        Pedir confirmación al eliminar proyectos
+                        Pedir confirmación al eliminar proyectos (las
+                        eliminaciones definitivas siempre piden confirmación)
                       </p>
                     </div>
                     <label class="relative inline-flex cursor-pointer items-center">
@@ -1077,296 +1078,60 @@ export default function Settings(props: { onClose: () => void }) {
                     Atajos Disponibles
                   </h3>
 
-                  {/* Nuevo Proyecto */}
-                  <div class="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-                    <div class="mb-2 flex items-center justify-between">
-                      <div>
-                        <p class="font-medium text-gray-900 dark:text-white">
-                          Nuevo Proyecto
-                        </p>
-                        <p class="text-sm text-gray-600 dark:text-gray-400">
-                          Abrir formulario de nuevo proyecto
-                        </p>
-                      </div>
-                      <label class="relative inline-flex cursor-pointer items-center">
-                        <input
-                          type="checkbox"
-                          class="peer sr-only"
-                          checked={
-                            config()?.shortcuts.shortcuts.new_project
-                              ?.enabled ?? true
-                          }
-                          onChange={(e) => {
-                            const cfg = config();
-                            if (cfg) {
-                              setConfig({
-                                ...cfg,
-                                shortcuts: {
-                                  ...cfg.shortcuts,
-                                  shortcuts: {
-                                    ...cfg.shortcuts.shortcuts,
-                                    new_project: {
-                                      ...cfg.shortcuts.shortcuts.new_project,
-                                      enabled: e.currentTarget.checked,
+                  {/* Un solo bloque parametrizado: los seis atajos rendereaban
+                      markup IDÉNTICO y solo cambiaban clave, textos y tecla por
+                      defecto. Ver SHORTCUT_METADATA en types/config.ts. */}
+                  <For each={Object.entries(SHORTCUT_METADATA)}>
+                    {([action, meta]) => (
+                      <div class="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+                        <div class="mb-2 flex items-center justify-between">
+                          <div>
+                            <p class="font-medium text-gray-900 dark:text-white">
+                              {meta.title}
+                            </p>
+                            <p class="text-sm text-gray-600 dark:text-gray-400">
+                              {meta.description}
+                            </p>
+                          </div>
+                          <label class="relative inline-flex cursor-pointer items-center">
+                            <input
+                              type="checkbox"
+                              class="peer sr-only"
+                              checked={
+                                config()?.shortcuts.shortcuts[action]?.enabled ??
+                                true
+                              }
+                              onChange={(e) => {
+                                const cfg = config();
+                                if (cfg) {
+                                  setConfig({
+                                    ...cfg,
+                                    shortcuts: {
+                                      ...cfg.shortcuts,
+                                      shortcuts: {
+                                        ...cfg.shortcuts.shortcuts,
+                                        [action]: {
+                                          ...cfg.shortcuts.shortcuts[action],
+                                          enabled: e.currentTarget.checked,
+                                        },
+                                      },
                                     },
-                                  },
-                                },
-                              });
-                            }
-                          }}
-                        />
-                        <div class="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:start-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-green-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 dark:border-gray-600 dark:bg-gray-700 dark:peer-focus:ring-green-800 rtl:peer-checked:after:-translate-x-full" />
-                      </label>
-                    </div>
-                    <div class="flex items-center gap-2">
-                      <kbd class="rounded border border-gray-300 bg-gray-100 px-2 py-1 font-mono text-xs text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white">
-                        {config()?.shortcuts.shortcuts.new_project?.key ||
-                          'Ctrl+N'}
-                      </kbd>
-                    </div>
-                  </div>
-
-                  {/* Buscar */}
-                  <div class="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-                    <div class="mb-2 flex items-center justify-between">
-                      <div>
-                        <p class="font-medium text-gray-900 dark:text-white">
-                          Buscar Proyectos
-                        </p>
-                        <p class="text-sm text-gray-600 dark:text-gray-400">
-                          Focus en barra de búsqueda
-                        </p>
+                                  });
+                                }
+                              }}
+                            />
+                            <div class="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:start-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-green-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 dark:border-gray-600 dark:bg-gray-700 dark:peer-focus:ring-green-800 rtl:peer-checked:after:-translate-x-full" />
+                          </label>
+                        </div>
+                        <div class="flex items-center gap-2">
+                          <kbd class="rounded border border-gray-300 bg-gray-100 px-2 py-1 font-mono text-xs text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+                            {config()?.shortcuts.shortcuts[action]?.key ||
+                              meta.defaultKey}
+                          </kbd>
+                        </div>
                       </div>
-                      <label class="relative inline-flex cursor-pointer items-center">
-                        <input
-                          type="checkbox"
-                          class="peer sr-only"
-                          checked={
-                            config()?.shortcuts.shortcuts.search?.enabled ??
-                            true
-                          }
-                          onChange={(e) => {
-                            const cfg = config();
-                            if (cfg) {
-                              setConfig({
-                                ...cfg,
-                                shortcuts: {
-                                  ...cfg.shortcuts,
-                                  shortcuts: {
-                                    ...cfg.shortcuts.shortcuts,
-                                    search: {
-                                      ...cfg.shortcuts.shortcuts.search,
-                                      enabled: e.currentTarget.checked,
-                                    },
-                                  },
-                                },
-                              });
-                            }
-                          }}
-                        />
-                        <div class="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:start-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-green-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 dark:border-gray-600 dark:bg-gray-700 dark:peer-focus:ring-green-800 rtl:peer-checked:after:-translate-x-full" />
-                      </label>
-                    </div>
-                    <div class="flex items-center gap-2">
-                      <kbd class="rounded border border-gray-300 bg-gray-100 px-2 py-1 font-mono text-xs text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white">
-                        {config()?.shortcuts.shortcuts.search?.key || 'Ctrl+F'}
-                      </kbd>
-                    </div>
-                  </div>
-
-                  {/* Configuración */}
-                  <div class="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-                    <div class="mb-2 flex items-center justify-between">
-                      <div>
-                        <p class="font-medium text-gray-900 dark:text-white">
-                          Abrir Configuración
-                        </p>
-                        <p class="text-sm text-gray-600 dark:text-gray-400">
-                          Abrir este panel de configuración
-                        </p>
-                      </div>
-                      <label class="relative inline-flex cursor-pointer items-center">
-                        <input
-                          type="checkbox"
-                          class="peer sr-only"
-                          checked={
-                            config()?.shortcuts.shortcuts.settings?.enabled ??
-                            true
-                          }
-                          onChange={(e) => {
-                            const cfg = config();
-                            if (cfg) {
-                              setConfig({
-                                ...cfg,
-                                shortcuts: {
-                                  ...cfg.shortcuts,
-                                  shortcuts: {
-                                    ...cfg.shortcuts.shortcuts,
-                                    settings: {
-                                      ...cfg.shortcuts.shortcuts.settings,
-                                      enabled: e.currentTarget.checked,
-                                    },
-                                  },
-                                },
-                              });
-                            }
-                          }}
-                        />
-                        <div class="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:start-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-green-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 dark:border-gray-600 dark:bg-gray-700 dark:peer-focus:ring-green-800 rtl:peer-checked:after:-translate-x-full" />
-                      </label>
-                    </div>
-                    <div class="flex items-center gap-2">
-                      <kbd class="rounded border border-gray-300 bg-gray-100 px-2 py-1 font-mono text-xs text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white">
-                        {config()?.shortcuts.shortcuts.settings?.key ||
-                          'Ctrl+Comma'}
-                      </kbd>
-                    </div>
-                  </div>
-
-                  {/* About / Acerca de */}
-                  <div class="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-                    <div class="mb-2 flex items-center justify-between">
-                      <div>
-                        <p class="font-medium text-gray-900 dark:text-white">
-                          Acerca de
-                        </p>
-                        <p class="text-sm text-gray-600 dark:text-gray-400">
-                          Ver información de la aplicación
-                        </p>
-                      </div>
-                      <label class="relative inline-flex cursor-pointer items-center">
-                        <input
-                          type="checkbox"
-                          class="peer sr-only"
-                          checked={
-                            config()?.shortcuts.shortcuts.about?.enabled ?? true
-                          }
-                          onChange={(e) => {
-                            const cfg = config();
-                            if (cfg) {
-                              setConfig({
-                                ...cfg,
-                                shortcuts: {
-                                  ...cfg.shortcuts,
-                                  shortcuts: {
-                                    ...cfg.shortcuts.shortcuts,
-                                    about: {
-                                      ...cfg.shortcuts.shortcuts.about,
-                                      enabled: e.currentTarget.checked,
-                                    },
-                                  },
-                                },
-                              });
-                            }
-                          }}
-                        />
-                        <div class="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:start-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-green-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 dark:border-gray-600 dark:bg-gray-700 dark:peer-focus:ring-green-800 rtl:peer-checked:after:-translate-x-full" />
-                      </label>
-                    </div>
-                    <div class="flex items-center gap-2">
-                      <kbd class="rounded border border-gray-300 bg-gray-100 px-2 py-1 font-mono text-xs text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white">
-                        {config()?.shortcuts.shortcuts.about?.key ||
-                          'Ctrl+Shift+A'}
-                      </kbd>
-                    </div>
-                  </div>
-
-                  {/* Recargar */}
-                  <div class="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-                    <div class="mb-2 flex items-center justify-between">
-                      <div>
-                        <p class="font-medium text-gray-900 dark:text-white">
-                          Recargar Proyectos
-                        </p>
-                        <p class="text-sm text-gray-600 dark:text-gray-400">
-                          Actualizar lista de proyectos
-                        </p>
-                      </div>
-                      <label class="relative inline-flex cursor-pointer items-center">
-                        <input
-                          type="checkbox"
-                          class="peer sr-only"
-                          checked={
-                            config()?.shortcuts.shortcuts.refresh?.enabled ??
-                            true
-                          }
-                          onChange={(e) => {
-                            const cfg = config();
-                            if (cfg) {
-                              setConfig({
-                                ...cfg,
-                                shortcuts: {
-                                  ...cfg.shortcuts,
-                                  shortcuts: {
-                                    ...cfg.shortcuts.shortcuts,
-                                    refresh: {
-                                      ...cfg.shortcuts.shortcuts.refresh,
-                                      enabled: e.currentTarget.checked,
-                                    },
-                                  },
-                                },
-                              });
-                            }
-                          }}
-                        />
-                        <div class="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:start-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-green-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 dark:border-gray-600 dark:bg-gray-700 dark:peer-focus:ring-green-800 rtl:peer-checked:after:-translate-x-full" />
-                      </label>
-                    </div>
-                    <div class="flex items-center gap-2">
-                      <kbd class="rounded border border-gray-300 bg-gray-100 px-2 py-1 font-mono text-xs text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white">
-                        {config()?.shortcuts.shortcuts.refresh?.key || 'Ctrl+R'}
-                      </kbd>
-                    </div>
-                  </div>
-
-                  {/* Cerrar Modal */}
-                  <div class="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-                    <div class="mb-2 flex items-center justify-between">
-                      <div>
-                        <p class="font-medium text-gray-900 dark:text-white">
-                          Cerrar Modal
-                        </p>
-                        <p class="text-sm text-gray-600 dark:text-gray-400">
-                          Cerrar cualquier modal activo
-                        </p>
-                      </div>
-                      <label class="relative inline-flex cursor-pointer items-center">
-                        <input
-                          type="checkbox"
-                          class="peer sr-only"
-                          checked={
-                            config()?.shortcuts.shortcuts.close_modal
-                              ?.enabled ?? true
-                          }
-                          onChange={(e) => {
-                            const cfg = config();
-                            if (cfg) {
-                              setConfig({
-                                ...cfg,
-                                shortcuts: {
-                                  ...cfg.shortcuts,
-                                  shortcuts: {
-                                    ...cfg.shortcuts.shortcuts,
-                                    close_modal: {
-                                      ...cfg.shortcuts.shortcuts.close_modal,
-                                      enabled: e.currentTarget.checked,
-                                    },
-                                  },
-                                },
-                              });
-                            }
-                          }}
-                        />
-                        <div class="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:start-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-green-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 dark:border-gray-600 dark:bg-gray-700 dark:peer-focus:ring-green-800 rtl:peer-checked:after:-translate-x-full" />
-                      </label>
-                    </div>
-                    <div class="flex items-center gap-2">
-                      <kbd class="rounded border border-gray-300 bg-gray-100 px-2 py-1 font-mono text-xs text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white">
-                        {config()?.shortcuts.shortcuts.close_modal?.key ||
-                          'Escape'}
-                      </kbd>
-                    </div>
-                  </div>
+                    )}
+                  </For>
                 </div>
 
                 <div class="rounded-lg bg-blue-50 p-4 dark:bg-blue-900/20">

@@ -8,6 +8,9 @@ import {
 } from '../services/api';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
+import { useConfig } from '../contexts/ConfigContext';
+import { shouldConfirm } from '../utils/confirm';
+import { logger } from '../utils/logger';
 
 interface ProjectJournalProps {
   projectId: number;
@@ -15,6 +18,7 @@ interface ProjectJournalProps {
 }
 
 export default function ProjectJournal(props: ProjectJournalProps) {
+  const configCtx = useConfig();
   const [entries, setEntries] = createSignal<JournalEntry[]>([]);
   const [loading, setLoading] = createSignal(false);
   const [newContent, setNewContent] = createSignal('');
@@ -36,7 +40,7 @@ export default function ProjectJournal(props: ProjectJournalProps) {
       setEntries(data);
       setError(null);
     } catch (err) {
-      console.error('Error loading journal entries:', err);
+      logger.error('Error loading journal entries:', err);
       setError('Error al cargar las entradas del diario');
     } finally {
       setLoading(false);
@@ -58,7 +62,7 @@ export default function ProjectJournal(props: ProjectJournalProps) {
       setNewTags('');
       await loadEntries();
     } catch (err) {
-      console.error('Error creating journal entry:', err);
+      logger.error('Error creating journal entry:', err);
       setError('Error al crear entrada');
     }
   };
@@ -85,7 +89,7 @@ export default function ProjectJournal(props: ProjectJournalProps) {
       setEditingId(null);
       await loadEntries();
     } catch (err) {
-      console.error('Error updating journal entry:', err);
+      logger.error('Error updating journal entry:', err);
       setError('Error al actualizar entrada');
     }
   };
@@ -97,13 +101,18 @@ export default function ProjectJournal(props: ProjectJournalProps) {
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm('¿Eliminar esta entrada del diario?')) return;
+    if (
+      shouldConfirm('reversible', configCtx.config()) &&
+      !confirm('¿Eliminar esta entrada del diario?')
+    ) {
+      return;
+    }
 
     try {
       await deleteJournalEntry(id);
       await loadEntries();
     } catch (err) {
-      console.error('Error deleting journal entry:', err);
+      logger.error('Error deleting journal entry:', err);
       setError('Error al eliminar entrada');
     }
   };

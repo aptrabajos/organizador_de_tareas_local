@@ -1,6 +1,7 @@
 import { Component, createSignal, For, Show, createEffect } from 'solid-js';
 import type { Project } from '../types/project';
 import { getRootProjects, getSubprojects } from '../services/api';
+import { logger } from '../utils/logger';
 
 interface TreeViewProps {
   onSelectProject: (project: Project) => void;
@@ -64,7 +65,7 @@ const TreeView: Component<TreeViewProps> = (props) => {
       if (requestId !== latestTreeRequestId) return; // respuesta obsoleta
       setTreeData(tree);
     } catch (err) {
-      console.error('Error loading tree:', err);
+      logger.error('Error loading tree:', err);
       if (requestId !== latestTreeRequestId) return;
       setError('Error al cargar el árbol de proyectos');
     } finally {

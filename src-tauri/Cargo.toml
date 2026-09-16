@@ -11,7 +11,6 @@ tauri-build = { version = "2.1", features = [] }
 [dependencies]
 tauri = { version = "2.1", features = [] }
 tauri-plugin-single-instance = "2.0"
-tauri-plugin-shell = "2.0"
 tauri-plugin-dialog = "2.0"
 tauri-plugin-fs = "2.0"
 tauri-plugin-global-shortcut = "2.0"
@@ -21,6 +20,13 @@ rusqlite = { version = "0.32", features = ["bundled"] }
 dirs = "5"
 chrono = "0.4"
 printpdf = "0.7"
+# Logging con niveles. `log` es la fachada estándar del ecosistema y `env_logger` el
+# backend mínimo que permite fijar el nivel por código (desde advanced.log_level) en
+# vez de depender de una variable de entorno. Se descartó `tracing`: su valor son los
+# spans y el contexto estructurado para código async/distribuido, que acá no hace
+# falta, y trae un árbol de dependencias bastante más grande.
+log = "0.4"
+env_logger = "0.11"
 
 [dev-dependencies]
 tempfile = "3.14"

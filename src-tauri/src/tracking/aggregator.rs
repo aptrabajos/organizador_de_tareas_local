@@ -1,8 +1,10 @@
-// Agregador de tiempo - persiste sesiones de tracking en la BD
-// Conecta el SessionManager con la base de datos
-
-use crate::db::Database;
-use std::sync::Arc;
+// Tipos de datos de las sesiones de tiempo.
+//
+// Son el contrato compartido entre `Database` (que lee y escribe la tabla
+// `time_tracking_sessions`) y los comandos Tauri que los devuelven al frontend.
+//
+// Acá vivía `TimeAggregator`, una fachada sobre esos mismos métodos de
+// `Database` que nadie construía en ningún lado. Se eliminó en el B17.
 
 /// Modelo de sesión de tracking para persistencia
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -44,68 +46,6 @@ impl Default for TimeStats {
         }
     }
 }
-
-/// Agregador de tiempo - conecta tracking con persistencia
-pub struct TimeAggregator {
-    db: Arc<Database>,
-}
-
-impl TimeAggregator {
-    /// Crear un nuevo agregador
-    pub fn new(db: Arc<Database>) -> Self {
-        Self { db }
-    }
-
-    /// Iniciar una nueva sesión de tracking (crear registro en BD)
-    pub fn start_session(&self, project_id: i64, source: &str) -> Result<i64, AggregatorError> {
-        self.db.create_tracking_session(project_id, source)
-            .map_err(|e| AggregatorError::DatabaseError(e.to_string()))
-    }
-
-    /// Terminar una sesión de tracking
-    pub fn end_session(&self, session_id: i64, duration_seconds: i64) -> Result<(), AggregatorError> {
-        self.db.end_tracking_session(session_id, duration_seconds)
-            .map_err(|e| AggregatorError::DatabaseError(e.to_string()))
-    }
-
-    /// Obtener sesiones de un proyecto
-    pub fn get_sessions(&self, project_id: i64, limit: i64) -> Result<Vec<TimeTrackingSession>, AggregatorError> {
-        self.db.get_tracking_sessions(project_id, limit)
-            .map_err(|e| AggregatorError::DatabaseError(e.to_string()))
-    }
-
-    /// Obtener estadísticas de tiempo para un proyecto
-    pub fn get_stats(&self, project_id: i64) -> Result<TimeStats, AggregatorError> {
-        self.db.get_time_stats(project_id)
-            .map_err(|e| AggregatorError::DatabaseError(e.to_string()))
-    }
-
-    /// Agregar tiempo a un proyecto (método simple sin sesión)
-    pub fn add_time(&self, project_id: i64, seconds: i64) -> Result<(), AggregatorError> {
-        // Crear sesión completa de una vez
-        let session_id = self.start_session(project_id, "manual")?;
-        self.end_session(session_id, seconds)?;
-        Ok(())
-    }
-}
-
-/// Errores del agregador
-#[derive(Debug, Clone)]
-pub enum AggregatorError {
-    DatabaseError(String),
-    SessionNotFound(i64),
-}
-
-impl std::fmt::Display for AggregatorError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            AggregatorError::DatabaseError(msg) => write!(f, "Database error: {}", msg),
-            AggregatorError::SessionNotFound(id) => write!(f, "Session not found: {}", id),
-        }
-    }
-}
-
-impl std::error::Error for AggregatorError {}
 
 // ==================== TESTS ====================
 
@@ -150,19 +90,10 @@ mod tests {
             started_at: "2025-01-22T10:00:00Z".to_string(),
             ended_at: Some("2025-01-22T11:00:00Z".to_string()),
             duration_seconds: Some(3600),
-            source: "shell_hook".to_string(),
+            source: "work_button".to_string(),
         };
 
         assert_eq!(session.project_id, 123);
         assert_eq!(session.duration_seconds, Some(3600));
-    }
-
-    #[test]
-    fn test_aggregator_error_display() {
-        let db_error = AggregatorError::DatabaseError("Connection failed".to_string());
-        assert_eq!(format!("{}", db_error), "Database error: Connection failed");
-
-        let not_found = AggregatorError::SessionNotFound(42);
-        assert_eq!(format!("{}", not_found), "Session not found: 42");
     }
 }

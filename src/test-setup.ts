@@ -1,9 +1,84 @@
 import { afterEach, vi } from 'vitest';
 import { cleanup } from '@solidjs/testing-library';
+import packageJson from '../package.json';
+
+// La versión del mock se lee de package.json a propósito: hardcodearla hizo que el
+// setup quedara clavado en 0.4.3 mientras la app ya iba por otra versión.
+const APP_VERSION = packageJson.version;
+
+// ==================== window.matchMedia controlable ====================
+// jsdom NO implementa matchMedia. Sin este mock, cualquier componente que
+// consulte `prefers-color-scheme` explota. Además lo dejamos CONTROLABLE para
+// poder testear el modo 'auto' del tema, que depende de que el sistema cambie
+// de esquema con la app abierta.
+
+const DARK_QUERY_FRAGMENT = 'prefers-color-scheme: dark';
+
+type MediaChangeListener = (event: { matches: boolean; media: string }) => void;
+
+const mediaListeners = new Set<MediaChangeListener>();
+let systemPrefersDark = false;
+
+/** Cambia el esquema del "sistema" y notifica a los listeners vivos. */
+export function setSystemPrefersDark(value: boolean): void {
+  systemPrefersDark = value;
+  const event = { matches: value, media: `(${DARK_QUERY_FRAGMENT})` };
+  mediaListeners.forEach((listener) => listener(event));
+}
+
+export function getSystemPrefersDark(): boolean {
+  return systemPrefersDark;
+}
+
+window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+  matches: query.includes(DARK_QUERY_FRAGMENT) ? systemPrefersDark : false,
+  media: query,
+  onchange: null,
+  addEventListener: (type: string, listener: MediaChangeListener) => {
+    if (type === 'change') mediaListeners.add(listener);
+  },
+  removeEventListener: (type: string, listener: MediaChangeListener) => {
+    if (type === 'change') mediaListeners.delete(listener);
+  },
+  // API vieja, por si algún componente la usa
+  addListener: (listener: MediaChangeListener) => mediaListeners.add(listener),
+  removeListener: (listener: MediaChangeListener) =>
+    mediaListeners.delete(listener),
+  dispatchEvent: () => false,
+}));
+
+// ==================== overrides de ui en get_config ====================
+// El mock de `get_config` devuelve los defaults del backend. Un test que quiera
+// probar, por ejemplo, `confirm_delete: false` o `theme: 'dark'` los pisa acá en
+// vez de tener que remockear el invoke entero.
+
+interface UiConfigOverrides {
+  theme?: 'light' | 'dark' | 'auto';
+  language?: string;
+  confirm_delete?: boolean;
+  show_welcome?: boolean;
+}
+
+let uiConfigOverrides: UiConfigOverrides = {};
+
+export function setUiConfigOverrides(overrides: UiConfigOverrides): void {
+  uiConfigOverrides = overrides;
+}
+
+// ==================== conteo de subproyectos por id ====================
+// `count_subprojects` devuelve 0 por defecto, o sea "ningún proyecto es grupo".
+// Un test que quiera una vista de grupos declara acá qué id tiene cuántos hijos,
+// siguiendo el mismo patrón que los overrides de `ui` de arriba.
+
+let subprojectCounts: Record<number, number> = {};
+
+export function setSubprojectCounts(counts: Record<number, number>): void {
+  subprojectCounts = counts;
+}
 
 // Mock de @tauri-apps/api/core
 vi.mock('@tauri-apps/api/core', () => ({
-  invoke: vi.fn((cmd: string) => {
+  invoke: vi.fn((cmd: string, args?: Record<string, unknown>) => {
     // Mocks para time tracking
     if (cmd === 'check_tracking_config') {
       return Promise.resolve(false);
@@ -24,12 +99,6 @@ vi.mock('@tauri-apps/api/core', () => ({
     if (cmd === 'get_tracking_sessions') {
       return Promise.resolve([]);
     }
-    if (cmd === 'get_tracking_status') {
-      return Promise.resolve({
-        is_tracking: false,
-        elapsed_seconds: 0,
-      });
-    }
     // Mocks para git
     if (cmd === 'get_git_branch') {
       return Promise.resolve('main');
@@ -38,7 +107,10 @@ vi.mock('@tauri-apps/api/core', () => ({
       return Promise.resolve('clean');
     }
     if (cmd === 'get_git_file_count') {
-      return Promise.resolve({ tracked: 10, modified: 0, staged: 0 });
+      // Debe respetar el contrato real `GitFileCount { modified, staged, untracked }`
+      // (src/types/git.ts y el struct de Rust). Los tres valores son DISTINTOS a
+      // propósito: si fueran iguales, un test que confunda campos pasaría igual.
+      return Promise.resolve({ modified: 2, staged: 1, untracked: 3 });
     }
     if (cmd === 'get_git_ahead_behind') {
       return Promise.resolve([0, 0]);
@@ -54,7 +126,10 @@ vi.mock('@tauri-apps/api/core', () => ({
     }
     // Mocks para proyectos
     if (cmd === 'count_subprojects') {
-      return Promise.resolve(0);
+      const parentId = (args as { parentId?: number } | undefined)?.parentId;
+      return Promise.resolve(
+        parentId === undefined ? 0 : (subprojectCounts[parentId] ?? 0)
+      );
     }
     if (cmd === 'track_project_open') {
       return Promise.resolve();
@@ -91,7 +166,7 @@ vi.mock('@tauri-apps/api/core', () => ({
     // Mocks para config
     if (cmd === 'get_config') {
       return Promise.resolve({
-        version: '0.4.3',
+        version: APP_VERSION,
         platform: {
           os_override: 'auto',
           terminal: { mode: 'auto', custom_args: [] },
@@ -111,6 +186,7 @@ vi.mock('@tauri-apps/api/core', () => ({
           language: 'es',
           confirm_delete: true,
           show_welcome: true,
+          ...uiConfigOverrides,
         },
         advanced: {
           log_level: 'info',
@@ -169,7 +245,7 @@ vi.mock('@tauri-apps/api/core', () => ({
 
 // Mock de @tauri-apps/api/app
 vi.mock('@tauri-apps/api/app', () => ({
-  getVersion: vi.fn(() => Promise.resolve('0.4.3')),
+  getVersion: vi.fn(() => Promise.resolve(APP_VERSION)),
   getName: vi.fn(() => Promise.resolve('Gestor de Proyectos')),
   getTauriVersion: vi.fn(() => Promise.resolve('2.1.0')),
 }));
@@ -178,6 +254,11 @@ vi.mock('@tauri-apps/api/app', () => ({
 vi.mock('@tauri-apps/plugin-dialog', () => ({
   open: vi.fn(() => Promise.resolve(null)),
   save: vi.fn(() => Promise.resolve(null)),
+  // `confirm` faltaba acá y es el que usan `App.handleDelete` y `TrashModal`:
+  // cualquier test que montara esos componentes sin mockearlo localmente se comía
+  // un "confirm is not a function". Default `true` (usuario acepta) porque es el
+  // camino que continúa, y un test que necesite la cancelación la mockea explícita.
+  confirm: vi.fn(() => Promise.resolve(true)),
 }));
 
 // Mock de @tauri-apps/plugin-fs
@@ -229,4 +310,19 @@ vi.mock('dompurify', () => ({
 // Cleanup después de cada test
 afterEach(() => {
   cleanup();
+  // El estado global del mock NO puede filtrarse entre tests: un test que deja
+  // el sistema en oscuro o confirm_delete en false haría fallar (o peor, pasar)
+  // al siguiente por motivos invisibles.
+  systemPrefersDark = false;
+  mediaListeners.clear();
+  uiConfigOverrides = {};
+  subprojectCounts = {};
+  document.documentElement.classList.remove('dark');
+  // jsdom no siempre expone `localStorage` como global (depende del origin), y
+  // el ThemeContext también lo accede defensivamente por el mismo motivo.
+  try {
+    window.localStorage?.clear();
+  } catch {
+    // sin localStorage no hay nada que limpiar
+  }
 });
