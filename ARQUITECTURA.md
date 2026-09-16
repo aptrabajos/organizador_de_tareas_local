@@ -85,8 +85,8 @@ Una **aplicación de escritorio nativa** para Linux construida con:
 │  │  pub async fn create_project(...)                 │  │
 │  │  pub async fn get_all_projects(...)               │  │
 │  │  pub async fn open_terminal(...)                  │  │
-│  │  pub async fn create_backup(...)                  │  │
-│  │  pub async fn sync_project(...)                   │  │
+│  │  pub async fn create_project_backup(...)          │  │
+│  │  pub async fn sync_project_to_backup(...)         │  │
 │  └───────────────────────────────────────────────────┘  │
 │                                                          │
 │  ┌───────────────────────────────────────────────────┐  │
@@ -319,9 +319,25 @@ gestor_proyecto/
 │   │   │   └── mod.rs
 │   │   ├── db/                   # SQLite operations
 │   │   │   └── mod.rs
-│   │   └── models/               # Structs de datos
-│   │       ├── mod.rs
-│   │       └── project.rs
+│   │   ├── models/               # Structs de datos
+│   │   │   ├── mod.rs
+│   │   │   └── project.rs
+│   │   ├── backup/               # Backup/restore de la BD
+│   │   ├── config/               # Configuración de la app (config.json)
+│   │   │   ├── schema.rs         # AppConfig y sub-structs
+│   │   │   ├── defaults.rs       # Defaults por OS
+│   │   │   └── manager.rs        # ConfigManager (carga/guardado)
+│   │   ├── platform/             # Abstracción por sistema operativo
+│   │   │   ├── detection.rs      # ProgramDetector
+│   │   │   ├── linux.rs          # LinuxPlatform
+│   │   │   └── windows.rs        # WindowsPlatform
+│   │   ├── pdf_export/           # Exportación de proyectos a PDF
+│   │   │   └── mod.rs
+│   │   └── tracking/             # Time tracking (PARCIALMENTE CABLEADO)
+│   │       ├── config.rs         # Carpeta .gestor/ por proyecto
+│   │       ├── session.rs        # TrackingSession / SessionManager
+│   │       ├── socket.rs         # SocketServer (Unix socket)
+│   │       └── aggregator.rs     # TimeAggregator (persistencia)
 │   ├── Cargo.toml                # Dependencias Rust
 │   └── tauri.conf.json           # Configuración Tauri
 │
@@ -336,6 +352,133 @@ gestor_proyecto/
 ├── package.json                  # Dependencias Node.js
 └── tsconfig.json                 # Configuración TypeScript
 ```
+
+---
+
+## 🧩 Módulos del backend Rust
+
+Cuatro módulos que no se mencionaban en este documento y que conviene entender
+antes de tocar el backend: `config/`, `platform/`, `pdf_export/` y `tracking/`.
+
+Los tres primeros están cableados en producción. **El cuarto no lo está del
+todo** — leé la advertencia grande más abajo antes de asumir nada.
+
+### `config/` — configuración persistente de la aplicación
+
+Maneja el `config.json` del usuario: qué terminal abrir, qué navegador, temas,
+atajos, política de backups.
+
+| Archivo | Responsabilidad |
+| ------- | --------------- |
+| `schema.rs` | Define `AppConfig` y sus sub-structs: `PlatformConfig`, `BackupConfig`, `UiConfig`, `AdvancedConfig`, `ShortcutsConfig`. Cada programa (terminal, navegador, file manager, editor) se describe con un `ProgramConfig` cuyo `ProgramMode` puede ser `Auto`, `Default`, `Custom` o `Script`. |
+| `defaults.rs` | Implementa `Default` para todo el árbol y expone `get_os_defaults()`, que arma una configuración inicial según el sistema operativo. `CONFIG_VERSION` está en `"0.3.0"`. |
+| `manager.rs` | `ConfigManager`: resuelve la ruta del archivo (`~/.config/gestor-proyectos/config.json` en Linux, `%APPDATA%/gestor-proyectos/` en Windows), lo crea en la primera ejecución, lo carga y lo guarda. |
+
+Dos decisiones de diseño que importan:
+
+- **Forward-compatibility.** Todos los structs llevan `#[serde(default)]`. Un
+  `config.json` viejo al que le faltan campos nuevos **no rompe**: los campos
+  ausentes toman su `Default`.
+- **Carga infalible.** `load_from_file` nunca propaga error. Si el JSON está
+  corrupto, hace un respaldo del archivo y cae a los defaults del OS. La razón
+  es concreta: `main.rs` hace `ConfigManager::new().expect(...)`, así que un
+  error ahí sería un panic **antes de que exista la ventana**, dejando al
+  usuario con una app que no abre y sin ningún mensaje.
+
+`ConfigManager` se instancia en `main.rs` y se registra con `.manage()`, o sea
+que está disponible como `State<ConfigManager>` en cualquier comando Tauri.
+
+### `platform/` — abstracción de sistema operativo
+
+Define el trait `PlatformOperations` con las operaciones que dependen del OS:
+`open_terminal`, `open_url`, `open_file_manager`, `open_text_editor`,
+`execute_script`, y los directorios de config/datos/backup.
+
+`get_platform()` devuelve la implementación correcta según `target_os`:
+`LinuxPlatform` (`linux.rs`) o `WindowsPlatform` (`windows.rs`). Cualquier otro
+OS hace `panic!` en tiempo de ejecución: solo se soportan Linux y Windows.
+
+`detection.rs` expone `ProgramDetector`, que sondea qué programas hay realmente
+instalados (`detect_terminals`, `detect_browsers`, `detect_file_managers`,
+`detect_text_editors`) y devuelve un `DetectedPrograms`. Eso es lo que alimenta
+el modo `Auto` de `ProgramConfig`.
+
+**Ojo con la sustitución de variables — hay dos métodos y no son
+intercambiables:**
+
+- `replace_variables(text, vars)` — para valores que van como argumento real de
+  proceso (`Command::arg`). No escapa nada, porque el valor se entrega literal
+  al proceso hijo sin pasar por ningún shell.
+- `replace_variables_shell_escaped(text, vars)` — **obligatorio** cuando el
+  string resultante lo va a interpretar un shell (`bash -c`, `sh -c`,
+  `powershell -Command`). Escapa cada valor con `shell_escape_posix()`, que lo
+  envuelve en comillas simples y neutraliza las comillas embebidas.
+
+Usar el primero donde va el segundo es una inyección de comandos: el path de un
+proyecto lo elige el usuario y puede contener `;`, `&&`, `$()`, backticks.
+
+### `pdf_export/` — exportación de un proyecto a PDF
+
+Un solo archivo, `mod.rs`, con la función `export_project_to_pdf(db, project,
+output_path)`. Usa el crate `printpdf` 0.7 y genera un A4 con fuentes built-in
+(Helvetica / Helvetica-Bold), sin dependencias externas de renderizado ni
+headless browser.
+
+Arma una portada con nombre, descripción, estado y fecha de exportación, y
+después vuelca los datos del proyecto. Las constantes de tipografía y color
+(`FONT_SIZE_*`, `COLOR_*`) están arriba del archivo.
+
+### `tracking/` — time tracking automático por shell hooks
+
+> ### ⚠️ LEER ESTO ANTES DE TOCAR `tracking/`
+>
+> **`SocketServer`, `SessionManager` y `TimeAggregator` están implementados y
+> tienen tests, pero NO se instancian en producción.** Sus únicas
+> instanciaciones en todo el repo están dentro de sus propios `#[cfg(test)]`
+> (`socket.rs:317`, `socket.rs:320`, `socket.rs:359`, `session.rs:342`,
+> `session.rs:365`, `session.rs:381`). Ningún comando Tauri, ni `main.rs`, los
+> construye.
+>
+> **No hay ningún socket escuchando en `/tmp/gestor-proyectos.sock` cuando la
+> app corre.** El `SocketServer` nunca arranca porque nadie lo arranca.
+>
+> **`get_tracking_status` es un stub.** Devuelve siempre
+> `is_tracking: false, project_id: None, project_path: None, elapsed_seconds: 0`
+> — valores fijos, no consulta nada. El comentario en
+> `commands/mod.rs:1385` lo dice: *"Cuando el socket esté integrado, esto leerá
+> del SessionManager"*. Todavía no está integrado.
+>
+> Si estás debuggeando "el tracking por socket no anda": no está roto, no está
+> conectado.
+
+Lo que el módulo **sí** tiene escrito:
+
+| Archivo | Qué contiene |
+| ------- | ------------ |
+| `config.rs` | Carpeta `.gestor/` por proyecto, con un `config.json` adentro — el mismo patrón que `.git/`. `GestorConfig` guarda `project_id`, `project_name`, `created_at`, `tracking_enabled`. `find_gestor_config()` busca hacia arriba desde un path. **Esta parte sí se usa en producción** vía los comandos `check_tracking_config` y `find_tracking_project`. |
+| `session.rs` | Máquina de estados `SessionState` (`Idle` → `Active` → `Paused`), `TrackingSession` con tiempo acumulado y heartbeat, y `SessionManager` que mantiene un `HashMap` de sesiones por path con auto-pausa por inactividad (default: 15 minutos). Solo se ejercita desde sus tests. |
+| `socket.rs` | `SocketServer` sobre Unix socket en `/tmp/gestor-proyectos.sock`, con el protocolo `TrackingMessage` (`Enter`, `Exit`, `Heartbeat`, `Status`) y `TrackingResponse`. Solo se ejercita desde sus tests. |
+| `aggregator.rs` | `TimeAggregator`, que persiste sesiones en SQLite (`start_session` / `end_session`) y define `TimeTrackingSession` y `TimeStats`. Solo se ejercita desde sus tests: los comandos van directo a `Database`, sin pasar por el agregador. |
+
+#### Qué del tracking SÍ funciona en producción
+
+El tracking que realmente anda es **manual y por comando Tauri**, y no toca ni
+el socket ni el `SessionManager`:
+
+- `start_tracking` / `stop_tracking` — crean y cierran filas en SQLite llamando
+  directo a `db.create_tracking_session` / `db.end_tracking_session`.
+- `get_time_stats` — lee estadísticas desde `db.get_time_stats`.
+- `check_tracking_config` / `find_tracking_project` — usan `tracking::config`
+  para detectar la carpeta `.gestor/`.
+- `start_work_session` / `stop_work_session` / `get_work_session_status` — el
+  camino de "sesión de trabajo" introducido en v0.5.1, que mantiene el estado en
+  un `ActiveSession` registrado con `.manage()` en `main.rs`. **Este es el que
+  hay que mirar si querés saber si hay una sesión activa**, no
+  `get_tracking_status`.
+
+En resumen: hay dos caminos de tracking en el repo. Uno funciona
+(`work_session` + comandos manuales sobre la BD) y el otro está escrito,
+testeado y desconectado (`socket` + `SessionManager` + `TimeAggregator`).
 
 ---
 

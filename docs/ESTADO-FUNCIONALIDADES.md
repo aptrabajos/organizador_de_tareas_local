@@ -1,7 +1,7 @@
 # 📊 Estado de Funcionalidades - Gestor de Proyectos
 
 **Última actualización:** 11 de octubre de 2025
-**Versión:** 0.1.0
+**Versión:** ver `package.json` (única fuente de verdad)
 
 ---
 
@@ -131,9 +131,12 @@ CREATE TABLE project_links (
 
 **Backend (Rust):**
 - ✅ `create_project_backup` - Generar archivo markdown con metadata
-- ✅ `write_file_to_path` - Escribir contenido a archivo
-- ✅ `sync_project_to_backup` - Sincronizar con rsync
-- ✅ `sync_project` - Sincronización bidireccional
+- ✅ `sync_project_to_backup` - Sincronizar con rsync a la carpeta de backup configurada
+
+> **Eliminados en el arreglo de bugs B12:** `write_file_to_path` y `sync_project`.
+> Aceptaban rutas arbitrarias sin ninguna validación y no tenían consumidor en la
+> UI. Se borraron en vez de endurecerse. La escritura del markdown de backup a la
+> carpeta que elige el usuario la hace el frontend con `writeTextFile`.
 
 **Características:**
 - Genera archivos `{proyecto}_BACKUP.md` con metadata JSON
@@ -201,11 +204,9 @@ CREATE TABLE project_links (
 11. `open_terminal` - Abrir terminal
 12. `open_url` - Abrir URL
 
-### Backups (3)
+### Backups (2)
 13. `create_project_backup` - Generar backup markdown
-14. `write_file_to_path` - Escribir archivo
-15. `sync_project_to_backup` - Sincronizar con rsync
-16. `sync_project` - Sincronización bidireccional
+14. `sync_project_to_backup` - Sincronizar con rsync
 
 ---
 

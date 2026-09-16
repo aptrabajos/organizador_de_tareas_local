@@ -6,7 +6,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Gestor de Proyectos** - Aplicación de escritorio nativa (Tauri 2.x) para gestionar proyectos locales. Versión actual: **0.4.3**
+**Gestor de Proyectos** - Aplicación de escritorio nativa (Tauri 2.x) para gestionar proyectos locales.
+
+> **Versión:** ver `package.json` (única fuente de verdad). `src-tauri/Cargo.toml` y
+> `src-tauri/tauri.conf.json` deben acompañar ese número. No repetirlo en la
+> documentación: siempre se desincroniza.
 
 ### Importante: Es una aplicación de escritorio, NO web
 

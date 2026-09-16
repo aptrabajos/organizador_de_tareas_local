@@ -1,3 +1,5 @@
+> **Congelado en v0.3.0.** No refleja el proceso actual de build. Se conserva como registro histórico.
+
 # ✅ CHECKLIST - Build para Windows
 
 **Proyecto:** Gestor de Proyectos v0.3.0
