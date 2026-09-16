@@ -1,8 +1,8 @@
 # `gestor` — la CLI para navegar tus proyectos
 
 Herramienta **externa** a la app: un script de shell que lee la misma base
-SQLite que usa la app gráfica y te deja saltar a la carpeta de cualquier
-proyecto sin soltar la terminal.
+SQLite que usa la app gráfica, te deja saltar a la carpeta de cualquier
+proyecto sin soltar la terminal y dar de alta proyectos nuevos.
 
 No es parte de `src/` ni de `src-tauri/`. No se compila, no se empaqueta, no
 toca el código de la app. Vive en `~/.local/bin/gestor` y este documento explica
@@ -40,6 +40,7 @@ gestor abrir CRM_Multas        # nombre exacto: va derecho
 gestor abrir multas            # varios matches: abre el menú ya acotado
 gestor abrir telwinet/speed    # también busca dentro de local_path
 
+gestor crear "Mi Proyecto" --ruta ~/proyectos/mi_proyecto
 gestor ayuda                   # uso y ejemplos (alias: --help, -h)
 ```
 
@@ -50,6 +51,66 @@ varios ambiguos, te abre el menú limitado a esos candidatos. Si no hay
 ninguno, sale con un error claro.
 
 Un subcomando desconocido imprime la ayuda y sale con código `2`.
+
+### 3. Dar de alta un proyecto
+
+```bash
+gestor crear <nombre> [--ruta <carpeta>] [--descripcion <texto>] [--grupo <grupo>]
+```
+
+| Flag | Obligatoria | Qué hace |
+| ---- | ----------- | -------- |
+| `<nombre>` | Sí | Nombre del proyecto. Entre comillas si tiene espacios. |
+| `--ruta <carpeta>` | No | Carpeta del proyecto. **Si no la pasás, la CLI la pregunta.** |
+| `--descripcion <texto>` | No | Descripción. Por defecto, cadena vacía. |
+| `--grupo <nombre>` | No | Nombre exacto de un grupo padre ya existente. |
+
+```bash
+gestor crear "Mi Proyecto" --ruta ~/proyectos/mi_proyecto
+gestor crear "Web Cliente" --grupo "Clientes web"
+gestor crear "API interna" --ruta /srv/api --descripcion "backend de facturación"
+
+gestor crear                   # sin argumentos: imprime el uso y sale ≠ 0
+gestor crear "Algo"            # sin --ruta: pregunta "Ruta del proyecto (Enter para cancelar):"
+```
+
+> **La CLI no crea la carpeta física — y la app gráfica tampoco.**
+> En la app vos elegís una carpeta que ya existe con un selector; acá la
+> indicás con `--ruta` o la tipeás en el prompt. Si no existe, o existe pero no
+> es un directorio, la CLI **falla con un error claro y no inserta nada**.
+> Crear, abrir o exportar la carpeta sigue siendo trabajo de la app.
+
+Antes de insertar valida, en este orden:
+
+1. **Nombre no vacío** (se recortan los espacios de los bordes).
+2. **La carpeta existe y es un directorio.** La ruta se guarda siempre
+   **absoluta**: la base la comparte la app, que no tiene tu directorio de
+   trabajo. Una ruta relativa como `./carpeta` se resuelve antes de guardarse, y
+   un `~` tipeado en el prompt se expande a mano (el shell no lo expande ahí).
+3. **No hay otro proyecto activo con el mismo nombre** (sin distinguir
+   mayúsculas). Los que están en la papelera no molestan.
+4. **El grupo existe y no está en la papelera.** Se busca por nombre exacto en
+   la *misma* tabla `projects` —la app usa `parent_id` para la jerarquía, no una
+   tabla aparte— y si no aparece, el error es literalmente el mismo que tira la
+   app: `El grupo padre seleccionado no existe o está en la papelera.`
+
+El `INSERT` replica columna por columna el de la app
+(`src-tauri/src/db/mod.rs::create_project`): `name`, `description`,
+`local_path`, `documentation_url`, `ai_documentation_url`, `drive_link`,
+`notes`, `image_data`, `parent_id`, `group_color`, `group_icon`. Todo lo que la
+CLI no pide queda en `NULL`, y el resto de las columnas toma el default del
+esquema (`status = 'activo'`, contadores en cero).
+
+Al terminar confirma por `stderr` y reporta el id:
+
+```
+→ proyecto 'Mi Proyecto' creado (/home/vos/proyectos/mi_proyecto)
+  id 67
+```
+
+`crear` **no te lleva a ningún lado**: no escribe `GESTOR_CD_FILE`, así que la
+función de shell no hace `cd`. Es un alta, no un viaje. Funciona igual invocando
+el script directo que a través de la función.
 
 ---
 
@@ -70,7 +131,7 @@ La solución es dividir las responsabilidades:
 
 | Quién | Qué hace |
 | ----- | -------- |
-| `~/.local/bin/gestor` (script) | Consulta la base, dibuja el menú, **resuelve** la ruta del proyecto y la entrega. Nunca hace `cd`. |
+| `~/.local/bin/gestor` (script) | Consulta la base, da de alta proyectos, dibuja el menú, **resuelve** la ruta del proyecto y la entrega. Nunca hace `cd`. |
 | Función `gestor()` en tu shell | Ejecuta el script, lee la ruta que resolvió y hace el `cd`. Como es una función, corre **en tu shell**: el `cd` es efectivo. |
 
 ### Cómo se pasan la ruta
@@ -96,7 +157,7 @@ gestor() {
 }
 ```
 
-Si el archivo queda vacío —porque corriste `gestor list`, pediste la ayuda,
+Si el archivo queda vacío —porque corriste `gestor list` o `gestor crear`, pediste la ayuda,
 cancelaste el menú o la ruta no existe— la función no hace `cd`. Sin casos
 especiales, sin listas de subcomandos que mantener: **si no hubo ruta, no hubo
 viaje.**
@@ -170,8 +231,13 @@ Se puede apuntar a otra con la variable `GESTOR_DB`.
 
 - **Todas las lecturas son read-only**, vía URI: `file:$DB?mode=ro`. La CLI no
   puede corromper ni bloquear la base de la app aunque quiera.
-- **La única escritura** es el registro del "abierto", que replica lo que hace
-  la app para su lista de recientes:
+- **Hay exactamente dos escrituras**, las dos con transacción corta y
+  `busy_timeout=2000`, porque la app puede estar corriendo y tener la base
+  tomada: el `INSERT` de `gestor crear` y el registro del "abierto".
+- El `INSERT` de `crear` sí es fatal si falla: si no se pudo dar de alta el
+  proyecto, la CLI lo dice y sale ≠ 0. No hay alta a medias.
+- El registro del "abierto" replica lo que hace la app para su lista de
+  recientes:
 
   ```sql
   PRAGMA busy_timeout=2000;
@@ -183,9 +249,13 @@ Se puede apuntar a otra con la variable `GESTOR_DB`.
   COMMIT;
   ```
 
-  Transacción corta y `busy_timeout` bajo: si la app tiene la base tomada, la
-  CLI espera un toque y, si no puede, **avisa por `stderr` y sigue igual**. Que
-  falle el contador nunca te impide llegar a tu carpeta.
+  Este nunca es fatal: si la app tiene la base tomada, la CLI espera un toque y,
+  si no puede, **avisa por `stderr` y sigue igual**. Que falle el contador nunca
+  te impide llegar a tu carpeta.
+
+  Para escribir, `crear` exige permiso sobre el archivo **y** sobre su
+  directorio: SQLite crea ahí el journal al abrir la transacción, así que con
+  permiso solo sobre el `.db` la escritura fallaría igual.
 
 - Los proyectos en la papelera (`deleted_at IS NOT NULL`) quedan fuera de todo,
   salvo que pidas `list --con-papelera`.
@@ -244,6 +314,18 @@ El texto que pasás a `abrir` se escapa antes de entrar a la consulta: comillas
 simples duplicadas y comodines de `LIKE` (`%`, `_`, `\`) neutralizados con
 `ESCAPE`. Los ids se fuerzan a entero con expansión aritmética.
 
+Lo mismo vale para `crear`: nombre, descripción y ruta pasan por `sql_quote`
+antes de entrar al `INSERT`, y el `parent_id` se fuerza a entero. Un proyecto
+llamado `O'Brien's App`, o una carpeta con comilla simple en el nombre, se
+guardan tal cual sin romper nada.
+
+### Comparaciones sin distinguir mayúsculas
+
+El duplicado de nombre y la búsqueda de grupo usan `COLLATE NOCASE`, que es la
+misma comparación que hace la app. Ojo con un detalle de SQLite: `NOCASE` solo
+pliega mayúsculas **ASCII**. `Clientes` y `CLIENTES` son el mismo nombre para la
+CLI; `Ñandú` y `ñandú`, no.
+
 ---
 
 ## Códigos de salida
@@ -251,6 +333,6 @@ simples duplicadas y comodines de `LIKE` (`%`, `_`, `\`) neutralizados con
 | Código | Significado |
 | ------ | ----------- |
 | `0` | Todo bien. |
-| `1` | Error de uso o de datos: sin coincidencias, falta un argumento, la carpeta no existe. |
+| `1` | Error de uso o de datos: sin coincidencias, falta un argumento, la carpeta no existe, el nombre está duplicado, el grupo no existe. |
 | `2` | Subcomando o flag desconocidos (se imprime la ayuda). |
-| `130` | Cancelaste el menú (Esc o Enter vacío). |
+| `130` | Cancelaste el menú, o la pregunta de ruta de `crear` (Esc o Enter vacío). |
