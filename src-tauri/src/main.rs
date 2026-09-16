@@ -165,9 +165,6 @@ fn main() {
             // Time Tracking (v0.5.0)
             commands::init_tracking,
             commands::get_tracking_sessions,
-            commands::get_tracking_status,
-            commands::start_tracking,
-            commands::stop_tracking,
             commands::check_tracking_config,
             commands::find_tracking_project,
             commands::get_time_stats,

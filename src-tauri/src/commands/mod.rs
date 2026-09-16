@@ -1454,59 +1454,13 @@ pub async fn get_tracking_sessions(
         .map_err(|e| format!("Error getting tracking sessions: {}", e))
 }
 
-/// Obtener estado actual de tracking (qué proyecto está siendo tracked)
-#[tauri::command]
-pub async fn get_tracking_status() -> Result<TrackingStatusResponse, String> {
-    // Por ahora retornamos un estado vacío
-    // Cuando el socket esté integrado, esto leerá del SessionManager
-    Ok(TrackingStatusResponse {
-        is_tracking: false,
-        project_id: None,
-        project_path: None,
-        elapsed_seconds: 0,
-    })
-}
-
+/// Estado de la sesion de trabajo activa. Lo devuelve `get_work_session_status`.
 #[derive(serde::Serialize)]
 pub struct TrackingStatusResponse {
     pub is_tracking: bool,
     pub project_id: Option<i64>,
     pub project_path: Option<String>,
     pub elapsed_seconds: u64,
-}
-
-/// Iniciar tracking manualmente para un proyecto
-#[tauri::command]
-pub async fn start_tracking(
-    db: State<'_, Database>,
-    project_id: i64,
-) -> Result<i64, String> {
-    debug!("▶️ [TRACKING] Iniciando tracking manual para proyecto ID: {}", project_id);
-
-    // Crear una nueva sesión de tracking
-    let session_id = db.create_tracking_session(project_id, "manual")
-        .map_err(|e| format!("Error starting tracking session: {}", e))?;
-
-    debug!("✅ [TRACKING] Sesión {} iniciada", session_id);
-
-    Ok(session_id)
-}
-
-/// Detener tracking actual
-#[tauri::command]
-pub async fn stop_tracking(
-    db: State<'_, Database>,
-    session_id: i64,
-    duration_seconds: i64,
-) -> Result<(), String> {
-    debug!("⏹️ [TRACKING] Deteniendo sesión {} con {} segundos", session_id, duration_seconds);
-
-    db.end_tracking_session(session_id, duration_seconds)
-        .map_err(|e| format!("Error stopping tracking session: {}", e))?;
-
-    debug!("✅ [TRACKING] Sesión {} terminada", session_id);
-
-    Ok(())
 }
 
 /// Verificar si un path tiene configuración de tracking (.gestor/)
