@@ -1,6 +1,6 @@
 # Rust
+# Cargo.lock SI se versiona: este repo produce un binario distribuible, no una libreria.
 target/
-Cargo.lock
 
 # Node
 node_modules/
