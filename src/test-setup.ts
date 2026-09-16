@@ -6,6 +6,65 @@ import packageJson from '../package.json';
 // setup quedara clavado en 0.4.3 mientras la app ya iba por otra versión.
 const APP_VERSION = packageJson.version;
 
+// ==================== window.matchMedia controlable ====================
+// jsdom NO implementa matchMedia. Sin este mock, cualquier componente que
+// consulte `prefers-color-scheme` explota. Además lo dejamos CONTROLABLE para
+// poder testear el modo 'auto' del tema, que depende de que el sistema cambie
+// de esquema con la app abierta.
+
+const DARK_QUERY_FRAGMENT = 'prefers-color-scheme: dark';
+
+type MediaChangeListener = (event: { matches: boolean; media: string }) => void;
+
+const mediaListeners = new Set<MediaChangeListener>();
+let systemPrefersDark = false;
+
+/** Cambia el esquema del "sistema" y notifica a los listeners vivos. */
+export function setSystemPrefersDark(value: boolean): void {
+  systemPrefersDark = value;
+  const event = { matches: value, media: `(${DARK_QUERY_FRAGMENT})` };
+  mediaListeners.forEach((listener) => listener(event));
+}
+
+export function getSystemPrefersDark(): boolean {
+  return systemPrefersDark;
+}
+
+window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+  matches: query.includes(DARK_QUERY_FRAGMENT) ? systemPrefersDark : false,
+  media: query,
+  onchange: null,
+  addEventListener: (type: string, listener: MediaChangeListener) => {
+    if (type === 'change') mediaListeners.add(listener);
+  },
+  removeEventListener: (type: string, listener: MediaChangeListener) => {
+    if (type === 'change') mediaListeners.delete(listener);
+  },
+  // API vieja, por si algún componente la usa
+  addListener: (listener: MediaChangeListener) => mediaListeners.add(listener),
+  removeListener: (listener: MediaChangeListener) =>
+    mediaListeners.delete(listener),
+  dispatchEvent: () => false,
+}));
+
+// ==================== overrides de ui en get_config ====================
+// El mock de `get_config` devuelve los defaults del backend. Un test que quiera
+// probar, por ejemplo, `confirm_delete: false` o `theme: 'dark'` los pisa acá en
+// vez de tener que remockear el invoke entero.
+
+interface UiConfigOverrides {
+  theme?: 'light' | 'dark' | 'auto';
+  language?: string;
+  confirm_delete?: boolean;
+  show_welcome?: boolean;
+}
+
+let uiConfigOverrides: UiConfigOverrides = {};
+
+export function setUiConfigOverrides(overrides: UiConfigOverrides): void {
+  uiConfigOverrides = overrides;
+}
+
 // Mock de @tauri-apps/api/core
 vi.mock('@tauri-apps/api/core', () => ({
   invoke: vi.fn((cmd: string) => {
@@ -119,6 +178,7 @@ vi.mock('@tauri-apps/api/core', () => ({
           language: 'es',
           confirm_delete: true,
           show_welcome: true,
+          ...uiConfigOverrides,
         },
         advanced: {
           log_level: 'info',
@@ -237,4 +297,18 @@ vi.mock('dompurify', () => ({
 // Cleanup después de cada test
 afterEach(() => {
   cleanup();
+  // El estado global del mock NO puede filtrarse entre tests: un test que deja
+  // el sistema en oscuro o confirm_delete en false haría fallar (o peor, pasar)
+  // al siguiente por motivos invisibles.
+  systemPrefersDark = false;
+  mediaListeners.clear();
+  uiConfigOverrides = {};
+  document.documentElement.classList.remove('dark');
+  // jsdom no siempre expone `localStorage` como global (depende del origin), y
+  // el ThemeContext también lo accede defensivamente por el mismo motivo.
+  try {
+    window.localStorage?.clear();
+  } catch {
+    // sin localStorage no hay nada que limpiar
+  }
 });
