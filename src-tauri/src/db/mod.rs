@@ -453,13 +453,27 @@ impl Database {
         Ok(projects)
     }
 
+    /// Leer UN proyecto activo por id.
+    ///
+    /// `AND deleted_at IS NULL`: era la única lectura del archivo que NO filtraba la
+    /// papelera (`get_all_projects`, `search_projects`, `get_root_projects` y
+    /// `get_subprojects` sí lo hacen), así que un proyecto borrado seguía apareciendo
+    /// en la cabecera de grupo y en el modal de contexto vía `refreshCurrentGroup()`.
+    /// `get_project_with_children` compone esta función y heredaba el defecto.
+    ///
+    /// Un proyecto en papelera devuelve `QueryReturnedNoRows`. NO hay variante
+    /// `_including_trashed` porque nadie la necesita: `restore_project` y
+    /// `purge_project` hacen su propio `SELECT deleted_at ... WHERE id = ?1` y exigen
+    /// que el proyecto SÍ esté en papelera.
     pub fn get_project(&self, id: i64) -> Result<Project> {
-        println!("🔍 [DB] get_project iniciado para ID: {}", id);
-        
-        // Intentar obtener la conexión con timeout
+        // Intentar obtener la conexión con timeout.
+        // NO tocar este try_lock: es la posible cicatriz de un deadlock por reentrancia
+        // del Mutex y nadie documentó el motivo original (§6.6 del plan de auditoría).
         let conn = match self.conn.try_lock() {
             Ok(conn) => conn,
             Err(_) => {
+                // Este println! SÍ se queda: sólo dispara en el camino de deadlock, no
+                // en cada invocación. Es diagnóstico real, no ruido.
                 println!("❌ [DB] No se pudo obtener lock de conexión - posible deadlock");
                 return Err(rusqlite::Error::SqliteFailure(
                     rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_BUSY),
@@ -468,17 +482,14 @@ impl Database {
             }
         };
 
-        println!("🔒 [DB] Conexión obtenida exitosamente");
-
-        let result = conn.query_row(
+        conn.query_row(
             "SELECT id, name, description, local_path, documentation_url, ai_documentation_url, drive_link, notes, image_data,
                     created_at, updated_at, last_opened_at, opened_count, total_time_seconds,
                     status, status_changed_at, is_pinned, pinned_order, display_order,
                     parent_id, group_color, group_icon, is_group_expanded
-             FROM projects WHERE id = ?1",
+             FROM projects WHERE id = ?1 AND deleted_at IS NULL",
             params![id],
             |row| {
-                println!("📊 [DB] Leyendo fila de base de datos...");
                 let project_id = row.get::<_, i64>(0)?;
 
                 // Obtener enlaces del proyecto
@@ -510,21 +521,9 @@ impl Database {
                     group_icon: row.get(21)?,
                     is_group_expanded: row.get(22)?,
                 };
-                println!("✅ [DB] Proyecto leído de BD: '{}'", project.name);
                 Ok(project)
             },
-        );
-
-        match &result {
-            Ok(proj) => {
-                println!("✅ [DB] get_project exitoso: '{}'", proj.name);
-            }
-            Err(e) => {
-                println!("❌ [DB] Error en get_project: {}", e);
-            }
-        }
-
-        result
+        )
     }
 
     pub fn update_project(&self, id: i64, updates: UpdateProjectDTO) -> Result<Project> {
@@ -855,8 +854,10 @@ impl Database {
     /// un shell), sino que la app corra git contra un repositorio arbitrario del disco.
     ///
     /// El filtro `deleted_at IS NULL` es DELIBERADO y explícito acá: mandar un proyecto
-    /// a la papelera tiene que REVOCAR el permiso git sobre su carpeta. B4 aplicará el
-    /// mismo criterio a `get_project`; este filtro es explícito y no depende de aquél.
+    /// a la papelera tiene que REVOCAR el permiso git sobre su carpeta. `get_project`
+    /// ya aplica el mismo criterio (B4), pero esto NO es redundancia: este método no
+    /// compone `get_project` —consulta por `local_path`, no por id— así que necesita su
+    /// propio filtro. Los dos tienen que decir lo mismo y cada uno lo asserta aparte.
     pub fn is_registered_project_path(&self, path: &str) -> Result<bool> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
@@ -1583,18 +1584,36 @@ impl Database {
         Ok(new_pinned)
     }
 
+    /// Reordenar los proyectos fijados. TODO o NADA.
+    ///
+    /// Antes era un `UPDATE` por proyecto suelto dentro del `for`: si uno fallaba a
+    /// mitad, los anteriores ya habían quedado escritos y el orden terminaba con
+    /// `pinned_order` duplicados o con huecos. Ahora va en una transacción.
+    ///
+    /// Un id inexistente en la lista ABORTA el reordenamiento entero. Es deliberado:
+    /// una lista con un id fantasma significa que el frontend está desincronizado con
+    /// la DB, y un reordenamiento a medias es peor que ninguno —deja un orden que el
+    /// usuario no pidió y que nadie puede explicar—. Fallar fuerte hace que el front
+    /// recargue y el usuario vuelva a arrastrar sobre datos reales.
     pub fn reorder_pinned_projects(&self, project_ids: Vec<i64>) -> Result<()> {
         let conn = self.conn.lock().unwrap();
+        let tx = conn.unchecked_transaction()?;
 
         for (index, project_id) in project_ids.iter().enumerate() {
-            conn.execute(
+            let rows = tx.execute(
                 "UPDATE projects
                  SET pinned_order = ?1
                  WHERE id = ?2",
                 params![index as i64 + 1, project_id],
             )?;
+
+            if rows == 0 {
+                // Sale sin commit: el Drop de `tx` hace rollback de lo ya escrito.
+                return Err(rusqlite::Error::QueryReturnedNoRows);
+            }
         }
 
+        tx.commit()?;
         Ok(())
     }
 
@@ -2011,11 +2030,16 @@ impl Database {
         Ok(conn.last_insert_rowid())
     }
 
-    /// Terminar una sesión de tracking
+    /// Terminar una sesión de tracking: cerrarla y acreditar su duración al proyecto.
+    ///
+    /// Los dos UPDATE van en UNA transacción. Antes eran dos `execute` sueltos bajo el
+    /// mismo lock: si el segundo fallaba, la sesión quedaba cerrada y el tiempo
+    /// trabajado se perdía en silencio, sin error y sin forma de recuperarlo.
     pub fn end_tracking_session(&self, session_id: i64, duration_seconds: i64) -> Result<()> {
         let conn = self.conn.lock().unwrap();
+        let tx = conn.unchecked_transaction()?;
 
-        conn.execute(
+        tx.execute(
             "UPDATE time_tracking_sessions
              SET ended_at = CURRENT_TIMESTAMP, duration_seconds = ?1
              WHERE id = ?2",
@@ -2023,13 +2047,14 @@ impl Database {
         )?;
 
         // También actualizar el tiempo total del proyecto
-        conn.execute(
+        tx.execute(
             "UPDATE projects
              SET total_time_seconds = COALESCE(total_time_seconds, 0) + ?1
              WHERE id = (SELECT project_id FROM time_tracking_sessions WHERE id = ?2)",
             params![duration_seconds, session_id],
         )?;
 
+        tx.commit()?;
         Ok(())
     }
 
@@ -2148,6 +2173,79 @@ mod tests {
         })
         .expect("no se pudo sembrar el proyecto")
         .id
+    }
+
+    // ==================== B4: get_project filtra la papelera ====================
+
+    #[test]
+    fn test_get_project_returns_active_project() {
+        let db = test_db();
+        let created = db.create_project(test_project_dto()).unwrap();
+
+        let fetched = db.get_project(created.id).expect("un proyecto activo debe leerse");
+        assert_eq!(fetched.id, created.id);
+    }
+
+    #[test]
+    fn test_get_project_rejects_trashed_project() {
+        let db = test_db();
+        let created = db.create_project(test_project_dto()).unwrap();
+        db.delete_project(created.id).unwrap();
+
+        let err = db
+            .get_project(created.id)
+            .expect_err("un proyecto en papelera no debe leerse");
+        assert!(
+            matches!(err, rusqlite::Error::QueryReturnedNoRows),
+            "debe ser QueryReturnedNoRows, fue: {err:?}"
+        );
+    }
+
+    /// `get_project_with_children` compone `get_project`, así que hereda el filtro.
+    #[test]
+    fn test_get_project_with_children_rejects_trashed_parent() {
+        let db = test_db();
+        let parent = db.create_project(test_project_dto()).unwrap();
+        db.delete_project(parent.id).unwrap();
+
+        assert!(
+            db.get_project_with_children(parent.id).is_err(),
+            "un grupo en papelera no debe leerse con get_project_with_children"
+        );
+    }
+
+    /// EL test de regresión que importa: el filtro NO rompió la restauración.
+    /// `restore_project` no compone `get_project` —hace su propio SELECT y exige que el
+    /// proyecto SÍ esté en papelera—, así que el camino de vuelta sigue intacto.
+    #[test]
+    fn test_restore_project_still_works_after_trash_filter() {
+        let db = test_db();
+        let created = db.create_project(test_project_dto()).unwrap();
+        db.delete_project(created.id).unwrap();
+
+        // Invisible mientras está en papelera...
+        assert!(db.get_project(created.id).is_err());
+
+        // ...pero restaurable, y después visible de nuevo.
+        db.restore_project(created.id)
+            .expect("restore_project debe seguir funcionando sobre un proyecto en papelera");
+        assert!(
+            db.get_project(created.id).is_ok(),
+            "tras restaurar, get_project debe volver a devolverlo"
+        );
+    }
+
+    /// `purge_project` tampoco compone `get_project`: sigue exigiendo papelera.
+    #[test]
+    fn test_purge_project_still_works_after_trash_filter() {
+        let db = test_db();
+        let created = db.create_project(test_project_dto()).unwrap();
+        db.delete_project(created.id).unwrap();
+        assert!(db.get_project(created.id).is_err());
+
+        db.purge_project(created.id)
+            .expect("purge_project debe seguir funcionando sobre un proyecto en papelera");
+        assert!(db.list_trash().unwrap().is_empty());
     }
 
     #[test]
@@ -2531,8 +2629,16 @@ mod tests {
         assert!(db.get_root_projects().unwrap().iter().all(|p| p.id != created.id));
         // ...pero SÍ está en la papelera...
         assert!(db.list_trash().unwrap().iter().any(|p| p.id == created.id));
-        // ...y el lookup por id sigue funcionando (lo necesita restaurar).
-        assert!(db.get_project(created.id).is_ok());
+        // ...y get_project YA NO lo devuelve (B4).
+        //
+        // El comentario anterior acá decía "el lookup por id sigue funcionando (lo
+        // necesita restaurar)". Era FALSO: `restore_project` no compone `get_project`,
+        // hace su propio `SELECT deleted_at FROM projects WHERE id = ?1`. Ver
+        // `test_restore_project_still_works_after_trash_filter`.
+        assert!(
+            db.get_project(created.id).is_err(),
+            "un proyecto en papelera no debe ser legible con get_project"
+        );
     }
 
     #[test]
@@ -3270,6 +3376,46 @@ mod tests {
         assert_eq!(f2.pinned_order, Some(3));
     }
 
+    /// B8: un id fantasma en la lista ABORTA todo el reordenamiento y no deja ni un
+    /// `pinned_order` escrito. Sin la transacción, los ids anteriores al fantasma ya
+    /// habrían quedado renumerados y el orden terminaba inconsistente.
+    #[test]
+    fn test_reorder_pinned_projects_aborts_on_unknown_id_without_partial_write() {
+        let db = test_db();
+        let mut ids = vec![];
+        for i in 0..3 {
+            let mut dto = test_project_dto();
+            dto.name = format!("P{}", i);
+            let p = db.create_project(dto).unwrap();
+            db.toggle_pin_project(p.id).unwrap();
+            ids.push(p.id);
+        }
+        let orden_previo: Vec<Option<i64>> = ids
+            .iter()
+            .map(|id| db.get_project(*id).unwrap().pinned_order)
+            .collect();
+
+        // El fantasma va ÚLTIMO a propósito: los dos primeros UPDATE ya corrieron y
+        // tienen que revertirse. Si el test pusiera el fantasma primero, pasaría en
+        // verde incluso sin transacción y no probaría nada.
+        let err = db
+            .reorder_pinned_projects(vec![ids[2], ids[0], 999_999])
+            .expect_err("un id inexistente debe abortar el reordenamiento");
+        assert!(
+            matches!(err, rusqlite::Error::QueryReturnedNoRows),
+            "debe ser QueryReturnedNoRows, fue: {err:?}"
+        );
+
+        let orden_posterior: Vec<Option<i64>> = ids
+            .iter()
+            .map(|id| db.get_project(*id).unwrap().pinned_order)
+            .collect();
+        assert_eq!(
+            orden_previo, orden_posterior,
+            "el rollback debe dejar el pinned_order exactamente como estaba"
+        );
+    }
+
     // --- Groups ---
 
     #[test]
@@ -3458,6 +3604,30 @@ mod tests {
         // Verify total_time updated on project
         let fetched = db.get_project(p.id).unwrap();
         assert_eq!(fetched.total_time_seconds, Some(300));
+    }
+
+    /// B8: cerrar una sesión inexistente no debe acreditarle tiempo a NINGÚN proyecto.
+    /// El segundo UPDATE resuelve su `WHERE id = (SELECT project_id ...)` a NULL y no
+    /// matchea nada; este test lo fija para que un refactor del subquery no empiece a
+    /// repartir tiempo fantasma.
+    #[test]
+    fn test_end_tracking_session_with_unknown_id_credits_no_project() {
+        let db = test_db();
+        let p = db.create_project(test_project_dto()).unwrap();
+        let session_id = db.create_tracking_session(p.id, "test").unwrap();
+        db.end_tracking_session(session_id, 300).unwrap();
+        assert_eq!(db.get_project(p.id).unwrap().total_time_seconds, Some(300));
+
+        // Sesión que no existe: no explota y no toca el total.
+        db.end_tracking_session(999_999, 5_000)
+            .expect("cerrar una sesión inexistente no debe ser un error duro");
+
+        assert_eq!(
+            db.get_project(p.id).unwrap().total_time_seconds,
+            Some(300),
+            "una sesión inexistente no debe sumar tiempo a ningún proyecto"
+        );
+        assert_eq!(db.get_tracking_sessions(p.id, 10).unwrap().len(), 1);
     }
 
     #[test]
