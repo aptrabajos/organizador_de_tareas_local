@@ -144,6 +144,22 @@ pub struct SessionManager {
 }
 
 impl SessionManager {
+    /// Toma el lock del mapa de sesiones, recuperándose del envenenamiento.
+    ///
+    /// Mismo criterio que `Database::conn`: `Mutex::lock()` solo devuelve `Err` si
+    /// otro hilo entró en panic con el lock tomado, y con `unwrap()` ese primer
+    /// panic convertía en panic TODAS las operaciones de sesión posteriores. El
+    /// `HashMap` de adentro sigue siendo un `HashMap` perfectamente usable: el
+    /// envenenamiento es una marca de Rust, no una corrupción del dato.
+    fn sessions(&self) -> std::sync::MutexGuard<'_, HashMap<String, TrackingSession>> {
+        self.sessions.lock().unwrap_or_else(|poisoned| {
+            log::error!(
+                "❌ [TRACKING] El mutex de sesiones estaba envenenado (hubo un panic con el lock tomado). Se recupera y se sigue operando."
+            );
+            poisoned.into_inner()
+        })
+    }
+
     /// Crear un nuevo gestor de sesiones
     pub fn new() -> Self {
         Self {
@@ -154,7 +170,7 @@ impl SessionManager {
 
     /// Entrar a un proyecto (crear o reanudar sesión)
     pub fn enter_project(&self, project_id: i64, project_path: String) {
-        let mut sessions = self.sessions.lock().unwrap();
+        let mut sessions = self.sessions();
 
         if let Some(session) = sessions.get_mut(&project_path) {
             // Sesión existente - reanudar si estaba pausada
@@ -171,7 +187,7 @@ impl SessionManager {
 
     /// Salir de un proyecto (pausar o terminar sesión)
     pub fn exit_project(&self, project_path: &str) -> Option<u64> {
-        let mut sessions = self.sessions.lock().unwrap();
+        let mut sessions = self.sessions();
 
         if let Some(session) = sessions.get_mut(project_path) {
             let duration = session.stop();
@@ -184,7 +200,7 @@ impl SessionManager {
 
     /// Registrar heartbeat para un proyecto
     pub fn heartbeat(&self, project_path: &str) {
-        let mut sessions = self.sessions.lock().unwrap();
+        let mut sessions = self.sessions();
 
         if let Some(session) = sessions.get_mut(project_path) {
             session.heartbeat();
@@ -193,7 +209,7 @@ impl SessionManager {
 
     /// Obtener estado actual de tracking
     pub fn get_current_session(&self) -> Option<(String, i64, SessionState, u64)> {
-        let sessions = self.sessions.lock().unwrap();
+        let sessions = self.sessions();
 
         for (path, session) in sessions.iter() {
             if session.state() == SessionState::Active {
@@ -210,7 +226,7 @@ impl SessionManager {
 
     /// Verificar y pausar sesiones inactivas
     pub fn check_all_inactivity(&self) {
-        let mut sessions = self.sessions.lock().unwrap();
+        let mut sessions = self.sessions();
         let timeout = self.inactivity_timeout;
 
         for session in sessions.values_mut() {
@@ -220,7 +236,7 @@ impl SessionManager {
 
     /// Obtener número de sesiones activas
     pub fn active_session_count(&self) -> usize {
-        let sessions = self.sessions.lock().unwrap();
+        let sessions = self.sessions();
         sessions.values()
             .filter(|s| s.state() == SessionState::Active)
             .count()
@@ -237,6 +253,27 @@ impl Default for SessionManager {
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn el_gestor_sigue_operando_despues_de_un_panic_con_el_lock_tomado() {
+        let manager = SessionManager::new();
+        manager.enter_project(1, "/tmp/proyecto".to_string());
+
+        let panicked = std::thread::scope(|scope| {
+            scope
+                .spawn(|| {
+                    let _guard = manager.sessions.lock().expect("el mutex arranca sano");
+                    panic!("panic deliberado con el lock de sesiones tomado");
+                })
+                .join()
+        });
+        assert!(panicked.is_err(), "el hilo tenía que entrar en panic");
+
+        // Con `lock().unwrap()` esto era un panic en cascada: un fallo aislado
+        // dejaba el tracking muerto hasta reiniciar la app.
+        assert_eq!(manager.active_session_count(), 1);
+    }
+
     use super::*;
     use std::thread;
     use std::time::Duration;

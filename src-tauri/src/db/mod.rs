@@ -70,6 +70,33 @@ pub struct Database {
 }
 
 impl Database {
+    /// Toma el lock de la conexión, recuperándose del envenenamiento.
+    ///
+    /// Había 45 `self.conn()` en el código de producción de este
+    /// archivo, y el problema no era el `unwrap()` en abstracto: `Mutex::lock()`
+    /// devuelve `Err` SOLO si el mutex quedó envenenado, o sea si otro hilo entró
+    /// en panic mientras lo tenía tomado. Con `unwrap()`, ese primer panic
+    /// convertía en panic TODAS las operaciones de base posteriores: un fallo
+    /// aislado en un camino cualquiera dejaba la app muerta hasta el reinicio.
+    ///
+    /// La política es recuperar, no propagar. El envenenamiento es una marca que
+    /// pone Rust, no una corrupción de SQLite: la conexión sigue siendo
+    /// perfectamente válida, así que `into_inner()` devuelve el guard y la app
+    /// sigue viva. Propagar un error tipado sería más "honesto" pero convertiría
+    /// el panic ajeno en un error visible al usuario en cada operación siguiente,
+    /// que es el mismo desastre con mejores modales.
+    ///
+    /// El `error!` no es opcional: si esto dispara, hubo un panic en algún lado y
+    /// alguien tiene que poder encontrarlo.
+    fn conn(&self) -> std::sync::MutexGuard<'_, Connection> {
+        self.conn.lock().unwrap_or_else(|poisoned| {
+            error!(
+                "❌ [DB] El mutex de la conexión estaba envenenado (hubo un panic con el lock tomado). Se recupera y se sigue operando."
+            );
+            poisoned.into_inner()
+        })
+    }
+
     pub fn new(db_path: PathBuf) -> Result<Self> {
         let conn = Connection::open(db_path)?;
 
@@ -318,7 +345,7 @@ impl Database {
     /// `dest` debe ser una ruta de archivo que NO exista: `VACUUM INTO` falla si
     /// el archivo destino ya existe.
     pub fn backup_to(&self, dest: &str) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
         conn.execute("VACUUM INTO ?1", params![dest])?;
         Ok(())
     }
@@ -346,7 +373,7 @@ impl Database {
     }
 
     pub fn create_project(&self, project: CreateProjectDTO) -> Result<Project> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         // Validar parent_id ANTES del INSERT (misma regla que assign_project_to_group,
         // la única barrera hoy validada contra grupos padre inexistentes/borrados): sin
@@ -397,7 +424,7 @@ impl Database {
     }
 
     pub fn get_all_projects(&self) -> Result<Vec<Project>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         let mut stmt = conn.prepare(
             &format!("SELECT {}
@@ -588,7 +615,7 @@ impl Database {
     /// Cascada: marca también los hijos directos AÚN activos con el MISMO
     /// timestamp (eso identifica el batch para restaurarlo en bloque).
     pub fn delete_project(&self, id: i64) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
         let now = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
         let tx = conn.unchecked_transaction()?;
         // Soft-delete del proyecto + TODOS sus descendientes activos (cualquier
@@ -618,7 +645,7 @@ impl Database {
     /// - Si el id ES un grupo, restaura también los hijos del MISMO batch (mismo
     ///   timestamp de borrado), preservando la jerarquía original.
     pub fn restore_project(&self, id: i64) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         // Validar que el proyecto exista Y esté efectivamente en la papelera ANTES de
         // cualquier UPDATE (mismo guard que ya tiene purge_project). Sin esto, para un
@@ -698,7 +725,7 @@ impl Database {
     /// Eliminar DEFINITIVAMENTE un proyecto (solo si está en papelera).
     /// Borra en cascada de todas las tablas hijas dentro de una transacción.
     pub fn purge_project(&self, id: i64) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         // Validar que el proyecto esté efectivamente en la papelera
         let deleted_at: Option<String> = conn
@@ -753,7 +780,7 @@ impl Database {
     /// Vaciar la papelera: elimina DEFINITIVAMENTE todos los proyectos con
     /// deleted_at IS NOT NULL y sus datos, en una sola transacción.
     pub fn empty_trash(&self) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         let ids: Vec<i64> = {
             let mut stmt = conn.prepare(
@@ -774,7 +801,7 @@ impl Database {
     /// Listar los proyectos en la papelera (deleted_at IS NOT NULL).
     /// Mismo mapeo posicional que get_all_projects.
     pub fn list_trash(&self) -> Result<Vec<TrashItem>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         // Devolvemos la fecha de borrado REAL (deleted_at) y cuántos subproyectos
         // cayeron también a la papelera, sin tocar el struct Project ni su SELECT.
@@ -812,7 +839,7 @@ impl Database {
     /// compone `get_project` —consulta por `local_path`, no por id— así que necesita su
     /// propio filtro. Los dos tienen que decir lo mismo y cada uno lo asserta aparte.
     pub fn is_registered_project_path(&self, path: &str) -> Result<bool> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
         let mut stmt = conn.prepare(
             "SELECT 1 FROM projects WHERE local_path = ?1 AND deleted_at IS NULL LIMIT 1",
         )?;
@@ -826,7 +853,7 @@ impl Database {
     /// no alcanza si la ruta guardada y la recibida difieren en forma (barra final,
     /// './' intermedio, symlink) apuntando al mismo directorio real.
     pub fn active_project_paths(&self) -> Result<Vec<String>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
         let mut stmt =
             conn.prepare("SELECT local_path FROM projects WHERE deleted_at IS NULL")?;
         let rows = stmt.query_map([], |row| row.get::<_, String>(0))?;
@@ -834,7 +861,7 @@ impl Database {
     }
 
     pub fn search_projects(&self, query: &str) -> Result<Vec<Project>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
         let search_pattern = format!("%{}%", query);
 
         let mut stmt = conn.prepare(
@@ -869,7 +896,7 @@ impl Database {
 
     // Métodos para manejar enlaces de proyectos
     pub fn create_link(&self, link: CreateLinkDTO) -> Result<ProjectLink> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         conn.execute(
             "INSERT INTO project_links (project_id, link_type, title, url)
@@ -898,7 +925,7 @@ impl Database {
     }
 
     pub fn get_project_links(&self, project_id: i64) -> Result<Vec<ProjectLink>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
         self.get_project_links_internal(project_id, &conn)
     }
 
@@ -985,7 +1012,7 @@ impl Database {
     }
 
     pub fn update_link(&self, id: i64, link: UpdateLinkDTO) -> Result<ProjectLink> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         // Construir la query dinámicamente basada en los campos proporcionados
         let mut set_clauses = Vec::new();
@@ -1043,14 +1070,14 @@ impl Database {
     }
 
     pub fn delete_link(&self, id: i64) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
         conn.execute("DELETE FROM project_links WHERE id = ?1", params![id])?;
         Ok(())
     }
 
     // Métodos para tracking y analytics
     pub fn track_project_open(&self, id: i64) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         conn.execute(
             "UPDATE projects
@@ -1071,7 +1098,7 @@ impl Database {
     }
 
     pub fn add_project_time(&self, id: i64, seconds: i64) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         conn.execute(
             "UPDATE projects
@@ -1086,7 +1113,7 @@ impl Database {
     pub fn get_project_stats(&self) -> Result<crate::models::project::ProjectStats> {
         use crate::models::project::{ProjectStats, ProjectActivity};
 
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         // Total de proyectos
         let total_projects: i64 = conn.query_row(
@@ -1152,7 +1179,7 @@ impl Database {
     pub fn get_project_activities(&self, project_id: i64, limit: i64) -> Result<Vec<crate::models::project::ProjectActivity>> {
         use crate::models::project::ProjectActivity;
 
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         let mut stmt = conn.prepare(
             "SELECT id, project_id, activity_type, description, duration_seconds, created_at
@@ -1189,7 +1216,7 @@ impl Database {
             ));
         }
 
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         conn.execute(
             "INSERT INTO project_attachments (project_id, filename, file_data, file_size, mime_type)
@@ -1226,7 +1253,7 @@ impl Database {
     }
 
     pub fn get_attachments(&self, project_id: i64) -> Result<Vec<ProjectAttachment>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         let mut stmt = conn.prepare(
             "SELECT id, project_id, filename, file_data, file_size, mime_type, created_at
@@ -1251,7 +1278,7 @@ impl Database {
     }
 
     pub fn delete_attachment(&self, id: i64) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         conn.execute("DELETE FROM project_attachments WHERE id = ?1", params![id])?;
 
@@ -1261,7 +1288,7 @@ impl Database {
     // ==================== MÉTODOS PARA PROJECT JOURNAL ====================
 
     pub fn create_journal_entry(&self, entry: CreateJournalEntryDTO) -> Result<JournalEntry> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         conn.execute(
             "INSERT INTO project_journal (project_id, content, tags)
@@ -1291,7 +1318,7 @@ impl Database {
     }
 
     pub fn get_journal_entries(&self, project_id: i64) -> Result<Vec<JournalEntry>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         let mut stmt = conn.prepare(
             "SELECT id, project_id, content, tags, created_at, updated_at
@@ -1317,7 +1344,7 @@ impl Database {
     }
 
     pub fn update_journal_entry(&self, id: i64, updates: UpdateJournalEntryDTO) -> Result<JournalEntry> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         let mut set_clauses = Vec::new();
         let mut params: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
@@ -1368,7 +1395,7 @@ impl Database {
     }
 
     pub fn delete_journal_entry(&self, id: i64) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         conn.execute("DELETE FROM project_journal WHERE id = ?1", params![id])?;
 
@@ -1378,7 +1405,7 @@ impl Database {
     // ==================== MÉTODOS PARA PROJECT TODOS ====================
 
     pub fn create_todo(&self, todo: CreateTodoDTO) -> Result<ProjectTodo> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         conn.execute(
             "INSERT INTO project_todos (project_id, content)
@@ -1408,7 +1435,7 @@ impl Database {
     }
 
     pub fn get_project_todos(&self, project_id: i64) -> Result<Vec<ProjectTodo>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         let mut stmt = conn.prepare(
             "SELECT id, project_id, content, is_completed, created_at, completed_at
@@ -1434,7 +1461,7 @@ impl Database {
     }
 
     pub fn update_todo(&self, id: i64, updates: UpdateTodoDTO) -> Result<ProjectTodo> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         let mut set_clauses = Vec::new();
         let mut params: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
@@ -1491,7 +1518,7 @@ impl Database {
     }
 
     pub fn delete_todo(&self, id: i64) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         conn.execute("DELETE FROM project_todos WHERE id = ?1", params![id])?;
 
@@ -1501,7 +1528,7 @@ impl Database {
     // ==================== MÉTODOS PARA ESTADOS Y FAVORITOS ====================
 
     pub fn update_project_status(&self, id: i64, status: String) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         conn.execute(
             "UPDATE projects
@@ -1514,7 +1541,7 @@ impl Database {
     }
 
     pub fn toggle_pin_project(&self, id: i64) -> Result<bool> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         // Obtener estado actual
         let is_pinned: bool = conn.query_row(
@@ -1564,7 +1591,7 @@ impl Database {
     /// usuario no pidió y que nadie puede explicar—. Fallar fuerte hace que el front
     /// recargue y el usuario vuelva a arrastrar sobre datos reales.
     pub fn reorder_pinned_projects(&self, project_ids: Vec<i64>) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
         let tx = conn.unchecked_transaction()?;
 
         for (index, project_id) in project_ids.iter().enumerate() {
@@ -1586,7 +1613,7 @@ impl Database {
     }
 
     pub fn update_project_order(&self, id: i64, new_order: i64) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         conn.execute(
             "UPDATE projects
@@ -1601,7 +1628,7 @@ impl Database {
     // ==================== DASHBOARD METHODS ====================
 
     pub fn get_recent_projects(&self) -> Result<Vec<Project>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
         let mut stmt = conn.prepare(
             &format!("SELECT {}
              FROM projects
@@ -1622,7 +1649,7 @@ impl Database {
 
     pub fn get_all_pending_todos(&self) -> Result<Vec<crate::models::project::DashboardTodo>> {
         use crate::models::project::{DashboardTodo, ProjectTodo};
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
         let mut stmt = conn.prepare(
             "SELECT
                 pt.id, pt.project_id, pt.content, pt.is_completed, pt.created_at, pt.completed_at,
@@ -1656,7 +1683,7 @@ impl Database {
 
     pub fn get_recent_journal_entries(&self) -> Result<Vec<crate::models::project::DashboardJournalEntry>> {
         use crate::models::project::{DashboardJournalEntry, JournalEntry};
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
         let mut stmt = conn.prepare(
             "SELECT
                 pj.id, pj.project_id, pj.content, pj.tags, pj.created_at, pj.updated_at,
@@ -1693,7 +1720,7 @@ impl Database {
 
     /// Obtener solo proyectos raíz (sin parent_id, grupos principales)
     pub fn get_root_projects(&self) -> Result<Vec<Project>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         let mut stmt = conn.prepare(
             &format!("SELECT {}
@@ -1727,7 +1754,7 @@ impl Database {
 
     /// Obtener subproyectos de un grupo (parent_id = id)
     pub fn get_subprojects(&self, parent_id: i64) -> Result<Vec<Project>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         let mut stmt = conn.prepare(
             &format!("SELECT {}
@@ -1774,7 +1801,7 @@ impl Database {
 
     /// Contar subproyectos de un grupo
     pub fn count_subprojects(&self, parent_id: i64) -> Result<i64> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         let count: i64 = conn.query_row(
             "SELECT COUNT(*) FROM projects WHERE parent_id = ?1 AND deleted_at IS NULL",
@@ -1830,7 +1857,7 @@ impl Database {
         child_id: i64,
         new_parent_id: Option<i64>,
     ) -> std::result::Result<(), String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         if let Some(parent_id) = new_parent_id {
             // 1) Un proyecto no puede ser su propio grupo padre
@@ -1870,7 +1897,7 @@ impl Database {
 
     /// Crear una nueva sesión de tracking
     pub fn create_tracking_session(&self, project_id: i64, source: &str) -> Result<i64> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         conn.execute(
             "INSERT INTO time_tracking_sessions (project_id, started_at, source)
@@ -1887,7 +1914,7 @@ impl Database {
     /// mismo lock: si el segundo fallaba, la sesión quedaba cerrada y el tiempo
     /// trabajado se perdía en silencio, sin error y sin forma de recuperarlo.
     pub fn end_tracking_session(&self, session_id: i64, duration_seconds: i64) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
         let tx = conn.unchecked_transaction()?;
 
         tx.execute(
@@ -1913,7 +1940,7 @@ impl Database {
     pub fn get_tracking_sessions(&self, project_id: i64, limit: i64) -> Result<Vec<crate::tracking::aggregator::TimeTrackingSession>> {
         use crate::tracking::aggregator::TimeTrackingSession;
 
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         let mut stmt = conn.prepare(
             "SELECT id, project_id, started_at, ended_at, duration_seconds, source
@@ -1942,7 +1969,7 @@ impl Database {
     pub fn get_time_stats(&self, project_id: i64) -> Result<crate::tracking::aggregator::TimeStats> {
         use crate::tracking::aggregator::TimeStats;
 
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         // Tiempo total y número de sesiones
         let (total_seconds, session_count): (i64, i64) = conn.query_row(
@@ -2046,6 +2073,40 @@ mod tests {
             .collect();
         titles.sort();
         titles
+    }
+
+    // ============ B15: el envenenamiento del mutex no mata la app ============
+
+    #[test]
+    fn la_base_sigue_operando_despues_de_un_panic_con_el_lock_tomado() {
+        let db = test_db();
+        seed_project_at(&db, "Antes del panic", "/tmp/antes");
+
+        // Envenenar el mutex a mano: un hilo toma el lock y entra en panic. Es
+        // exactamente lo que pasa cuando cualquier camino de la app panickea con
+        // la conexión tomada, y es la ÚNICA forma de que `Mutex::lock()` devuelva
+        // Err.
+        let panicked = std::thread::scope(|scope| {
+            scope
+                .spawn(|| {
+                    let _guard = db.conn.lock().expect("el mutex arranca sano");
+                    panic!("panic deliberado con el lock de la conexión tomado");
+                })
+                .join()
+        });
+        assert!(panicked.is_err(), "el hilo tenía que entrar en panic");
+
+        // Con `lock().unwrap()` esta línea era un panic, y con ella TODA operación
+        // de base posterior: un fallo aislado en un camino cualquiera dejaba la
+        // app muerta hasta el reinicio. Este test fallaba con el código anterior.
+        let projects = db
+            .get_all_projects()
+            .expect("la base tiene que seguir operando después del envenenamiento");
+        assert_eq!(projects.len(), 1);
+
+        // Y no es solo leer: escribir también.
+        seed_project_at(&db, "Después del panic", "/tmp/despues");
+        assert_eq!(db.get_all_projects().unwrap().len(), 2);
     }
 
     // ==================== B16: los enlaces se cargan en lote ====================
