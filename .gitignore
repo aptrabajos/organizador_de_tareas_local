@@ -7,6 +7,11 @@ node_modules/
 dist/
 .vite/
 
+# Gestor de paquetes: pnpm es el UNICO soportado.
+# El unico lockfile versionado es pnpm-lock.yaml.
+package-lock.json
+yarn.lock
+
 # Database
 *.db
 *.db-journal
@@ -44,3 +49,18 @@ dist-ssr/
 win10/
 release-*/
 .gestor/
+
+# Artefactos binarios: NO se versionan (ver docs/historico/win10.md)
+*.exe
+*.tar.gz
+docs/historico/win10/
+
+# Salidas de tests E2E (se regeneran con `pnpm run test:e2e`)
+playwright-report/
+test-results/
+
+# PDFs exportados por la app durante pruebas manuales
+gestor_de_proyectos_*.pdf
+
+# Archivo local: artefactos sacados del indice pero conservados en disco
+_archivo_local/
