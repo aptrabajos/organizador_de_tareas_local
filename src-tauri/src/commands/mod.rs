@@ -247,11 +247,20 @@ pub struct BackupData {
     filename: String,
 }
 
-/// Sanea un nombre de proyecto para usarlo como componente de nombre de archivo,
-/// evitando path traversal. Reemplaza separadores de path ('/' y '\') y colapsa
-/// secuencias '..' para que el resultado nunca contenga un separador ni una
-/// referencia a directorio padre. Usado por `create_project_backup`; el mismo
-/// criterio (mínimo) ya se aplica en `sync_project_to_backup` y en el export a PDF.
+/// Sanea un nombre de proyecto para usarlo como componente de nombre de archivo o
+/// de carpeta, evitando path traversal. Reemplaza separadores de path ('/' y '\')
+/// y colapsa secuencias '..' para que el resultado nunca contenga un separador ni
+/// una referencia a directorio padre.
+///
+/// ÚNICA fuente de verdad del saneado: la usan `create_project_backup`,
+/// `sync_project_to_backup` y `export_project_to_pdf`. Antes cada una tenía su
+/// propio criterio y la del PDF era la laxa (sólo espacios y '/'), así que un
+/// proyecto llamado `../../etc/passwd` generaba una ruta de PDF con traversal.
+///
+/// Los espacios se PRESERVAN a propósito: no son un riesgo de traversal (las rutas
+/// se pasan a `File::create`/`rsync` como argumento, nunca por shell) y convertirlos
+/// a '_' renombraría las carpetas de backup ya existentes en destino, dejándolas
+/// huérfanas y forzando un resync completo.
 fn sanitize_backup_filename_component(name: &str) -> String {
     name.trim().replace(['/', '\\'], "_").replace("..", "_")
 }
@@ -337,10 +346,8 @@ pub async fn create_project_backup(
     );
 
     // Crear nombre del archivo. Sanear project.name contra path traversal: reemplazar
-    // espacios NO alcanza (a diferencia de lo que hacía antes), hay que neutralizar
-    // separadores de path y '..' igual que en sync_project_to_backup (arriba) y en el
-    // export a PDF (más abajo), o un nombre de proyecto malicioso podría escapar la
-    // carpeta destino elegida por el usuario.
+    // espacios NO alcanza, hay que neutralizar separadores de path y '..' o un nombre
+    // de proyecto malicioso podría escapar la carpeta destino elegida por el usuario.
     let filename = format!("{}_BACKUP.md", sanitize_backup_filename_component(&project.name));
     let backup_path = PathBuf::from(&project.local_path).join(&filename);
 
@@ -359,31 +366,6 @@ pub async fn create_project_backup(
         path: result_path,
         filename,
     })
-}
-
-#[tauri::command]
-pub async fn write_file_to_path(
-    file_path: String,
-    content: String,
-) -> Result<String, String> {
-    println!("📝 [WRITE] Escribiendo archivo: {}", file_path);
-    
-    use std::fs::write;
-    use std::path::Path;
-    
-    // Crear directorio padre si no existe
-    if let Some(parent) = Path::new(&file_path).parent() {
-        std::fs::create_dir_all(parent)
-            .map_err(|e| format!("Error creando directorio: {}", e))?;
-    }
-    
-    // Escribir archivo
-    write(&file_path, content)
-        .map_err(|e| format!("Error escribiendo archivo: {}", e))?;
-    
-    println!("✅ [WRITE] Archivo escrito exitosamente: {}", file_path);
-    
-    Ok(format!("Archivo escrito en: {}", file_path))
 }
 
 /// Sincroniza los ARCHIVOS de un proyecto a la carpeta de backup configurada (no la DB).
@@ -414,11 +396,8 @@ pub async fn sync_project_to_backup(
 
     // Sanear project_name contra path traversal: join() con una ruta absoluta o con
     // componentes '..' ESCAPARÍA la carpeta de backup. Lo reducimos a un único nombre
-    // de carpeta seguro (sin separadores ni '..').
-    let safe_name = project_name
-        .trim()
-        .replace(['/', '\\'], "_")
-        .replace("..", "_");
+    // de carpeta seguro (sin separadores ni '..') con el saneado compartido.
+    let safe_name = sanitize_backup_filename_component(&project_name);
     if safe_name.is_empty() {
         return Err("Nombre de proyecto no válido para el backup".to_string());
     }
@@ -459,47 +438,6 @@ pub async fn sync_project_to_backup(
 
     println!("✅ [RSYNC] Sincronización completada en {}", backup_str);
     Ok(format!("Proyecto sincronizado en: {}", backup_str))
-}
-
-#[tauri::command]
-pub async fn sync_project(
-    source_path: String,
-    destination_path: String,
-) -> Result<String, String> {
-    println!(
-        "Sincronizando {} -> {}",
-        source_path, destination_path
-    );
-
-    // Verificar que rsync esté disponible
-    let rsync_check = Command::new("which").arg("rsync").output();
-
-    if rsync_check.is_err() || !rsync_check.unwrap().status.success() {
-        return Err("rsync no está instalado en el sistema".to_string());
-    }
-
-    // Ejecutar rsync
-    let output = Command::new("rsync")
-        .arg("-av") // archive + verbose
-        .arg("--update") // solo copiar archivos más nuevos
-        .arg("--progress")
-        .arg(format!("{}/", source_path)) // trailing slash importante
-        .arg(&destination_path)
-        .output()
-        .map_err(|e| format!("Error ejecutando rsync: {}", e))?;
-
-    if !output.status.success() {
-        let error = String::from_utf8_lossy(&output.stderr);
-        return Err(format!("rsync falló: {}", error));
-    }
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    println!("rsync output:\n{}", stdout);
-
-    Ok(format!(
-        "Sincronización completada exitosamente a: {}",
-        destination_path
-    ))
 }
 
 // Comandos para manejar enlaces de proyectos
@@ -1377,7 +1315,10 @@ pub async fn export_project_to_pdf(
 
     // Nombre del archivo con timestamp
     let timestamp = Local::now().format("%Y%m%d_%H%M%S");
-    let safe_project_name = project.name.replace(" ", "_").replace("/", "-");
+    // Saneado compartido: antes acá sólo se tocaban espacios y '/', así que un nombre
+    // con '\' o '..' (ej. `../../etc/passwd`) escapaba la carpeta del proyecto al
+    // hacer join(). Ahora usa el MISMO criterio que los backups.
+    let safe_project_name = sanitize_backup_filename_component(&project.name);
     let filename = format!("{}_{}.pdf", safe_project_name, timestamp);
     let output_path = export_dir.join(&filename);
 
@@ -1709,6 +1650,7 @@ pub async fn get_work_session_status(
 #[cfg(test)]
 mod backup_filename_sanitization_tests {
     use super::sanitize_backup_filename_component;
+    use std::path::{Component, Path};
 
     /// Auditoría (ALTO): un project.name con separadores de path o '..' no debe
     /// sobrevivir en el nombre de archivo del backup, o escapa la carpeta destino
@@ -1745,6 +1687,63 @@ mod backup_filename_sanitization_tests {
     fn normal_names_are_left_intact_modulo_trim() {
         assert_eq!(sanitize_backup_filename_component("Mi Proyecto"), "Mi Proyecto");
         assert_eq!(sanitize_backup_filename_component("  Mi Proyecto  "), "Mi Proyecto");
+    }
+
+    /// Decisión explícita al unificar los tres saneados: el criterio del PDF convertía
+    /// los espacios a '_', el de los backups no. Gana "preservar": el espacio no es un
+    /// vector de traversal y renombrar rompería las carpetas de backup ya sincronizadas.
+    #[test]
+    fn spaces_are_preserved_by_design() {
+        assert_eq!(
+            sanitize_backup_filename_component("Proyecto Con Espacios"),
+            "Proyecto Con Espacios"
+        );
+    }
+
+    /// La garantía que realmente importa: el resultado es UN SOLO componente de ruta,
+    /// así que `dir.join(resultado)` nunca puede salirse de `dir`.
+    #[test]
+    fn traversal_payload_collapses_to_single_path_component() {
+        for malicious in ["../../etc/passwd", "..\\..\\Windows\\System32", "/etc/shadow"] {
+            let safe = sanitize_backup_filename_component(malicious);
+            let as_path = Path::new(&safe);
+            assert_eq!(
+                as_path.components().count(),
+                1,
+                "'{malicious}' debería quedar en un único componente, quedó '{safe}'"
+            );
+            assert!(
+                !as_path
+                    .components()
+                    .any(|c| matches!(c, Component::ParentDir | Component::RootDir)),
+                "'{malicious}' no debe dejar componentes '..' ni raíz, quedó '{safe}'"
+            );
+        }
+    }
+
+    /// Regresión del agujero real: `export_project_to_pdf` saneaba sólo espacios y '/',
+    /// así que un proyecto llamado `../../etc/passwd` producía una ruta de PDF fuera de
+    /// la carpeta del proyecto. El nombre construido debe quedar SIEMPRE dentro.
+    #[test]
+    fn pdf_filename_from_traversal_name_stays_inside_export_dir() {
+        let export_dir = Path::new("/home/user/proyectos/demo");
+        let filename = format!(
+            "{}_{}.pdf",
+            sanitize_backup_filename_component("../../etc/passwd"),
+            "20250101_120000"
+        );
+        let output_path = export_dir.join(&filename);
+
+        assert_eq!(
+            output_path.parent(),
+            Some(export_dir),
+            "el PDF se escribió fuera de la carpeta del proyecto: {output_path:?}"
+        );
+        assert!(!filename.contains(".."), "filename con '..': {filename}");
+        assert!(
+            !filename.contains('/') && !filename.contains('\\'),
+            "filename con separador de ruta: {filename}"
+        );
     }
 }
 

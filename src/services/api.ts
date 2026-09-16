@@ -91,13 +91,6 @@ export async function createProjectBackup(
   return await invoke('create_project_backup', { projectId });
 }
 
-export async function syncProject(
-  sourcePath: string,
-  destinationPath: string
-): Promise<string> {
-  return await invoke('sync_project', { sourcePath, destinationPath });
-}
-
 export async function syncProjectToBackup(
   sourcePath: string,
   projectName: string
