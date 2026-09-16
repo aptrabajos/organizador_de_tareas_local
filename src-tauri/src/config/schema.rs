@@ -140,6 +140,25 @@ pub enum LogLevel {
     Debug,
 }
 
+impl LogLevel {
+    /// Traduce el nivel de la config al filtro del crate `log`.
+    ///
+    /// Es la bisagra que hace que `advanced.log_level` DEJE de ser decorativa: la
+    /// perilla existía en Settings y se persistía, pero no tenía ningún consumidor
+    /// —no había logger que configurar—, así que no controlaba nada.
+    ///
+    /// Un `LevelFilter` admite un record si `record.level() <= filtro`, o sea que
+    /// `Warn` deja pasar `Error` y `Warn`, y descarta `Info` y `Debug`.
+    pub fn to_level_filter(&self) -> log::LevelFilter {
+        match self {
+            LogLevel::Error => log::LevelFilter::Error,
+            LogLevel::Warn => log::LevelFilter::Warn,
+            LogLevel::Info => log::LevelFilter::Info,
+            LogLevel::Debug => log::LevelFilter::Debug,
+        }
+    }
+}
+
 /// Sistema operativo a utilizar
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "lowercase")]

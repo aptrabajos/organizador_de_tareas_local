@@ -7,15 +7,23 @@ mod config;
 mod db;
 mod models;
 mod platform;
+mod logging;
 mod pdf_export;
 mod tracking;
 
 use db::Database;
 use config::ConfigManager;
 use commands::ActiveSession;
+use log::{info, warn};
 use tauri::Manager;
 
 fn main() {
+    // El logger va PRIMERO: todo lo que sigue (resolver la DB, leer la config,
+    // el auto-backup) ya loguea, y sin logger instalado esos records se tiran.
+    // Arranca en Info; el nivel real de `advanced.log_level` se aplica abajo,
+    // apenas la config esté leída.
+    logging::init();
+
     // Ruta de la DB viva: misma resolución que usa `backup::restore_backup` para
     // reemplazarla, así ambas quedan garantizadas en sync (una sola fuente de verdad).
     let db_path = backup::live_db_path().expect("No se pudo resolver la ruta de la base de datos");
@@ -24,12 +32,24 @@ fn main() {
     let config_manager = ConfigManager::new().expect("Error al inicializar la configuración");
     let active_session = ActiveSession::default();
 
+    // Acá la perilla `advanced.log_level` de Settings empieza a gobernar de verdad:
+    // hasta ahora el campo se validaba, se persistía y no tenía ni un consumidor.
+    // Si la config no se pudo leer se sigue con el Info del arranque: quedarse sin
+    // logs por no poder leer una preferencia sería el peor de los dos mundos.
+    match config_manager.get_config() {
+        Ok(cfg) => logging::apply_level(cfg.advanced.log_level),
+        Err(e) => warn!(
+            "⚠️ [LOG] No se pudo leer advanced.log_level, se mantiene 'info': {}",
+            e
+        ),
+    }
+
     // Auto-backup al arrancar: si está activado y pasó el intervalo desde el último,
     // crea un backup verificado. Corre sincrónico antes de abrir la ventana (rápido
     // para una DB local; un destino lento/de red podría demorar el arranque). Si falla
     // NO aborta: se loguea y la app abre igual.
     if let Err(e) = backup::maybe_auto_backup(&db, &config_manager) {
-        eprintln!("⚠️ [AUTO-BACKUP] No se pudo crear el backup automático: {}", e);
+        warn!("⚠️ [AUTO-BACKUP] No se pudo crear el backup automático: {}", e);
     }
 
     tauri::Builder::default()
@@ -61,11 +81,11 @@ fn main() {
                 let active_session = window.state::<ActiveSession>();
                 match commands::stop_active_session_sync(&db, &active_session) {
                     Ok(Some(duration)) => {
-                        println!("⏹️ [WORK] Sesión activa cerrada al salir de la app ({}s)", duration);
+                        info!("⏹️ [WORK] Sesión activa cerrada al salir de la app ({}s)", duration);
                     }
                     Ok(None) => {}
                     Err(e) => {
-                        eprintln!("⚠️ [WORK] No se pudo cerrar la sesión activa al salir: {}", e);
+                        warn!("⚠️ [WORK] No se pudo cerrar la sesión activa al salir: {}", e);
                     }
                 }
             }

@@ -11,6 +11,7 @@
 //! - La retención SOLO borra archivos que matchean el patrón `projects-*.db` y
 //!   NUNCA borra el backup más reciente.
 
+use log::warn;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -163,14 +164,14 @@ pub fn run_backup(db: &Database, config_mgr: &ConfigManager) -> Result<BackupRes
     // NO debemos invalidar un backup correcto. Solo se loguea.
     cfg.backup.last_backup = Some(created_at.clone());
     if let Err(e) = config_mgr.update_config(cfg.clone()) {
-        eprintln!("⚠️ [BACKUP] No se pudo persistir last_backup: {}", e);
+        warn!("⚠️ [BACKUP] No se pudo persistir last_backup: {}", e);
     }
 
     // 5. Retención opcional de backups antiguos
     if cfg.backup.cleanup_old_backups {
         // La limpieza no debe hacer fallar un backup exitoso: solo se loguea
         if let Err(e) = apply_retention(&dir, cfg.backup.retention_days) {
-            eprintln!("⚠️ [BACKUP] No se pudo aplicar la retención: {}", e);
+            warn!("⚠️ [BACKUP] No se pudo aplicar la retención: {}", e);
         }
     }
 
@@ -275,7 +276,7 @@ fn apply_retention(dir: &Path, retention_days: u32) -> Result<(), String> {
                     // best-effort, un huérfano no rompe nada (nunca se lee sin el .db).
                     let _ = fs::remove_file(ok_manifest_path(path));
                 }
-                Err(e) => eprintln!(
+                Err(e) => warn!(
                     "⚠️ [BACKUP] No se pudo borrar el backup antiguo '{}': {}",
                     path.display(),
                     e

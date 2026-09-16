@@ -151,7 +151,10 @@ impl SocketServer {
                         let handler = handler.clone();
                         thread::spawn(move || {
                             if let Err(e) = handle_client(stream, &*handler) {
-                                eprintln!("Error handling client: {}", e);
+                                // Ruta completa en vez de `use log::warn`: este bloque
+                                // está detrás de `cfg(unix)` y un import a nivel de
+                                // archivo quedaría sin usar en el resto de plataformas.
+                                log::warn!("Error atendiendo a un cliente del socket: {}", e);
                             }
                         });
                     }
@@ -160,7 +163,7 @@ impl SocketServer {
                         thread::sleep(std::time::Duration::from_millis(100));
                     }
                     Err(e) => {
-                        eprintln!("Socket accept error: {}", e);
+                        log::warn!("Error aceptando una conexión en el socket: {}", e);
                     }
                 }
             }

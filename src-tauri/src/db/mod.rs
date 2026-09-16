@@ -1,3 +1,4 @@
+use log::{debug, error};
 use rusqlite::{params, Connection, Result};
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -472,9 +473,10 @@ impl Database {
         let conn = match self.conn.try_lock() {
             Ok(conn) => conn,
             Err(_) => {
-                // Este println! SÍ se queda: sólo dispara en el camino de deadlock, no
-                // en cada invocación. Es diagnóstico real, no ruido.
-                println!("❌ [DB] No se pudo obtener lock de conexión - posible deadlock");
+                // Este log SÍ se queda, y en nivel `error`: sólo dispara en el camino de
+                // deadlock, no en cada invocación. Es diagnóstico real, no ruido, y es
+                // justo lo que querés seguir viendo aunque el nivel esté en `error`.
+                error!("❌ [DB] No se pudo obtener lock de conexión - posible deadlock");
                 return Err(rusqlite::Error::SqliteFailure(
                     rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_BUSY),
                     None
@@ -527,13 +529,13 @@ impl Database {
     }
 
     pub fn update_project(&self, id: i64, updates: UpdateProjectDTO) -> Result<Project> {
-        println!("🗄️ [DB] Iniciando update_project en base de datos para ID: {}", id);
+        debug!("🗄️ [DB] Iniciando update_project en base de datos para ID: {}", id);
         
         // Intentar obtener la conexión con timeout
         let conn = match self.conn.try_lock() {
             Ok(conn) => conn,
             Err(_) => {
-                println!("❌ [DB] No se pudo obtener lock de conexión en update_project - posible deadlock");
+                error!("❌ [DB] No se pudo obtener lock de conexión en update_project - posible deadlock");
                 return Err(rusqlite::Error::SqliteFailure(
                     rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_BUSY),
                     None
@@ -541,7 +543,7 @@ impl Database {
             }
         };
 
-        println!("🔒 [DB] Conexión obtenida exitosamente para update_project");
+        debug!("🔒 [DB] Conexión obtenida exitosamente para update_project");
 
         let mut query_parts = vec![];
         let mut params: Vec<Box<dyn rusqlite::ToSql>> = vec![];
@@ -599,33 +601,36 @@ impl Database {
             query_parts.join(", ")
         );
 
-        println!("🗄️ [DB] Query SQL: {}", query);
-        println!("🗄️ [DB] Número de parámetros: {}", params.len());
+        // NO se loguea la query ni el conteo de parámetros. Acá había dos `println!` que
+        // volcaban el SQL completo del UPDATE y la cantidad de valores en CADA
+        // actualización. Se BORRARON en vez de bajarlos a `debug!`: una query con datos
+        // del usuario no debería poder aparecer en un log, ni siquiera en modo debug.
+        // Para diagnosticar alcanza con el id afectado y las filas modificadas.
 
         let params_ref: Vec<&dyn rusqlite::ToSql> = params.iter().map(|p| p.as_ref()).collect();
         
         match conn.execute(&query, params_ref.as_slice()) {
             Ok(rows_affected) => {
-                println!("🗄️ [DB] UPDATE ejecutado exitosamente, filas afectadas: {}", rows_affected);
+                debug!("🗄️ [DB] UPDATE ejecutado exitosamente, filas afectadas: {}", rows_affected);
             }
             Err(e) => {
-                println!("🗄️ [DB] ERROR en UPDATE: {}", e);
+                debug!("🗄️ [DB] ERROR en UPDATE: {}", e);
                 return Err(e);
             }
         }
 
         // Liberar la conexión antes de llamar a get_project
-        println!("🔓 [DB] Liberando conexión después del UPDATE");
+        debug!("🔓 [DB] Liberando conexión después del UPDATE");
         drop(conn); // Liberar explícitamente la conexión
         
-        println!("🔍 [DB] Obteniendo proyecto actualizado con ID: {}", id);
+        debug!("🔍 [DB] Obteniendo proyecto actualizado con ID: {}", id);
         let result = self.get_project(id);
         match &result {
             Ok(project) => {
-                println!("✅ [DB] Proyecto obtenido exitosamente: '{}'", project.name);
+                debug!("✅ [DB] Proyecto obtenido exitosamente: '{}'", project.name);
             }
             Err(e) => {
-                println!("❌ [DB] Error al obtener proyecto: {}", e);
+                error!("❌ [DB] Error al obtener proyecto: {}", e);
             }
         }
         result
