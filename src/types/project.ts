@@ -129,13 +129,6 @@ export interface CreateAttachmentDTO {
   mime_type: string;
 }
 
-export interface GitCommit {
-  hash: string;
-  author: string;
-  date: string;
-  message: string;
-}
-
 // ==================== PROJECT JOURNAL ====================
 
 export interface JournalEntry {

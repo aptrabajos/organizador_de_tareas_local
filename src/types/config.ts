@@ -101,27 +101,6 @@ export interface DetectedPrograms {
   text_editors: DetectedProgram[];
 }
 
-// ==================== VALIDACIÓN ====================
-
-export interface ValidationIssue {
-  field: string;
-  message: string;
-}
-
-export interface ValidationResult {
-  is_valid: boolean;
-  issues: ValidationIssue[];
-}
-
-// ==================== ESTADO DE CONFIGURACIÓN ====================
-
-export interface ConfigState {
-  config: AppConfig | null;
-  isLoading: boolean;
-  error: string | null;
-  detectedPrograms: DetectedPrograms | null;
-}
-
 // ==================== ATAJOS DE TECLADO ====================
 
 // Configuración de atajos de teclado individual
@@ -146,12 +125,51 @@ export type ShortcutAction =
   | 'refresh'
   | 'close_modal';
 
-// Mapa de acciones a descripciones legibles
-export const SHORTCUT_DESCRIPTIONS: Record<ShortcutAction, string> = {
-  new_project: 'Crear nuevo proyecto',
-  search: 'Buscar proyectos',
-  settings: 'Abrir configuración',
-  about: 'Abrir acerca de',
-  refresh: 'Recargar lista de proyectos',
-  close_modal: 'Cerrar modal activo',
+// Metadata de cada atajo para la pantalla de configuración.
+//
+// Reemplaza al viejo `SHORTCUT_DESCRIPTIONS`, que mapeaba una sola string por
+// acción y no tenía NINGÚN consumidor: Settings renderizaba seis bloques copiados
+// con estos textos hardcodeados. Cada bloque necesita TRES datos (título,
+// descripción y tecla por defecto), así que un `Record<ShortcutAction, string>`
+// no alcanzaba para alimentarlos sin perder texto.
+//
+// El ORDEN de las claves es el orden en que se listan en la UI: `Object.entries`
+// preserva el orden de inserción de claves string, así que no hay que duplicarlo.
+export interface ShortcutMetadata {
+  title: string;
+  description: string;
+  defaultKey: string;
+}
+
+export const SHORTCUT_METADATA: Record<ShortcutAction, ShortcutMetadata> = {
+  new_project: {
+    title: 'Nuevo Proyecto',
+    description: 'Abrir formulario de nuevo proyecto',
+    defaultKey: 'Ctrl+N',
+  },
+  search: {
+    title: 'Buscar Proyectos',
+    description: 'Focus en barra de búsqueda',
+    defaultKey: 'Ctrl+F',
+  },
+  settings: {
+    title: 'Abrir Configuración',
+    description: 'Abrir este panel de configuración',
+    defaultKey: 'Ctrl+Comma',
+  },
+  about: {
+    title: 'Acerca de',
+    description: 'Ver información de la aplicación',
+    defaultKey: 'Ctrl+Shift+A',
+  },
+  refresh: {
+    title: 'Recargar Proyectos',
+    description: 'Actualizar lista de proyectos',
+    defaultKey: 'Ctrl+R',
+  },
+  close_modal: {
+    title: 'Cerrar Modal',
+    description: 'Cerrar cualquier modal activo',
+    defaultKey: 'Escape',
+  },
 };
