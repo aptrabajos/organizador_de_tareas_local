@@ -847,6 +847,38 @@ impl Database {
         rows.collect()
     }
 
+    /// ¿Hay un proyecto ACTIVO cuyo `local_path` sea exactamente `path`?
+    ///
+    /// Es la fuente de verdad de AUTORIZACIÓN para los comandos git: la app sólo puede
+    /// operar git sobre carpetas de proyectos que ella misma gestiona. El riesgo que
+    /// cubre no es inyección de comandos (los argumentos van como argv real, nunca a
+    /// un shell), sino que la app corra git contra un repositorio arbitrario del disco.
+    ///
+    /// El filtro `deleted_at IS NULL` es DELIBERADO y explícito acá: mandar un proyecto
+    /// a la papelera tiene que REVOCAR el permiso git sobre su carpeta. B4 aplicará el
+    /// mismo criterio a `get_project`; este filtro es explícito y no depende de aquél.
+    pub fn is_registered_project_path(&self, path: &str) -> Result<bool> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT 1 FROM projects WHERE local_path = ?1 AND deleted_at IS NULL LIMIT 1",
+        )?;
+        stmt.exists(params![path])
+    }
+
+    /// `local_path` de todos los proyectos ACTIVOS (mismo criterio que
+    /// `is_registered_project_path`, en bloque).
+    ///
+    /// La usa el guard de git para comparar en forma CANÓNICA: el match textual exacto
+    /// no alcanza si la ruta guardada y la recibida difieren en forma (barra final,
+    /// './' intermedio, symlink) apuntando al mismo directorio real.
+    pub fn active_project_paths(&self) -> Result<Vec<String>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt =
+            conn.prepare("SELECT local_path FROM projects WHERE deleted_at IS NULL")?;
+        let rows = stmt.query_map([], |row| row.get::<_, String>(0))?;
+        rows.collect()
+    }
+
     pub fn search_projects(&self, query: &str) -> Result<Vec<Project>> {
         let conn = self.conn.lock().unwrap();
         let search_pattern = format!("%{}%", query);
@@ -2098,6 +2130,90 @@ mod tests {
 
     fn test_db() -> Database {
         Database::new(PathBuf::from(":memory:")).expect("Failed to create in-memory database")
+    }
+
+    fn seed_project_at(db: &Database, name: &str, local_path: &str) -> i64 {
+        db.create_project(CreateProjectDTO {
+            name: name.to_string(),
+            description: "desc".to_string(),
+            local_path: local_path.to_string(),
+            documentation_url: None,
+            ai_documentation_url: None,
+            drive_link: None,
+            notes: None,
+            image_data: None,
+            parent_id: None,
+            group_color: None,
+            group_icon: None,
+        })
+        .expect("no se pudo sembrar el proyecto")
+        .id
+    }
+
+    #[test]
+    fn test_is_registered_project_path_true_for_registered() {
+        let db = test_db();
+        seed_project_at(&db, "Alpha", "/home/user/alpha");
+
+        assert!(db.is_registered_project_path("/home/user/alpha").unwrap());
+    }
+
+    #[test]
+    fn test_is_registered_project_path_false_for_unregistered() {
+        let db = test_db();
+        seed_project_at(&db, "Alpha", "/home/user/alpha");
+
+        assert!(!db.is_registered_project_path("/home/user/ajeno").unwrap());
+        assert!(!db.is_registered_project_path("").unwrap());
+    }
+
+    /// EL test que importa: mandar un proyecto a la papelera REVOCA el permiso git
+    /// sobre su carpeta. Si `deleted_at IS NULL` se cayera de la query, esto pasa a
+    /// verde en falso y un proyecto borrado seguiría habilitando git.
+    #[test]
+    fn test_is_registered_project_path_false_for_trashed_project() {
+        let db = test_db();
+        let id = seed_project_at(&db, "Alpha", "/home/user/alpha");
+        assert!(db.is_registered_project_path("/home/user/alpha").unwrap());
+
+        db.delete_project(id).expect("no se pudo borrar");
+
+        assert!(
+            !db.is_registered_project_path("/home/user/alpha").unwrap(),
+            "un proyecto en papelera no debe seguir registrado para git"
+        );
+
+        // Y restaurarlo vuelve a habilitarlo.
+        db.restore_project(id).expect("no se pudo restaurar");
+        assert!(db.is_registered_project_path("/home/user/alpha").unwrap());
+    }
+
+    /// `is_registered_project_path` compara el string TAL CUAL: la barra final y el
+    /// './' intermedio son un miss acá a propósito. Normalizarlos es responsabilidad
+    /// del guard (`commands::guards`), que canonicaliza ambos lados contra el disco.
+    #[test]
+    fn test_is_registered_project_path_is_an_exact_string_match() {
+        let db = test_db();
+        seed_project_at(&db, "Alpha", "/home/user/alpha");
+
+        assert!(!db.is_registered_project_path("/home/user/alpha/").unwrap());
+        assert!(!db.is_registered_project_path("/home/user/./alpha").unwrap());
+        assert!(!db.is_registered_project_path("/home/user/alpha/sub").unwrap());
+    }
+
+    #[test]
+    fn test_active_project_paths_excludes_trashed() {
+        let db = test_db();
+        seed_project_at(&db, "Alpha", "/home/user/alpha");
+        let beta = seed_project_at(&db, "Beta", "/home/user/beta");
+
+        let mut paths = db.active_project_paths().unwrap();
+        paths.sort();
+        assert_eq!(paths, vec!["/home/user/alpha", "/home/user/beta"]);
+
+        db.delete_project(beta).expect("no se pudo borrar");
+
+        assert_eq!(db.active_project_paths().unwrap(), vec!["/home/user/alpha"]);
     }
 
     /// Siembra UNA fila en cada una de las 6 tablas hijas de `project_id`. Usado para

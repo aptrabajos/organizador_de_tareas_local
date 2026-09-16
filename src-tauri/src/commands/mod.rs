@@ -1,3 +1,7 @@
+mod guards;
+
+use guards::assert_registered_project_path;
+
 use crate::models::project::{
     CreateProjectDTO, CreateLinkDTO, Project, ProjectLink, UpdateProjectDTO, UpdateLinkDTO, ProjectWithChildren,
     DashboardData
@@ -687,8 +691,15 @@ pub async fn update_project_order(
 }
 
 // Git Commands
+//
+// Los 11 comandos git empiezan SIEMPRE con `assert_registered_project_path`: sin ese
+// guard la app corre git sobre cualquier repositorio del disco, gestionado o no (ver
+// `commands::guards`). El `db: State<'_, Database>` lo inyecta Tauri, NO viaja en el
+// payload de `invoke`, así que la firma del lado del cliente no cambia.
 #[tauri::command]
-pub async fn get_git_branch(path: String) -> Result<String, String> {
+pub async fn get_git_branch(db: State<'_, Database>, path: String) -> Result<String, String> {
+    assert_registered_project_path(&db, &path)?;
+
     let output = Command::new("git")
         .args(["-C", &path, "rev-parse", "--abbrev-ref", "HEAD"])
         .output()
@@ -705,7 +716,9 @@ pub async fn get_git_branch(path: String) -> Result<String, String> {
 }
 
 #[tauri::command]
-pub async fn get_git_status(path: String) -> Result<String, String> {
+pub async fn get_git_status(db: State<'_, Database>, path: String) -> Result<String, String> {
+    assert_registered_project_path(&db, &path)?;
+
     let output = Command::new("git")
         .args(["-C", &path, "status", "--porcelain"])
         .output()
@@ -728,7 +741,13 @@ pub struct GitCommit {
 }
 
 #[tauri::command]
-pub async fn get_recent_commits(path: String, limit: usize) -> Result<Vec<GitCommit>, String> {
+pub async fn get_recent_commits(
+    db: State<'_, Database>,
+    path: String,
+    limit: usize,
+) -> Result<Vec<GitCommit>, String> {
+    assert_registered_project_path(&db, &path)?;
+
     let limit_str = limit.to_string();
     let output = Command::new("git")
         .args([
@@ -777,7 +796,12 @@ pub struct GitFileCount {
 
 /// Obtener conteo de archivos modificados, staged y untracked
 #[tauri::command]
-pub async fn get_git_file_count(path: String) -> Result<GitFileCount, String> {
+pub async fn get_git_file_count(
+    db: State<'_, Database>,
+    path: String,
+) -> Result<GitFileCount, String> {
+    assert_registered_project_path(&db, &path)?;
+
     let output = Command::new("git")
         .args(["-C", &path, "status", "--porcelain"])
         .output()
@@ -825,7 +849,12 @@ pub async fn get_git_file_count(path: String) -> Result<GitFileCount, String> {
 
 /// Obtener lista de archivos modificados
 #[tauri::command]
-pub async fn get_git_modified_files(path: String) -> Result<Vec<String>, String> {
+pub async fn get_git_modified_files(
+    db: State<'_, Database>,
+    path: String,
+) -> Result<Vec<String>, String> {
+    assert_registered_project_path(&db, &path)?;
+
     let output = Command::new("git")
         .args(["-C", &path, "status", "--porcelain"])
         .output()
@@ -852,7 +881,13 @@ pub async fn get_git_modified_files(path: String) -> Result<Vec<String>, String>
 
 /// Stage archivos (git add)
 #[tauri::command]
-pub async fn git_add(path: String, files: Vec<String>) -> Result<String, String> {
+pub async fn git_add(
+    db: State<'_, Database>,
+    path: String,
+    files: Vec<String>,
+) -> Result<String, String> {
+    assert_registered_project_path(&db, &path)?;
+
     println!("📝 [GIT] Staging {} archivos", files.len());
 
     let mut args = vec!["-C", &path, "add"];
@@ -875,7 +910,13 @@ pub async fn git_add(path: String, files: Vec<String>) -> Result<String, String>
 
 /// Crear commit (git commit)
 #[tauri::command]
-pub async fn git_commit(path: String, message: String) -> Result<String, String> {
+pub async fn git_commit(
+    db: State<'_, Database>,
+    path: String,
+    message: String,
+) -> Result<String, String> {
+    assert_registered_project_path(&db, &path)?;
+
     println!("💾 [GIT] Creando commit: {}", message);
 
     let output = Command::new("git")
@@ -895,7 +936,9 @@ pub async fn git_commit(path: String, message: String) -> Result<String, String>
 
 /// Push a remote (git push)
 #[tauri::command]
-pub async fn git_push(path: String) -> Result<String, String> {
+pub async fn git_push(db: State<'_, Database>, path: String) -> Result<String, String> {
+    assert_registered_project_path(&db, &path)?;
+
     println!("🚀 [GIT] Pushing to remote");
 
     let output = Command::new("git")
@@ -916,7 +959,9 @@ pub async fn git_push(path: String) -> Result<String, String> {
 
 /// Pull from remote (git pull)
 #[tauri::command]
-pub async fn git_pull(path: String) -> Result<String, String> {
+pub async fn git_pull(db: State<'_, Database>, path: String) -> Result<String, String> {
+    assert_registered_project_path(&db, &path)?;
+
     println!("⬇️ [GIT] Pulling from remote");
 
     let output = Command::new("git")
@@ -936,7 +981,12 @@ pub async fn git_pull(path: String) -> Result<String, String> {
 
 /// Obtener URL del remote origin
 #[tauri::command]
-pub async fn get_git_remote_url(path: String) -> Result<Option<String>, String> {
+pub async fn get_git_remote_url(
+    db: State<'_, Database>,
+    path: String,
+) -> Result<Option<String>, String> {
+    assert_registered_project_path(&db, &path)?;
+
     let output = Command::new("git")
         .args(["-C", &path, "remote", "get-url", "origin"])
         .output()
@@ -956,7 +1006,14 @@ pub async fn get_git_remote_url(path: String) -> Result<Option<String>, String> 
 
 /// Obtener commits ahead/behind respecto al remote
 #[tauri::command]
-pub async fn get_git_ahead_behind(path: String) -> Result<(u32, u32), String> {
+pub async fn get_git_ahead_behind(
+    db: State<'_, Database>,
+    path: String,
+) -> Result<(u32, u32), String> {
+    // El guard importa especialmente acá: este comando hace `fetch`, o sea tráfico de
+    // red contra el remoto del repositorio que le pasen.
+    assert_registered_project_path(&db, &path)?;
+
     // Primero hacer fetch para tener info actualizada
     let _ = Command::new("git")
         .args(["-C", &path, "fetch", "--quiet"])
