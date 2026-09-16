@@ -6,12 +6,15 @@ import {
   updateTodo,
   deleteTodo,
 } from '../services/api';
+import { useConfig } from '../contexts/ConfigContext';
+import { shouldConfirm } from '../utils/confirm';
 
 interface TodoListProps {
   projectId: number;
 }
 
 export default function TodoList(props: TodoListProps) {
+  const configCtx = useConfig();
   const [todos, setTodos] = createSignal<ProjectTodo[]>([]);
   const [loading, setLoading] = createSignal(true);
   const [error, setError] = createSignal<string | null>(null);
@@ -66,7 +69,14 @@ export default function TodoList(props: TodoListProps) {
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm('¿Eliminar esta tarea?')) return;
+    // Borrar una tarea es reversible en la práctica (se puede volver a crear),
+    // así que respeta `ui.confirm_delete`.
+    if (
+      shouldConfirm('reversible', configCtx.config()) &&
+      !confirm('¿Eliminar esta tarea?')
+    ) {
+      return;
+    }
 
     try {
       await deleteTodo(id);

@@ -40,7 +40,10 @@ const TrashModal: Component<TrashModalProps> = (props) => {
     }
   }
 
-  // Eliminar definitivamente: requiere confirmación explícita (irreversible).
+  // Eliminar definitivamente: confirmación SIEMPRE, es irreversible.
+  // A propósito NO pasa por `shouldConfirm`/`ui.confirm_delete`: ese flag gobierna
+  // solo los borrados reversibles. Apagar una preferencia de comodidad no puede
+  // habilitar la pérdida definitiva de datos con un click. Ver src/utils/confirm.ts.
   async function handlePurge(project: TrashItem) {
     const confirmed = await confirm(
       `Esto borra «${project.name}» y todos sus datos PARA SIEMPRE. No se puede deshacer.`,

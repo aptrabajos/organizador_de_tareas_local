@@ -7,6 +7,8 @@ import {
   openUrl,
 } from '../services/api';
 import type { CreateLinkDTO } from '../services/api';
+import { useConfig } from '../contexts/ConfigContext';
+import { shouldConfirm } from '../utils/confirm';
 
 interface ProjectLinksProps {
   projectId: number;
@@ -63,6 +65,7 @@ const LINK_TYPES = [
 ] as const;
 
 const ProjectLinks: Component<ProjectLinksProps> = (props) => {
+  const configCtx = useConfig();
   const [links, setLinks] = createSignal<ProjectLink[]>([]);
   const [showAddForm, setShowAddForm] = createSignal(false);
   const [isLoading, setIsLoading] = createSignal(false);
@@ -117,7 +120,10 @@ const ProjectLinks: Component<ProjectLinksProps> = (props) => {
   };
 
   const handleDeleteLink = async (linkId: number) => {
-    if (!confirm('¿Estás seguro de que quieres eliminar este enlace?')) {
+    if (
+      shouldConfirm('reversible', configCtx.config()) &&
+      !confirm('¿Estás seguro de que quieres eliminar este enlace?')
+    ) {
       return;
     }
 

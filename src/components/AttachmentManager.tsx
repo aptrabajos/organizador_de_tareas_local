@@ -7,12 +7,15 @@ import {
 } from '../services/api';
 import type { ProjectAttachment, CreateAttachmentDTO } from '../types/project';
 import { getImageDataUrl } from '../utils/attachments';
+import { useConfig } from '../contexts/ConfigContext';
+import { shouldConfirm } from '../utils/confirm';
 
 interface AttachmentManagerProps {
   projectId: number;
 }
 
 const AttachmentManager: Component<AttachmentManagerProps> = (props) => {
+  const configCtx = useConfig();
   const [attachments, setAttachments] = createSignal<ProjectAttachment[]>([]);
   const [isUploading, setIsUploading] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
@@ -82,7 +85,12 @@ const AttachmentManager: Component<AttachmentManagerProps> = (props) => {
   };
 
   const handleDelete = async (id: number, filename: string) => {
-    if (!confirm(`¿Eliminar el archivo "${filename}"?`)) return;
+    if (
+      shouldConfirm('reversible', configCtx.config()) &&
+      !confirm(`¿Eliminar el archivo "${filename}"?`)
+    ) {
+      return;
+    }
 
     try {
       await deleteAttachment(id);

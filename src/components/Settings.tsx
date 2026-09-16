@@ -19,10 +19,13 @@ import {
   restoreBackup,
 } from '../services/api';
 import { getErrorMessage } from '../utils/errors';
+import { useTheme } from '../contexts/ThemeContext';
+import type { ThemeMode } from '../types/config';
 
 type Tab = 'programs' | 'backup' | 'ui' | 'shortcuts' | 'advanced';
 
 export default function Settings(props: { onClose: () => void }) {
+  const { setThemeMode } = useTheme();
   const [activeTab, setActiveTab] = createSignal<Tab>('programs');
   const [config, setConfig] = createSignal<AppConfig | null>(null);
   const [detectedPrograms, setDetectedPrograms] =
@@ -903,18 +906,14 @@ export default function Settings(props: { onClose: () => void }) {
                       class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                       value={config()?.ui.theme || 'auto'}
                       onChange={(e) => {
+                        const mode = e.currentTarget.value as ThemeMode;
+                        // El tema se aplica y persiste EN EL ACTO vía el contexto:
+                        // antes solo se guardaba en la config y no lo leía nadie,
+                        // así que elegir "Oscuro" acá no cambiaba nada en pantalla.
+                        setThemeMode(mode);
                         const cfg = config();
                         if (cfg) {
-                          setConfig({
-                            ...cfg,
-                            ui: {
-                              ...cfg.ui,
-                              theme: e.currentTarget.value as
-                                | 'light'
-                                | 'dark'
-                                | 'auto',
-                            },
-                          });
+                          setConfig({ ...cfg, ui: { ...cfg.ui, theme: mode } });
                         }
                       }}
                     >
@@ -973,7 +972,8 @@ export default function Settings(props: { onClose: () => void }) {
                         Confirmar antes de eliminar
                       </p>
                       <p class="text-sm text-gray-600 dark:text-gray-400">
-                        Pedir confirmación al eliminar proyectos
+                        Pedir confirmación al eliminar proyectos (las
+                        eliminaciones definitivas siempre piden confirmación)
                       </p>
                     </div>
                     <label class="relative inline-flex cursor-pointer items-center">

@@ -16,7 +16,9 @@ import type { ProjectFiltersProps } from './components/ProjectFilters';
 import TreeView from './components/TreeView';
 import Dashboard from './components/Dashboard';
 import { ThemeProvider } from './contexts/ThemeContext';
+import { ConfigProvider, useConfig } from './contexts/ConfigContext';
 import { ShortcutsProvider, useShortcuts } from './contexts/ShortcutsContext';
+import { shouldConfirm } from './utils/confirm';
 import type { Project } from './types/project';
 import { confirm } from '@tauri-apps/plugin-dialog';
 import { getConfig, countSubprojects } from './services/api';
@@ -25,6 +27,7 @@ import { getConfig, countSubprojects } from './services/api';
 const AppContent: Component = () => {
   const store = createProjectStore();
   const shortcuts = useShortcuts();
+  const configCtx = useConfig();
   // Entrar a un grupo: salir del Dashboard (el store sale de la búsqueda por sí solo).
   const enterGroup = (group: Project) => {
     setShowDashboard(false);
@@ -145,23 +148,27 @@ const AppContent: Component = () => {
       // si falla el conteo, seguimos con el mensaje base
     }
 
-    const confirmed = await confirm(message, {
-      title: 'Mover a la papelera',
-      kind: 'warning',
-    });
+    // Mover a la papelera es REVERSIBLE (soft-delete), así que respeta
+    // `ui.confirm_delete`. El purgado definitivo vive en TrashModal y confirma
+    // siempre, sin importar el flag.
+    if (shouldConfirm('reversible', configCtx.config())) {
+      const confirmed = await confirm(message, {
+        title: 'Mover a la papelera',
+        kind: 'warning',
+      });
+      if (!confirmed) return;
+    }
 
-    if (confirmed) {
-      try {
-        // Si borramos el grupo en el que estamos parados, salimos de su vista
-        // para no quedar mostrando una cabecera de un grupo ya eliminado.
-        const wasCurrentGroup = project.id === store.currentGroup()?.id;
-        await store.deleteProject(project.id);
-        if (wasCurrentGroup) {
-          await store.navigateBack();
-        }
-      } catch {
-        alert('Error al mover el proyecto a la papelera');
+    try {
+      // Si borramos el grupo en el que estamos parados, salimos de su vista
+      // para no quedar mostrando una cabecera de un grupo ya eliminado.
+      const wasCurrentGroup = project.id === store.currentGroup()?.id;
+      await store.deleteProject(project.id);
+      if (wasCurrentGroup) {
+        await store.navigateBack();
       }
+    } catch {
+      alert('Error al mover el proyecto a la papelera');
     }
   };
 
@@ -618,14 +625,18 @@ const AppContent: Component = () => {
   );
 };
 
-// Componente principal envuelto con providers
+// Componente principal envuelto con providers.
+// ConfigProvider va ARRIBA de ThemeProvider: el tema ahora se persiste en la
+// config de Rust, así que el contexto de tema depende del de config.
 const App: Component = () => {
   return (
-    <ThemeProvider>
-      <ShortcutsProvider>
-        <AppContent />
-      </ShortcutsProvider>
-    </ThemeProvider>
+    <ConfigProvider>
+      <ThemeProvider>
+        <ShortcutsProvider>
+          <AppContent />
+        </ShortcutsProvider>
+      </ThemeProvider>
+    </ConfigProvider>
   );
 };
 

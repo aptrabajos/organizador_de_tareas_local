@@ -8,6 +8,8 @@ import {
 } from '../services/api';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
+import { useConfig } from '../contexts/ConfigContext';
+import { shouldConfirm } from '../utils/confirm';
 
 interface ProjectJournalProps {
   projectId: number;
@@ -15,6 +17,7 @@ interface ProjectJournalProps {
 }
 
 export default function ProjectJournal(props: ProjectJournalProps) {
+  const configCtx = useConfig();
   const [entries, setEntries] = createSignal<JournalEntry[]>([]);
   const [loading, setLoading] = createSignal(false);
   const [newContent, setNewContent] = createSignal('');
@@ -97,7 +100,12 @@ export default function ProjectJournal(props: ProjectJournalProps) {
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm('¿Eliminar esta entrada del diario?')) return;
+    if (
+      shouldConfirm('reversible', configCtx.config()) &&
+      !confirm('¿Eliminar esta entrada del diario?')
+    ) {
+      return;
+    }
 
     try {
       await deleteJournalEntry(id);
