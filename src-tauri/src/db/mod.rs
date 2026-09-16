@@ -1,5 +1,6 @@
 use log::{debug, error};
-use rusqlite::{params, Connection, Result};
+use rusqlite::{params, Connection, Result, Row};
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Mutex;
 
@@ -13,6 +14,55 @@ pub struct TrashItem {
     pub name: String,
     pub deleted_at: String,
     pub subproject_count: i64,
+}
+
+/// Las 23 columnas de `projects`, EN ORDEN.
+///
+/// Esta lista aparecía textualmente en siete métodos (`create_project`,
+/// `get_all_projects`, `get_project`, `search_projects`, `get_recent_projects`,
+/// `get_root_projects`, `get_subprojects`). Agregar una columna obligaba a tocar
+/// los siete en sincronía, y olvidarse de uno no rompe la compilación: rompe en
+/// runtime, en el índice posicional de [`row_to_project`], y solo en el camino
+/// que se olvidó.
+///
+/// El orden ES el contrato: [`row_to_project`] lee por posición.
+const PROJECT_COLUMNS: &str = "id, name, description, local_path, documentation_url, ai_documentation_url, drive_link, notes, image_data,
+                    created_at, updated_at, last_opened_at, opened_count, total_time_seconds,
+                    status, status_changed_at, is_pinned, pinned_order, display_order,
+                    parent_id, group_color, group_icon, is_group_expanded";
+
+/// Construye un `Project` desde una fila que trae [`PROJECT_COLUMNS`] en ese orden.
+///
+/// `links` queda en `None` a propósito: los enlaces viven en otra tabla y quien
+/// los necesite los completa después con [`Database::get_links_for_projects`].
+/// Mezclarlos acá era justamente lo que producía el N+1.
+fn row_to_project(row: &Row) -> Result<Project> {
+    Ok(Project {
+        id: row.get(0)?,
+        name: row.get(1)?,
+        description: row.get(2)?,
+        local_path: row.get(3)?,
+        documentation_url: row.get(4)?,
+        ai_documentation_url: row.get(5)?,
+        drive_link: row.get(6)?,
+        notes: row.get(7)?,
+        image_data: row.get(8)?,
+        links: None,
+        created_at: row.get(9)?,
+        updated_at: row.get(10)?,
+        last_opened_at: row.get(11)?,
+        opened_count: row.get(12)?,
+        total_time_seconds: row.get(13)?,
+        status: row.get(14)?,
+        status_changed_at: row.get(15)?,
+        is_pinned: row.get(16)?,
+        pinned_order: row.get(17)?,
+        display_order: row.get(18)?,
+        parent_id: row.get(19)?,
+        group_color: row.get(20)?,
+        group_icon: row.get(21)?,
+        is_group_expanded: row.get(22)?,
+    })
 }
 
 pub struct Database {
@@ -337,40 +387,10 @@ impl Database {
         let id = conn.last_insert_rowid();
 
         let project = conn.query_row(
-            "SELECT id, name, description, local_path, documentation_url, ai_documentation_url, drive_link, notes, image_data,
-                    created_at, updated_at, last_opened_at, opened_count, total_time_seconds,
-                    status, status_changed_at, is_pinned, pinned_order, display_order,
-                    parent_id, group_color, group_icon, is_group_expanded
-             FROM projects WHERE id = ?1",
+            &format!("SELECT {}
+             FROM projects WHERE id = ?1", PROJECT_COLUMNS),
             params![id],
-            |row| {
-                Ok(Project {
-                    id: row.get(0)?,
-                    name: row.get(1)?,
-                    description: row.get(2)?,
-                    local_path: row.get(3)?,
-                    documentation_url: row.get(4)?,
-                    ai_documentation_url: row.get(5)?,
-                    drive_link: row.get(6)?,
-                    notes: row.get(7)?,
-                    image_data: row.get(8)?,
-                    links: None, // Los enlaces se cargan por separado
-                    created_at: row.get(9)?,
-                    updated_at: row.get(10)?,
-                    last_opened_at: row.get(11)?,
-                    opened_count: row.get(12)?,
-                    total_time_seconds: row.get(13)?,
-                    status: row.get(14)?,
-                    status_changed_at: row.get(15)?,
-                    is_pinned: row.get(16)?,
-                    pinned_order: row.get(17)?,
-                    display_order: row.get(18)?,
-                    parent_id: row.get(19)?,
-                    group_color: row.get(20)?,
-                    group_icon: row.get(21)?,
-                    is_group_expanded: row.get(22)?,
-                })
-            },
+            row_to_project,
         )?;
 
         Ok(project)
@@ -380,76 +400,31 @@ impl Database {
         let conn = self.conn.lock().unwrap();
 
         let mut stmt = conn.prepare(
-            "SELECT id, name, description, local_path, documentation_url, ai_documentation_url, drive_link, notes, image_data,
-                    created_at, updated_at, last_opened_at, opened_count, total_time_seconds,
-                    status, status_changed_at, is_pinned, pinned_order, display_order,
-                    parent_id, group_color, group_icon, is_group_expanded
+            &format!("SELECT {}
              FROM projects
              WHERE deleted_at IS NULL
-             ORDER BY display_order ASC, is_pinned DESC, pinned_order ASC, updated_at DESC"
+             ORDER BY display_order ASC, is_pinned DESC, pinned_order ASC, updated_at DESC", PROJECT_COLUMNS)
         )?;
 
-        let mut projects = Vec::new();
-        let project_rows = stmt.query_map([], |row| {
-            Ok((
-                row.get::<_, i64>(0)?,  // id
-                row.get::<_, String>(1)?,  // name
-                row.get::<_, String>(2)?,  // description
-                row.get::<_, String>(3)?,  // local_path
-                row.get::<_, Option<String>>(4)?,  // documentation_url
-                row.get::<_, Option<String>>(5)?,  // ai_documentation_url
-                row.get::<_, Option<String>>(6)?,  // drive_link
-                row.get::<_, Option<String>>(7)?,  // notes
-                row.get::<_, Option<String>>(8)?,  // image_data
-                row.get::<_, String>(9)?,  // created_at
-                row.get::<_, String>(10)?,  // updated_at
-                row.get::<_, Option<String>>(11)?,  // last_opened_at
-                row.get::<_, Option<i64>>(12)?,  // opened_count
-                row.get::<_, Option<i64>>(13)?,  // total_time_seconds
-                row.get::<_, Option<String>>(14)?,  // status
-                row.get::<_, Option<String>>(15)?,  // status_changed_at
-                row.get::<_, Option<bool>>(16)?,  // is_pinned
-                row.get::<_, Option<i64>>(17)?,  // pinned_order
-                row.get::<_, Option<i64>>(18)?,  // display_order
-                row.get::<_, Option<i64>>(19)?,  // parent_id
-                row.get::<_, Option<String>>(20)?,  // group_color
-                row.get::<_, Option<String>>(21)?,  // group_icon
-                row.get::<_, Option<bool>>(22)?,  // is_group_expanded
-            ))
-        })?
-        .collect::<Result<Vec<_>>>()?;
+        let projects_without_links = stmt
+            .query_map([], row_to_project)?
+            .collect::<Result<Vec<_>>>()?;
 
-        // Para cada proyecto, obtener sus enlaces
-        for (id, name, description, local_path, documentation_url, ai_documentation_url, drive_link, notes, image_data, created_at, updated_at, last_opened_at, opened_count, total_time_seconds, status, status_changed_at, is_pinned, pinned_order, display_order, parent_id, group_color, group_icon, is_group_expanded) in project_rows {
-            let links = self.get_project_links_internal(id, &conn).unwrap_or_else(|_| Vec::new());
+        // Los enlaces de TODA la lista en una sola consulta. Antes era una
+        // consulta por proyecto, y encima con `unwrap_or_else(|_| Vec::new())`:
+        // un fallo al cargar enlaces se tragaba en silencio y el proyecto
+        // aparecía sin enlaces sin que nadie se enterara. Ahora el error sube.
+        let ids: Vec<i64> = projects_without_links.iter().map(|p| p.id).collect();
+        let mut links_by_project = self.get_links_for_projects(&ids, &conn)?;
 
-            projects.push(Project {
-                id,
-                name,
-                description,
-                local_path,
-                documentation_url,
-                ai_documentation_url,
-                drive_link,
-                notes,
-                image_data,
-                links: Some(links),
-                created_at,
-                updated_at,
-                last_opened_at,
-                opened_count,
-                total_time_seconds,
-                status,
-                status_changed_at,
-                is_pinned,
-                pinned_order,
-                display_order,
-                parent_id,
-                group_color,
-                group_icon,
-                is_group_expanded,
-            });
-        }
+        let projects: Vec<Project> = projects_without_links
+            .into_iter()
+            .map(|mut project| {
+                project.links =
+                    Some(links_by_project.remove(&project.id).unwrap_or_default());
+                project
+            })
+            .collect();
 
         Ok(projects)
     }
@@ -484,48 +459,21 @@ impl Database {
             }
         };
 
-        conn.query_row(
-            "SELECT id, name, description, local_path, documentation_url, ai_documentation_url, drive_link, notes, image_data,
-                    created_at, updated_at, last_opened_at, opened_count, total_time_seconds,
-                    status, status_changed_at, is_pinned, pinned_order, display_order,
-                    parent_id, group_color, group_icon, is_group_expanded
-             FROM projects WHERE id = ?1 AND deleted_at IS NULL",
+        let mut project = conn.query_row(
+            &format!("SELECT {}
+             FROM projects WHERE id = ?1 AND deleted_at IS NULL", PROJECT_COLUMNS),
             params![id],
-            |row| {
-                let project_id = row.get::<_, i64>(0)?;
+            row_to_project,
+        )?;
 
-                // Obtener enlaces del proyecto
-                let links = self.get_project_links_internal(project_id, &conn).unwrap_or_else(|_| Vec::new());
+        // Los enlaces se cargan DESPUÉS de cerrar la fila, no adentro del closure de
+        // `query_row`. Es un solo proyecto, así que acá nunca hubo N+1; lo que había
+        // era `unwrap_or_else(|_| Vec::new())`, que se tragaba en silencio un fallo
+        // al cargar enlaces y devolvía el proyecto como si no tuviera ninguno. Ahora
+        // el error sube.
+        project.links = Some(self.get_project_links_internal(id, &conn)?);
 
-                let project = Project {
-                    id: project_id,
-                    name: row.get(1)?,
-                    description: row.get(2)?,
-                    local_path: row.get(3)?,
-                    documentation_url: row.get(4)?,
-                    ai_documentation_url: row.get(5)?,
-                    drive_link: row.get(6)?,
-                    notes: row.get(7)?,
-                    image_data: row.get(8)?,
-                    links: Some(links),
-                    created_at: row.get(9)?,
-                    updated_at: row.get(10)?,
-                    last_opened_at: row.get(11)?,
-                    opened_count: row.get(12)?,
-                    total_time_seconds: row.get(13)?,
-                    status: row.get(14)?,
-                    status_changed_at: row.get(15)?,
-                    is_pinned: row.get(16)?,
-                    pinned_order: row.get(17)?,
-                    display_order: row.get(18)?,
-                    parent_id: row.get(19)?,
-                    group_color: row.get(20)?,
-                    group_icon: row.get(21)?,
-                    is_group_expanded: row.get(22)?,
-                };
-                Ok(project)
-            },
-        )
+        Ok(project)
     }
 
     pub fn update_project(&self, id: i64, updates: UpdateProjectDTO) -> Result<Project> {
@@ -890,76 +838,31 @@ impl Database {
         let search_pattern = format!("%{}%", query);
 
         let mut stmt = conn.prepare(
-            "SELECT id, name, description, local_path, documentation_url, ai_documentation_url, drive_link, notes, image_data,
-                    created_at, updated_at, last_opened_at, opened_count, total_time_seconds,
-                    status, status_changed_at, is_pinned, pinned_order, display_order,
-                    parent_id, group_color, group_icon, is_group_expanded
+            &format!("SELECT {}
              FROM projects
              WHERE (name LIKE ?1 OR description LIKE ?1 OR local_path LIKE ?1 OR notes LIKE ?1) AND deleted_at IS NULL
-             ORDER BY display_order ASC, is_pinned DESC, pinned_order ASC, updated_at DESC"
+             ORDER BY display_order ASC, is_pinned DESC, pinned_order ASC, updated_at DESC", PROJECT_COLUMNS)
         )?;
 
-        let mut projects = Vec::new();
-        let project_rows = stmt.query_map(params![search_pattern], |row| {
-            Ok((
-                row.get::<_, i64>(0)?,  // id
-                row.get::<_, String>(1)?,  // name
-                row.get::<_, String>(2)?,  // description
-                row.get::<_, String>(3)?,  // local_path
-                row.get::<_, Option<String>>(4)?,  // documentation_url
-                row.get::<_, Option<String>>(5)?,  // ai_documentation_url
-                row.get::<_, Option<String>>(6)?,  // drive_link
-                row.get::<_, Option<String>>(7)?,  // notes
-                row.get::<_, Option<String>>(8)?,  // image_data
-                row.get::<_, String>(9)?,  // created_at
-                row.get::<_, String>(10)?,  // updated_at
-                row.get::<_, Option<String>>(11)?,  // last_opened_at
-                row.get::<_, Option<i64>>(12)?,  // opened_count
-                row.get::<_, Option<i64>>(13)?,  // total_time_seconds
-                row.get::<_, Option<String>>(14)?,  // status
-                row.get::<_, Option<String>>(15)?,  // status_changed_at
-                row.get::<_, Option<bool>>(16)?,  // is_pinned
-                row.get::<_, Option<i64>>(17)?,  // pinned_order
-                row.get::<_, Option<i64>>(18)?,  // display_order
-                row.get::<_, Option<i64>>(19)?,  // parent_id
-                row.get::<_, Option<String>>(20)?,  // group_color
-                row.get::<_, Option<String>>(21)?,  // group_icon
-                row.get::<_, Option<bool>>(22)?,  // is_group_expanded
-            ))
-        })?
-        .collect::<Result<Vec<_>>>()?;
+        let projects_without_links = stmt
+            .query_map(params![search_pattern], row_to_project)?
+            .collect::<Result<Vec<_>>>()?;
 
-        // Para cada proyecto, obtener sus enlaces
-        for (id, name, description, local_path, documentation_url, ai_documentation_url, drive_link, notes, image_data, created_at, updated_at, last_opened_at, opened_count, total_time_seconds, status, status_changed_at, is_pinned, pinned_order, display_order, parent_id, group_color, group_icon, is_group_expanded) in project_rows {
-            let links = self.get_project_links_internal(id, &conn).unwrap_or_else(|_| Vec::new());
+        // Los enlaces de TODA la lista en una sola consulta. Antes era una
+        // consulta por proyecto, y encima con `unwrap_or_else(|_| Vec::new())`:
+        // un fallo al cargar enlaces se tragaba en silencio y el proyecto
+        // aparecía sin enlaces sin que nadie se enterara. Ahora el error sube.
+        let ids: Vec<i64> = projects_without_links.iter().map(|p| p.id).collect();
+        let mut links_by_project = self.get_links_for_projects(&ids, &conn)?;
 
-            projects.push(Project {
-                id,
-                name,
-                description,
-                local_path,
-                documentation_url,
-                ai_documentation_url,
-                drive_link,
-                notes,
-                image_data,
-                links: Some(links),
-                created_at,
-                updated_at,
-                last_opened_at,
-                opened_count,
-                total_time_seconds,
-                status,
-                status_changed_at,
-                is_pinned,
-                pinned_order,
-                display_order,
-                parent_id,
-                group_color,
-                group_icon,
-                is_group_expanded,
-            });
-        }
+        let projects: Vec<Project> = projects_without_links
+            .into_iter()
+            .map(|mut project| {
+                project.links =
+                    Some(links_by_project.remove(&project.id).unwrap_or_default());
+                project
+            })
+            .collect();
 
         Ok(projects)
     }
@@ -997,6 +900,66 @@ impl Database {
     pub fn get_project_links(&self, project_id: i64) -> Result<Vec<ProjectLink>> {
         let conn = self.conn.lock().unwrap();
         self.get_project_links_internal(project_id, &conn)
+    }
+
+    /// Enlaces de varios proyectos en UNA sola consulta.
+    ///
+    /// Reemplaza al N+1 que tenían `get_all_projects`, `search_projects`,
+    /// `get_root_projects` y `get_subprojects`: los cuatro llamaban a
+    /// `get_project_links_internal` una vez POR PROYECTO de la lista. Con la base
+    /// local y el Mutex ya tomado el costo por consulta es bajo y con decenas de
+    /// proyectos no se nota, pero con cientos sí.
+    ///
+    /// Un proyecto sin enlaces NO aparece en el mapa; el consumidor usa
+    /// `unwrap_or_default()` y obtiene la lista vacía, que es lo que devolvía el
+    /// camino viejo.
+    ///
+    /// El batcheo no es adorno: SQLite tiene un tope de parámetros por statement
+    /// (`SQLITE_MAX_VARIABLE_NUMBER`, 32766 en versiones recientes) y pasarlo hace
+    /// fallar la query entera. Se usa un tamaño conservador.
+    fn get_links_for_projects(
+        &self,
+        ids: &[i64],
+        conn: &Connection,
+    ) -> Result<HashMap<i64, Vec<ProjectLink>>> {
+        const BATCH_SIZE: usize = 500;
+
+        let mut by_project: HashMap<i64, Vec<ProjectLink>> = HashMap::new();
+        if ids.is_empty() {
+            return Ok(by_project);
+        }
+
+        for chunk in ids.chunks(BATCH_SIZE) {
+            let placeholders = vec!["?"; chunk.len()].join(", ");
+            let mut stmt = conn.prepare(&format!(
+                "SELECT id, project_id, link_type, title, url, created_at FROM project_links
+                 WHERE project_id IN ({})
+                 ORDER BY created_at DESC",
+                placeholders
+            ))?;
+
+            let params: Vec<&dyn rusqlite::ToSql> =
+                chunk.iter().map(|id| id as &dyn rusqlite::ToSql).collect();
+
+            let links = stmt
+                .query_map(params.as_slice(), |row| {
+                    Ok(ProjectLink {
+                        id: row.get(0)?,
+                        project_id: row.get(1)?,
+                        link_type: row.get(2)?,
+                        title: row.get(3)?,
+                        url: row.get(4)?,
+                        created_at: row.get(5)?,
+                    })
+                })?
+                .collect::<Result<Vec<_>>>()?;
+
+            for link in links {
+                by_project.entry(link.project_id).or_default().push(link);
+            }
+        }
+
+        Ok(by_project)
     }
 
     fn get_project_links_internal(&self, project_id: i64, conn: &Connection) -> Result<Vec<ProjectLink>> {
@@ -1640,44 +1603,15 @@ impl Database {
     pub fn get_recent_projects(&self) -> Result<Vec<Project>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT id, name, description, local_path, documentation_url, ai_documentation_url, drive_link, notes, image_data,
-                    created_at, updated_at, last_opened_at, opened_count, total_time_seconds,
-                    status, status_changed_at, is_pinned, pinned_order, display_order,
-                    parent_id, group_color, group_icon, is_group_expanded
+            &format!("SELECT {}
              FROM projects
              WHERE last_opened_at IS NOT NULL AND deleted_at IS NULL
              ORDER BY last_opened_at DESC
-             LIMIT 5"
+             LIMIT 5", PROJECT_COLUMNS)
         )?;
 
-        let projects_iter = stmt.query_map([], |row| {
-            Ok(Project {
-                id: row.get(0)?,
-                name: row.get(1)?,
-                description: row.get(2)?,
-                local_path: row.get(3)?,
-                documentation_url: row.get(4)?,
-                ai_documentation_url: row.get(5)?,
-                drive_link: row.get(6)?,
-                notes: row.get(7)?,
-                image_data: row.get(8)?,
-                links: None, // Links can be loaded separately if needed on dashboard
-                created_at: row.get(9)?,
-                updated_at: row.get(10)?,
-                last_opened_at: row.get(11)?,
-                opened_count: row.get(12)?,
-                total_time_seconds: row.get(13)?,
-                status: row.get(14)?,
-                status_changed_at: row.get(15)?,
-                is_pinned: row.get(16)?,
-                pinned_order: row.get(17)?,
-                display_order: row.get(18)?,
-                parent_id: row.get(19)?,
-                group_color: row.get(20)?,
-                group_icon: row.get(21)?,
-                is_group_expanded: row.get(22)?,
-            })
-        })?;
+        // `links` queda en None, igual que antes: el dashboard no los muestra.
+        let projects_iter = stmt.query_map([], row_to_project)?;
 
         let mut projects = Vec::new();
         for project in projects_iter {
@@ -1762,75 +1696,31 @@ impl Database {
         let conn = self.conn.lock().unwrap();
 
         let mut stmt = conn.prepare(
-            "SELECT id, name, description, local_path, documentation_url, ai_documentation_url, drive_link, notes, image_data,
-                    created_at, updated_at, last_opened_at, opened_count, total_time_seconds,
-                    status, status_changed_at, is_pinned, pinned_order, display_order,
-                    parent_id, group_color, group_icon, is_group_expanded
+            &format!("SELECT {}
              FROM projects
              WHERE parent_id IS NULL AND deleted_at IS NULL
-             ORDER BY display_order ASC, is_pinned DESC, pinned_order ASC, updated_at DESC"
+             ORDER BY display_order ASC, is_pinned DESC, pinned_order ASC, updated_at DESC", PROJECT_COLUMNS)
         )?;
 
-        let mut projects = Vec::new();
-        let project_rows = stmt.query_map([], |row| {
-            Ok((
-                row.get::<_, i64>(0)?,
-                row.get::<_, String>(1)?,
-                row.get::<_, String>(2)?,
-                row.get::<_, String>(3)?,
-                row.get::<_, Option<String>>(4)?,
-                row.get::<_, Option<String>>(5)?,
-                row.get::<_, Option<String>>(6)?,
-                row.get::<_, Option<String>>(7)?,
-                row.get::<_, Option<String>>(8)?,
-                row.get::<_, String>(9)?,
-                row.get::<_, String>(10)?,
-                row.get::<_, Option<String>>(11)?,
-                row.get::<_, Option<i64>>(12)?,
-                row.get::<_, Option<i64>>(13)?,
-                row.get::<_, Option<String>>(14)?,
-                row.get::<_, Option<String>>(15)?,
-                row.get::<_, Option<bool>>(16)?,
-                row.get::<_, Option<i64>>(17)?,
-                row.get::<_, Option<i64>>(18)?,
-                row.get::<_, Option<i64>>(19)?,
-                row.get::<_, Option<String>>(20)?,
-                row.get::<_, Option<String>>(21)?,
-                row.get::<_, Option<bool>>(22)?,
-            ))
-        })?
-        .collect::<Result<Vec<_>>>()?;
+        let projects_without_links = stmt
+            .query_map([], row_to_project)?
+            .collect::<Result<Vec<_>>>()?;
 
-        for (id, name, description, local_path, documentation_url, ai_documentation_url, drive_link, notes, image_data, created_at, updated_at, last_opened_at, opened_count, total_time_seconds, status, status_changed_at, is_pinned, pinned_order, display_order, parent_id, group_color, group_icon, is_group_expanded) in project_rows {
-            let links = self.get_project_links_internal(id, &conn).unwrap_or_else(|_| Vec::new());
+        // Los enlaces de TODA la lista en una sola consulta. Antes era una
+        // consulta por proyecto, y encima con `unwrap_or_else(|_| Vec::new())`:
+        // un fallo al cargar enlaces se tragaba en silencio y el proyecto
+        // aparecía sin enlaces sin que nadie se enterara. Ahora el error sube.
+        let ids: Vec<i64> = projects_without_links.iter().map(|p| p.id).collect();
+        let mut links_by_project = self.get_links_for_projects(&ids, &conn)?;
 
-            projects.push(Project {
-                id,
-                name,
-                description,
-                local_path,
-                documentation_url,
-                ai_documentation_url,
-                drive_link,
-                notes,
-                image_data,
-                links: Some(links),
-                created_at,
-                updated_at,
-                last_opened_at,
-                opened_count,
-                total_time_seconds,
-                status,
-                status_changed_at,
-                is_pinned,
-                pinned_order,
-                display_order,
-                parent_id,
-                group_color,
-                group_icon,
-                is_group_expanded,
-            });
-        }
+        let projects: Vec<Project> = projects_without_links
+            .into_iter()
+            .map(|mut project| {
+                project.links =
+                    Some(links_by_project.remove(&project.id).unwrap_or_default());
+                project
+            })
+            .collect();
 
         Ok(projects)
     }
@@ -1840,75 +1730,31 @@ impl Database {
         let conn = self.conn.lock().unwrap();
 
         let mut stmt = conn.prepare(
-            "SELECT id, name, description, local_path, documentation_url, ai_documentation_url, drive_link, notes, image_data,
-                    created_at, updated_at, last_opened_at, opened_count, total_time_seconds,
-                    status, status_changed_at, is_pinned, pinned_order, display_order,
-                    parent_id, group_color, group_icon, is_group_expanded
+            &format!("SELECT {}
              FROM projects
              WHERE parent_id = ?1 AND deleted_at IS NULL
-             ORDER BY display_order ASC, name ASC"
+             ORDER BY display_order ASC, name ASC", PROJECT_COLUMNS)
         )?;
 
-        let mut projects = Vec::new();
-        let project_rows = stmt.query_map([parent_id], |row| {
-            Ok((
-                row.get::<_, i64>(0)?,
-                row.get::<_, String>(1)?,
-                row.get::<_, String>(2)?,
-                row.get::<_, String>(3)?,
-                row.get::<_, Option<String>>(4)?,
-                row.get::<_, Option<String>>(5)?,
-                row.get::<_, Option<String>>(6)?,
-                row.get::<_, Option<String>>(7)?,
-                row.get::<_, Option<String>>(8)?,
-                row.get::<_, String>(9)?,
-                row.get::<_, String>(10)?,
-                row.get::<_, Option<String>>(11)?,
-                row.get::<_, Option<i64>>(12)?,
-                row.get::<_, Option<i64>>(13)?,
-                row.get::<_, Option<String>>(14)?,
-                row.get::<_, Option<String>>(15)?,
-                row.get::<_, Option<bool>>(16)?,
-                row.get::<_, Option<i64>>(17)?,
-                row.get::<_, Option<i64>>(18)?,
-                row.get::<_, Option<i64>>(19)?,
-                row.get::<_, Option<String>>(20)?,
-                row.get::<_, Option<String>>(21)?,
-                row.get::<_, Option<bool>>(22)?,
-            ))
-        })?
-        .collect::<Result<Vec<_>>>()?;
+        let projects_without_links = stmt
+            .query_map([parent_id], row_to_project)?
+            .collect::<Result<Vec<_>>>()?;
 
-        for (id, name, description, local_path, documentation_url, ai_documentation_url, drive_link, notes, image_data, created_at, updated_at, last_opened_at, opened_count, total_time_seconds, status, status_changed_at, is_pinned, pinned_order, display_order, parent_id, group_color, group_icon, is_group_expanded) in project_rows {
-            let links = self.get_project_links_internal(id, &conn).unwrap_or_else(|_| Vec::new());
+        // Los enlaces de TODA la lista en una sola consulta. Antes era una
+        // consulta por proyecto, y encima con `unwrap_or_else(|_| Vec::new())`:
+        // un fallo al cargar enlaces se tragaba en silencio y el proyecto
+        // aparecía sin enlaces sin que nadie se enterara. Ahora el error sube.
+        let ids: Vec<i64> = projects_without_links.iter().map(|p| p.id).collect();
+        let mut links_by_project = self.get_links_for_projects(&ids, &conn)?;
 
-            projects.push(Project {
-                id,
-                name,
-                description,
-                local_path,
-                documentation_url,
-                ai_documentation_url,
-                drive_link,
-                notes,
-                image_data,
-                links: Some(links),
-                created_at,
-                updated_at,
-                last_opened_at,
-                opened_count,
-                total_time_seconds,
-                status,
-                status_changed_at,
-                is_pinned,
-                pinned_order,
-                display_order,
-                parent_id,
-                group_color,
-                group_icon,
-                is_group_expanded,
-            });
-        }
+        let projects: Vec<Project> = projects_without_links
+            .into_iter()
+            .map(|mut project| {
+                project.links =
+                    Some(links_by_project.remove(&project.id).unwrap_or_default());
+                project
+            })
+            .collect();
 
         Ok(projects)
     }
@@ -2178,6 +2024,116 @@ mod tests {
         })
         .expect("no se pudo sembrar el proyecto")
         .id
+    }
+
+    fn seed_link(db: &Database, project_id: i64, title: &str) {
+        db.create_link(CreateLinkDTO {
+            project_id,
+            link_type: "docs".to_string(),
+            title: title.to_string(),
+            url: format!("https://example.com/{}", title),
+        })
+        .expect("no se pudo sembrar el enlace");
+    }
+
+    fn link_titles(project: &Project) -> Vec<String> {
+        let mut titles: Vec<String> = project
+            .links
+            .as_ref()
+            .expect("links nunca debe ser None en un listado")
+            .iter()
+            .map(|link| link.title.clone())
+            .collect();
+        titles.sort();
+        titles
+    }
+
+    // ==================== B16: los enlaces se cargan en lote ====================
+
+    #[test]
+    fn los_tres_listados_devuelven_los_enlaces_completos_de_un_proyecto() {
+        let db = test_db();
+        let id = seed_project_at(&db, "Con enlaces", "/tmp/con-enlaces");
+        seed_link(&db, id, "alfa");
+        seed_link(&db, id, "beta");
+        seed_link(&db, id, "gamma");
+
+        let esperado = vec![
+            "alfa".to_string(),
+            "beta".to_string(),
+            "gamma".to_string(),
+        ];
+
+        // Los tres caminos de lectura comparten el mismo batch: si el agrupado por
+        // project_id se rompe, se rompe en los tres.
+        let todos = db.get_all_projects().unwrap();
+        assert_eq!(link_titles(&todos[0]), esperado, "get_all_projects");
+
+        let raices = db.get_root_projects().unwrap();
+        assert_eq!(link_titles(&raices[0]), esperado, "get_root_projects");
+
+        let encontrados = db.search_projects("Con enlaces").unwrap();
+        assert_eq!(link_titles(&encontrados[0]), esperado, "search_projects");
+    }
+
+    #[test]
+    fn un_proyecto_sin_enlaces_trae_lista_vacia_y_no_none() {
+        let db = test_db();
+        seed_project_at(&db, "Sin enlaces", "/tmp/sin-enlaces");
+
+        let todos = db.get_all_projects().unwrap();
+        // La distinción importa: el frontend hace `project.links.length` y un `None`
+        // que serializa a `null` lo rompe. El batch omite del mapa a los proyectos
+        // sin enlaces, así que este es el caso que verifica el `unwrap_or_default`.
+        let links = todos[0]
+            .links
+            .as_ref()
+            .expect("links debe ser Some(vec![]), no None");
+        assert!(links.is_empty(), "un proyecto sin enlaces no debe traer ninguno");
+    }
+
+    #[test]
+    fn con_dos_proyectos_los_enlaces_no_se_le_atribuyen_al_equivocado() {
+        let db = test_db();
+        let con = seed_project_at(&db, "Con enlaces", "/tmp/con");
+        let sin = seed_project_at(&db, "Sin enlaces", "/tmp/sin");
+        seed_link(&db, con, "alfa");
+        seed_link(&db, con, "beta");
+
+        let todos = db.get_all_projects().unwrap();
+        let del_con = todos.iter().find(|p| p.id == con).unwrap();
+        let del_sin = todos.iter().find(|p| p.id == sin).unwrap();
+
+        // Este es el test que detecta un error de agrupación en el HashMap: con una
+        // sola consulta para toda la lista, un `entry()` mal armado le cuelga los dos
+        // enlaces al proyecto equivocado, o se los cuelga a los dos.
+        assert_eq!(link_titles(del_con), vec!["alfa".to_string(), "beta".to_string()]);
+        assert_eq!(link_titles(del_sin), Vec::<String>::new());
+    }
+
+    #[test]
+    fn los_subproyectos_tambien_traen_sus_enlaces() {
+        let db = test_db();
+        let padre = seed_project_at(&db, "Padre", "/tmp/padre");
+        let hijo = db
+            .create_project(CreateProjectDTO {
+                name: "Hijo".to_string(),
+                description: "desc".to_string(),
+                local_path: "/tmp/hijo".to_string(),
+                documentation_url: None,
+                ai_documentation_url: None,
+                drive_link: None,
+                notes: None,
+                image_data: None,
+                parent_id: Some(padre),
+                group_color: None,
+                group_icon: None,
+            })
+            .unwrap();
+        seed_link(&db, hijo.id, "manual");
+
+        let hijos = db.get_subprojects(padre).unwrap();
+        assert_eq!(link_titles(&hijos[0]), vec!["manual".to_string()]);
     }
 
     // ==================== B4: get_project filtra la papelera ====================
