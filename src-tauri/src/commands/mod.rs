@@ -17,6 +17,10 @@ pub struct ActiveSessionState {
     pub session_id: Option<i64>,
     pub project_id: Option<i64>,
     pub project_name: Option<String>,
+    /// `local_path` del proyecto. Antes NO existía y `get_work_session_status` rellenaba
+    /// su campo `project_path` con `project_name` —lo más parecido que había a mano—,
+    /// o sea devolvía un nombre donde el contrato promete una ruta.
+    pub project_path: Option<String>,
     pub started_at: Option<std::time::Instant>,
 }
 
@@ -26,6 +30,7 @@ impl Default for ActiveSessionState {
             session_id: None,
             project_id: None,
             project_name: None,
+            project_path: None,
             started_at: None,
         }
     }
@@ -1562,7 +1567,7 @@ pub async fn start_work_session(
     }
 
     let (session_id, previous_stopped) =
-        start_new_session_sync(&db, &active_session, project_id, &project.name)?;
+        start_new_session_sync(&db, &active_session, project_id, &project.name, &project.local_path)?;
 
     println!("✅ [WORK] Sesión {} iniciada para: {}", session_id, project.name);
 
@@ -1592,6 +1597,7 @@ fn start_new_session_sync(
     active_session: &ActiveSession,
     project_id: i64,
     project_name: &str,
+    project_path: &str,
 ) -> Result<(i64, bool), String> {
     let mut session_state = active_session.0.lock()
         .map_err(|_| "Error locking session state")?;
@@ -1620,6 +1626,7 @@ fn start_new_session_sync(
     session_state.session_id = None;
     session_state.project_id = None;
     session_state.project_name = None;
+    session_state.project_path = None;
     session_state.started_at = None;
 
     // Crear nueva sesión de tracking (todavía bajo el mismo lock)
@@ -1630,6 +1637,7 @@ fn start_new_session_sync(
     session_state.session_id = Some(session_id);
     session_state.project_id = Some(project_id);
     session_state.project_name = Some(project_name.to_string());
+    session_state.project_path = Some(project_path.to_string());
     session_state.started_at = Some(std::time::Instant::now());
 
     Ok((session_id, previous_stopped))
@@ -1659,6 +1667,7 @@ pub fn stop_active_session_sync(
         session_state.session_id = None;
         session_state.project_id = None;
         session_state.project_name = None;
+        session_state.project_path = None;
         session_state.started_at = None;
 
         Ok(Some(duration))
@@ -1678,20 +1687,25 @@ pub async fn stop_work_session(
     stop_active_session_sync(&db, &active_session)
 }
 
-/// Obtener estado de la sesión de trabajo actual (mejorado)
-#[tauri::command]
-pub async fn get_work_session_status(
-    active_session: State<'_, ActiveSession>,
+/// Armar el estado de la sesión de trabajo a partir del estado global.
+///
+/// Extraída como función libre (mismo criterio que `start_new_session_sync` y
+/// `stop_active_session_sync`) para poder testearla con un `ActiveSession` real, sin
+/// necesitar un `AppHandle`.
+fn work_session_status_sync(
+    active_session: &ActiveSession,
 ) -> Result<TrackingStatusResponse, String> {
     let session_state = active_session.0.lock()
         .map_err(|_| "Error locking session state")?;
 
-    if let (Some(project_id), Some(started_at), Some(ref project_name)) =
-        (session_state.project_id, session_state.started_at, &session_state.project_name) {
+    // `project_path` sale del path REAL capturado al arrancar la sesión, no del nombre
+    // del proyecto (ver `ActiveSessionState::project_path`).
+    if let (Some(project_id), Some(started_at), Some(ref project_path)) =
+        (session_state.project_id, session_state.started_at, &session_state.project_path) {
         Ok(TrackingStatusResponse {
             is_tracking: true,
             project_id: Some(project_id),
-            project_path: Some(project_name.clone()),
+            project_path: Some(project_path.clone()),
             elapsed_seconds: started_at.elapsed().as_secs(),
         })
     } else {
@@ -1702,6 +1716,14 @@ pub async fn get_work_session_status(
             elapsed_seconds: 0,
         })
     }
+}
+
+/// Obtener estado de la sesión de trabajo actual (mejorado)
+#[tauri::command]
+pub async fn get_work_session_status(
+    active_session: State<'_, ActiveSession>,
+) -> Result<TrackingStatusResponse, String> {
+    work_session_status_sync(&active_session)
 }
 
 #[cfg(test)]
@@ -1806,7 +1828,9 @@ mod backup_filename_sanitization_tests {
 
 #[cfg(test)]
 mod work_session_tests {
-    use super::{start_new_session_sync, stop_active_session_sync, ActiveSession};
+    use super::{
+        start_new_session_sync, stop_active_session_sync, work_session_status_sync, ActiveSession,
+    };
     use crate::db::Database;
     use crate::models::project::CreateProjectDTO;
     use std::path::PathBuf;
@@ -1817,11 +1841,15 @@ mod work_session_tests {
     }
 
     fn seed_project(db: &Database, name: &str) -> i64 {
+        seed_project_with_path(db, name, "/tmp/does-not-matter")
+    }
+
+    fn seed_project_with_path(db: &Database, name: &str, local_path: &str) -> i64 {
         let project = db
             .create_project(CreateProjectDTO {
                 name: name.to_string(),
                 description: "desc".to_string(),
-                local_path: "/tmp/does-not-matter".to_string(),
+                local_path: local_path.to_string(),
                 documentation_url: None,
                 ai_documentation_url: None,
                 drive_link: None,
@@ -1833,6 +1861,74 @@ mod work_session_tests {
             })
             .expect("Failed to seed project");
         project.id
+    }
+
+    /// B2: `get_work_session_status` devolvía `project_path: Some(project_name.clone())`,
+    /// o sea el NOMBRE del proyecto donde el contrato promete una RUTA. No era el typo de
+    /// una variable disponible: `ActiveSessionState` nunca había capturado el path.
+    ///
+    /// El fixture usa un nombre y un path deliberadamente distintos y sin ninguna
+    /// subcadena en común: si fueran parecidos, el test pasaría con el bug puesto.
+    #[test]
+    fn work_session_status_returns_the_real_path_not_the_project_name() {
+        const NAME: &str = "Mi Proyecto Alfa";
+        const PATH: &str = "/srv/repos/zeta-backend";
+
+        let db = test_db();
+        let active_session = ActiveSession::default();
+        let project_id = seed_project_with_path(&db, NAME, PATH);
+
+        start_new_session_sync(&db, &active_session, project_id, NAME, PATH)
+            .expect("start_work_session no debería fallar");
+
+        let status = work_session_status_sync(&active_session).expect("status no debería fallar");
+
+        assert!(status.is_tracking);
+        assert_eq!(status.project_id, Some(project_id));
+        assert_eq!(
+            status.project_path.as_deref(),
+            Some(PATH),
+            "project_path debe ser el local_path real del proyecto"
+        );
+        assert_ne!(
+            status.project_path.as_deref(),
+            Some(NAME),
+            "project_path NO debe ser el nombre del proyecto (regresión B2)"
+        );
+    }
+
+    /// Sin sesión activa el status no inventa un path.
+    #[test]
+    fn work_session_status_is_empty_without_an_active_session() {
+        let active_session = ActiveSession::default();
+
+        let status = work_session_status_sync(&active_session).expect("status no debería fallar");
+
+        assert!(!status.is_tracking);
+        assert_eq!(status.project_id, None);
+        assert_eq!(status.project_path, None);
+        assert_eq!(status.elapsed_seconds, 0);
+    }
+
+    /// Parar la sesión limpia también el path: no debe sobrevivir al cierre.
+    #[test]
+    fn stopping_a_session_clears_the_project_path() {
+        const NAME: &str = "Mi Proyecto Alfa";
+        const PATH: &str = "/srv/repos/zeta-backend";
+
+        let db = test_db();
+        let active_session = ActiveSession::default();
+        let project_id = seed_project_with_path(&db, NAME, PATH);
+
+        start_new_session_sync(&db, &active_session, project_id, NAME, PATH).unwrap();
+        stop_active_session_sync(&db, &active_session).expect("no se pudo parar la sesión");
+
+        let status = work_session_status_sync(&active_session).unwrap();
+        assert!(!status.is_tracking);
+        assert_eq!(
+            status.project_path, None,
+            "el path no debe sobrevivir al cierre de la sesión"
+        );
     }
 
     /// Auditoría (CRÍTICO): dos llamadas a `start_work_session` en rápida sucesión no
@@ -1850,12 +1946,12 @@ mod work_session_tests {
         let project_id = seed_project(&db, "Proyecto de prueba");
 
         let (session_id_1, previous_stopped_1) =
-            start_new_session_sync(&db, &active_session, project_id, "Proyecto de prueba")
+            start_new_session_sync(&db, &active_session, project_id, "Proyecto de prueba", "/tmp/does-not-matter")
                 .expect("primer start_work_session no debería fallar");
         assert!(!previous_stopped_1, "no había sesión previa que parar");
 
         let (session_id_2, _previous_stopped_2) =
-            start_new_session_sync(&db, &active_session, project_id, "Proyecto de prueba")
+            start_new_session_sync(&db, &active_session, project_id, "Proyecto de prueba", "/tmp/does-not-matter")
                 .expect("segundo start_work_session no debería fallar");
 
         assert_ne!(session_id_1, session_id_2, "cada llamada debe crear su propia fila");
@@ -1905,7 +2001,7 @@ mod work_session_tests {
                 let barrier = Arc::clone(&barrier);
                 std::thread::spawn(move || {
                     barrier.wait();
-                    start_new_session_sync(&db, &active_session, project_id, "Proyecto concurrente")
+                    start_new_session_sync(&db, &active_session, project_id, "Proyecto concurrente", "/tmp/does-not-matter")
                         .expect("start_work_session no debería fallar bajo concurrencia")
                 })
             })
@@ -1943,7 +2039,7 @@ mod work_session_tests {
         let project_id = seed_project(&db, "Proyecto a cerrar");
 
         let (session_id, _) =
-            start_new_session_sync(&db, &active_session, project_id, "Proyecto a cerrar")
+            start_new_session_sync(&db, &active_session, project_id, "Proyecto a cerrar", "/tmp/does-not-matter")
                 .expect("start_work_session no debería fallar");
 
         let stopped = stop_active_session_sync(&db, &active_session)
