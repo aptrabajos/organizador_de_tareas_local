@@ -246,6 +246,11 @@ vi.mock('@tauri-apps/api/app', () => ({
 vi.mock('@tauri-apps/plugin-dialog', () => ({
   open: vi.fn(() => Promise.resolve(null)),
   save: vi.fn(() => Promise.resolve(null)),
+  // `confirm` faltaba acá y es el que usan `App.handleDelete` y `TrashModal`:
+  // cualquier test que montara esos componentes sin mockearlo localmente se comía
+  // un "confirm is not a function". Default `true` (usuario acepta) porque es el
+  // camino que continúa, y un test que necesite la cancelación la mockea explícita.
+  confirm: vi.fn(() => Promise.resolve(true)),
 }));
 
 // Mock de @tauri-apps/plugin-fs
