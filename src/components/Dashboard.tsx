@@ -5,6 +5,7 @@ import {
   trackProjectOpen,
 } from '../services/api';
 import type { DashboardData } from '../types/dashboard';
+import { getErrorMessage } from '../utils/errors';
 import type { Project } from '../types/project';
 import toast from 'solid-toast';
 import { logger } from '../utils/logger';
@@ -126,14 +127,25 @@ const Dashboard: Component<DashboardProps> = (props) => {
               Error al cargar el dashboard
             </p>
             <p class="text-sm text-rose-600 dark:text-rose-300">
-              {data.error.message || 'Error desconocido'}
+              {/* `data.error.message` no sirve acá: en Tauri v2 un comando que
+                  devuelve `Err(String)` rechaza la promesa con un STRING PLANO,
+                  no con un `Error`. O sea que `.message` era `undefined` y esto
+                  mostraba "Error desconocido" SIEMPRE, tapando el mensaje real
+                  del backend. Es el mismo B7 que se arregló en el resto de la
+                  app; este camino se había quedado afuera. */}
+              {getErrorMessage(data.error)}
             </p>
           </div>
         </div>
       </Show>
 
       {/* Data Loaded */}
-      <Show when={data() && !data.loading && !data.error}>
+      {/* El ORDEN de los operandos importa y no es cosmético: en Solid, leer
+          `data()` de un recurso que rechazó RE-TIRA el error. Con `data()`
+          primero, ese throw rompía el render del componente entero y el bloque
+          de error de arriba —que ya estaba escrito— no llegaba a mostrarse
+          nunca. Chequear `data.error` antes hace que el `&&` corte ahí. */}
+      <Show when={!data.loading && !data.error && data()}>
         <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
           {/* ═══════════════════════════════════════════════════════════════════
               Proyectos Recientes

@@ -214,4 +214,37 @@ describe('Dashboard', () => {
       );
     });
   });
+
+  describe('estado de error (B7)', () => {
+    it('muestra el mensaje real del backend cuando rechaza con un string plano', async () => {
+      // Esta es LA forma en que Tauri v2 rechaza: un comando que devuelve
+      // `Err(String)` rechaza la promesa con el string pelado, NO con un
+      // `Error`. Leer `.message` sobre eso da `undefined`.
+      (getDashboardData as ReturnType<typeof vi.fn>).mockRejectedValue(
+        'No se pudo abrir la base de datos'
+      );
+
+      render(() => <Dashboard />);
+
+      await waitFor(() => {
+        expect(
+          screen.getByText('No se pudo abrir la base de datos')
+        ).toBeTruthy();
+      });
+      // El fallback genérico tapaba el mensaje accionable del backend.
+      expect(screen.queryByText('Error desconocido')).toBeFalsy();
+    });
+
+    it('sigue mostrando el mensaje cuando el rechazo SÍ es un Error', async () => {
+      (getDashboardData as ReturnType<typeof vi.fn>).mockRejectedValue(
+        new Error('fallo de red')
+      );
+
+      render(() => <Dashboard />);
+
+      await waitFor(() => {
+        expect(screen.getByText('fallo de red')).toBeTruthy();
+      });
+    });
+  });
 });
