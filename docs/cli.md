@@ -74,16 +74,38 @@ gestor crear                   # sin argumentos: abre el ASISTENTE paso a paso
 gestor crear "Algo"            # sin --ruta: pregunta "Ruta del proyecto (Enter para cancelar):"
 ```
 
-> **La CLI no crea la carpeta física — y la app gráfica tampoco.**
-> En la app vos elegís una carpeta que ya existe con un selector; acá la
-> indicás con `--ruta` o la tipeás en el prompt. Si no existe, o existe pero no
-> es un directorio, la CLI **falla con un error claro y no inserta nada**.
-> Crear, abrir o exportar la carpeta sigue siendo trabajo de la app.
+> **Si la carpeta no existe, la CLI te ofrece crearla — nunca sin tu sí.**
+> En la app gráfica elegís con un selector una carpeta que ya existe; acá la
+> indicás con `--ruta` o la tipeás en el prompt. Si esa ruta no existe, la CLI
+> pregunta `La carpeta '<ruta>' no existe. ¿Crearla? [s/N]:` y recién con un
+> `s` hace `mkdir -p` —crea también los padres que falten—. Enter, `n` o
+> cualquier otra cosa es **no**: no se crea nada y no se inserta nada.
+> La carpeta creada queda **asociada al proyecto**, porque es exactamente la
+> ruta que se guarda en `local_path`.
+>
+> Dos casos que **no** preguntan nada: si la ruta existe pero es un archivo, es
+> un error (`la ruta no es una carpeta: <ruta>`); y si la carpeta ya existe, se
+> usa tal cual, en silencio.
+
+```console
+$ gestor crear "API interna" --ruta /srv/api-nueva
+La carpeta '/srv/api-nueva' no existe. ¿Crearla? [s/N]: s
+→ carpeta creada: /srv/api-nueva
+→ proyecto 'API interna' creado (/srv/api-nueva)
+  id 68
+
+$ gestor crear "Otra cosa" --ruta /srv/mejor-no
+La carpeta '/srv/mejor-no' no existe. ¿Crearla? [s/N]:
+gestor: la carpeta se necesita para crear el proyecto; elegí otra ruta o cancelá
+$ echo $?
+1
+```
 
 Antes de insertar valida, en este orden:
 
 1. **Nombre no vacío** (se recortan los espacios de los bordes).
-2. **La carpeta existe y es un directorio.** La ruta se guarda siempre
+2. **La carpeta existe y es un directorio** —y si no existe, se pregunta si
+   crearla, como se explica arriba—. La ruta se guarda siempre
    **absoluta**: la base la comparte la app, que no tiene tu directorio de
    trabajo. Una ruta relativa como `./carpeta` se resuelve antes de guardarse, y
    un `~` tipeado en el prompt se expande a mano (el shell no lo expande ahí).
@@ -149,9 +171,32 @@ grupo del proyecto > (ninguno — sin grupo)
 | - | ----- | ----------- | -------- |
 | 1 | **Nombre** | Sí | Vacío no pasa. Escribí `?` y te **lista los proyectos que ya existen** (con `fzf` si está, si no en texto plano) sin perder el campo. Si el nombre ya está tomado, te avisa **en el momento** y te vuelve a preguntar: no llegás al resumen con un duplicado. |
 | 2 | **Descripción** | No | Texto libre. Enter vacío la omite. |
-| 3 | **Ruta** | Sí | **TAB completa carpetas reales** (readline nativo). Acepta relativas y `~`; se guarda siempre **absoluta**. Si la carpeta no existe o no es un directorio, te lo dice y te vuelve a preguntar — no te patea afuera del asistente. |
+| 3 | **Ruta** | Sí | **TAB completa carpetas reales** (readline nativo). Acepta relativas y `~`; se guarda siempre **absoluta**. Si la carpeta **no existe**, te pregunta `¿Crearla? [s/N]`: con `s` la crea con `mkdir -p` (padres incluidos) y sigue; con Enter te avisa que la carpeta hace falta y te **vuelve a preguntar la ruta**. Si el `mkdir` falla —permisos, un archivo en el medio— te muestra el error real y te vuelve a preguntar. Nunca te patea afuera del asistente. |
 | 4 | **Grupo** | No | Menú de los **grupos activos** (las filas que ya son padre de algún proyecto vivo), más una opción `(ninguno — sin grupo)`. Si no hay ningún grupo en la base, el campo **ni aparece**. |
 | 5 | **Resumen** | — | Te muestra los cuatro valores y pregunta `¿Confirmar? [S/n]`. Enter = sí. Cualquier otra cosa cancela sin escribir nada. |
+
+### El asistente puede crear la carpeta
+
+Es el mismo `mkdir -p` de la alta directa, con la misma regla: **nunca sin tu
+sí explícito**. La diferencia es que acá un "no" no corta nada — volvés al
+campo Ruta y probás otra:
+
+```console
+$ gestor crear
+Ruta del proyecto (TAB completa carpetas): /home/vos/2025/telwinet/api-fact
+La carpeta '/home/vos/2025/telwinet/api-fact' no existe. ¿Crearla? [s/N]: s
+→ carpeta creada: /home/vos/2025/telwinet/api-fact
+```
+
+Un `mkdir` que falla tampoco te saca del asistente: te muestra el error de
+verdad (no un mensaje genérico) y te vuelve a preguntar la ruta.
+
+```console
+Ruta del proyecto (TAB completa carpetas): /tmp/archivo.txt/subdir
+La carpeta '/tmp/archivo.txt/subdir' no existe. ¿Crearla? [s/N]: s
+gestor: no pude crear la carpeta: mkdir: no se puede crear el directorio «/tmp/archivo.txt»: No es un directorio
+Ruta del proyecto (TAB completa carpetas):
+```
 
 ### Cancelar y revalidar
 
@@ -499,6 +544,6 @@ CLI; `Ñandú` y `ñandú`, no.
 | Código | Significado |
 | ------ | ----------- |
 | `0` | Todo bien. |
-| `1` | Error de uso o de datos: sin coincidencias, falta un argumento, la carpeta no existe, el nombre está duplicado, el grupo no existe. |
+| `1` | Error de uso o de datos: sin coincidencias, falta un argumento, la carpeta no existe y dijiste que **no** la cree (o el `mkdir` falló), el nombre está duplicado, el grupo no existe. |
 | `2` | Subcomando o flag desconocidos (se imprime la ayuda). |
 | `130` | Cancelaste: el menú (Esc), la pregunta de ruta de `crear` (Enter vacío), o el asistente (Ctrl+D, `q`, Esc en el menú de grupo, o un `n` en `¿Confirmar?`). |
