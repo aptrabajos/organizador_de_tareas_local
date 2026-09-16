@@ -6,6 +6,7 @@ import type {
   JournalEntry,
   ProjectTodo,
   ProjectLink,
+  ProjectAttachment,
 } from '../types/project';
 
 // Mock de las APIs
@@ -80,6 +81,22 @@ describe('ProjectContext', () => {
       title: 'Repositorio principal',
       url: 'https://github.com/user/repo',
       created_at: '2025-01-01T10:00:00Z',
+    },
+  ];
+
+  // `file_data` se guarda como base64 CRUDO, sin el prefijo `data:...;base64,`:
+  // AttachmentManager lo recorta al subir (fileToBase64) y `downloadAttachment`
+  // hace `atob(file_data)` asumiendo lo mismo. Para pintarlo en un `<img src>`
+  // hay que recomponer el data URL.
+  const mockAttachments: ProjectAttachment[] = [
+    {
+      id: 1,
+      project_id: 1,
+      filename: 'captura.png',
+      file_data: 'iVBORw0KGgo=',
+      file_size: 2048,
+      mime_type: 'image/png',
+      created_at: '2025-01-12T11:00:00Z',
     },
   ];
 
@@ -167,6 +184,21 @@ describe('ProjectContext', () => {
       await waitFor(() => {
         expect(screen.getByText(/sin tareas pendientes/i)).toBeTruthy();
       });
+    });
+
+    it('should render attachment thumbnail as a valid data URL', async () => {
+      (getAttachments as ReturnType<typeof vi.fn>).mockResolvedValue(
+        mockAttachments
+      );
+
+      render(() => <ProjectContext projectId={1} onClose={mockOnClose} />);
+
+      const img = await screen.findByAltText('captura.png');
+
+      // Un `src` con base64 crudo NO es una URL válida: la miniatura no renderiza.
+      expect(img.getAttribute('src')).toBe(
+        'data:image/png;base64,iVBORw0KGgo='
+      );
     });
 
     it('should show empty state when no links', async () => {

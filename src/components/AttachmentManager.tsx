@@ -6,6 +6,7 @@ import {
   deleteAttachment,
 } from '../services/api';
 import type { ProjectAttachment, CreateAttachmentDTO } from '../types/project';
+import { getImageDataUrl } from '../utils/attachments';
 
 interface AttachmentManagerProps {
   projectId: number;
@@ -176,11 +177,6 @@ const AttachmentManager: Component<AttachmentManagerProps> = (props) => {
 
     // Subir el primer archivo
     await uploadFile(files[0]);
-  };
-
-  // Obtener URL de imagen para preview
-  const getImageDataUrl = (attachment: ProjectAttachment): string => {
-    return `data:${attachment.mime_type};base64,${attachment.file_data}`;
   };
 
   return (

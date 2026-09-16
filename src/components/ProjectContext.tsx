@@ -13,6 +13,7 @@ import {
   getProjectLinks,
   getAttachments,
 } from '../services/api';
+import { getImageDataUrl } from '../utils/attachments';
 import TimeTracker from './TimeTracker';
 
 interface ProjectContextProps {
@@ -297,7 +298,7 @@ export default function ProjectContext(props: ProjectContextProps) {
                             when={attachment.mime_type.startsWith('image/')}
                           >
                             <img
-                              src={attachment.file_data}
+                              src={getImageDataUrl(attachment)}
                               alt={attachment.filename}
                               class="h-12 w-12 rounded border border-gray-300 object-cover dark:border-gray-600"
                             />
