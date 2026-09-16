@@ -87,10 +87,17 @@ const ProjectList: Component<ProjectListProps> = (props) => {
   const [statusFilter, setStatusFilter] = createSignal<string>('all');
   const [showPinnedOnly, setShowPinnedOnly] = createSignal(false);
 
-  // Estado para rastrear qué proyectos son grupos (v0.4.0)
-  const [projectGroups, setProjectGroups] = createSignal<Set<number>>(
-    new Set()
-  );
+  // Conteo de subproyectos por id (v0.4.0). Antes era un `Set` con los ids que
+  // tenían hijos, y el número en sí se tiraba: por eso cada GroupCard renderizada
+  // tenía que volver a pedirle el conteo al backend en su propio `onMount`, una
+  // llamada por tarjeta, para un dato que acá ya estaba. Guardando el número se
+  // lo podemos pasar por prop y esa segunda ronda desaparece.
+  const [subprojectCounts, setSubprojectCounts] = createSignal<
+    Map<number, number>
+  >(new Map());
+
+  /** Un proyecto es "grupo" si tiene al menos un hijo. */
+  const isGroupId = (id: number) => (subprojectCounts().get(id) ?? 0) > 0;
 
   // Token de ejecución del efecto de abajo: si una corrida vieja (IIFE async) resuelve
   // después de que ya arrancó una más nueva, su resultado se descarta. Sin esto una
@@ -105,25 +112,32 @@ const ProjectList: Component<ProjectListProps> = (props) => {
       const token = ++projectGroupsToken;
       const currentProjects = props.projects;
       (async () => {
-        const groupIds = new Set<number>();
-        for (const project of currentProjects) {
-          try {
-            const count = await countSubprojects(project.id);
-            if (count > 0) {
-              groupIds.add(project.id);
+        // En paralelo, no en serie. Este bucle era un `for` con `await` adentro:
+        // con N proyectos en vista eran N viajes de IPC ENCADENADOS antes de que
+        // la grilla supiera qué tarjeta es un grupo. Son independientes entre sí,
+        // así que no hay ninguna razón para esperar uno para pedir el siguiente.
+        //
+        // El fallo se maneja por proyecto y no con un `Promise.all` pelado a
+        // propósito: si una sola llamada se rompe, `Promise.all` descarta TODAS
+        // las demás y la vista se queda sin ningún grupo detectado.
+        const entries = await Promise.all(
+          currentProjects.map(async (project): Promise<[number, number]> => {
+            try {
+              return [project.id, await countSubprojects(project.id)];
+            } catch (err) {
+              logger.error('Error contando subproyectos:', err);
+              return [project.id, 0];
             }
-          } catch (err) {
-            logger.error('Error contando subproyectos:', err);
-          }
-        }
+          })
+        );
         if (token !== projectGroupsToken) return; // corrida obsoleta, descartar
-        setProjectGroups(groupIds);
+        setSubprojectCounts(new Map(entries));
       })();
     } else {
       // En vista de subproyectos (sin búsqueda), ninguno es grupo (nivel único).
       // Invalida cualquier corrida async pendiente del bloque anterior.
       projectGroupsToken++;
-      setProjectGroups(new Set<number>());
+      setSubprojectCounts(new Map());
     }
   });
 
@@ -248,10 +262,11 @@ const ProjectList: Component<ProjectListProps> = (props) => {
         duration: 3000,
       });
 
-      // Actualizar el set de grupos inmediatamente para feedback visual
-      const currentGroups = new Set(projectGroups());
-      currentGroups.add(groupId);
-      setProjectGroups(currentGroups);
+      // Actualizar el conteo inmediatamente para feedback visual: el proyecto que
+      // se acaba de soltar es un hijo más. `onProjectsChanged` recarga después.
+      const counts = new Map(subprojectCounts());
+      counts.set(groupId, (counts.get(groupId) ?? 0) + 1);
+      setSubprojectCounts(counts);
 
       // Refrescar lista de proyectos (esto recargará desde la BD)
       if (props.onProjectsChanged) {
@@ -302,7 +317,7 @@ const ProjectList: Component<ProjectListProps> = (props) => {
     if (!draggedProject || !targetProject) return;
 
     // v0.4.0 - Detectar si el target es un grupo (tiene hijos)
-    const isTargetGroup = projectGroups().has(overId);
+    const isTargetGroup = isGroupId(overId);
 
     if (isTargetGroup && props.viewMode === 'groups') {
       // Caso: Arrastrar proyecto sobre un GroupCard para convertirlo en subproyecto
@@ -474,7 +489,7 @@ const ProjectList: Component<ProjectListProps> = (props) => {
     variant: 'grid' | 'self-group' = 'grid'
   ) => {
     const isGrid = variant === 'grid';
-    const isGroup = () => projectGroups().has(project.id);
+    const isGroup = () => isGroupId(project.id);
 
     // El sortable solo existe en la grilla; la cabecera del propio grupo no se arrastra
     const sortable = isGrid ? createSortable(project.id) : null;
@@ -1102,7 +1117,7 @@ const ProjectList: Component<ProjectListProps> = (props) => {
                 <For each={filteredProjects()}>
                   {(project) => {
                     // Determinar si este proyecto es un grupo (tiene hijos)
-                    const isGroup = () => projectGroups().has(project.id);
+                    const isGroup = () => isGroupId(project.id);
 
                     // Si es un grupo y estamos en vista de grupos (sin búsqueda), usar GroupCard
                     return (
@@ -1116,6 +1131,9 @@ const ProjectList: Component<ProjectListProps> = (props) => {
                         {/* Render GroupCard para proyectos que son grupos */}
                         <GroupCard
                           project={project}
+                          subprojectCount={
+                            subprojectCounts().get(project.id) ?? 0
+                          }
                           onViewProjects={(group) => {
                             if (props.onViewGroup) {
                               props.onViewGroup(group);

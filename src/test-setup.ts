@@ -65,9 +65,20 @@ export function setUiConfigOverrides(overrides: UiConfigOverrides): void {
   uiConfigOverrides = overrides;
 }
 
+// ==================== conteo de subproyectos por id ====================
+// `count_subprojects` devuelve 0 por defecto, o sea "ningún proyecto es grupo".
+// Un test que quiera una vista de grupos declara acá qué id tiene cuántos hijos,
+// siguiendo el mismo patrón que los overrides de `ui` de arriba.
+
+let subprojectCounts: Record<number, number> = {};
+
+export function setSubprojectCounts(counts: Record<number, number>): void {
+  subprojectCounts = counts;
+}
+
 // Mock de @tauri-apps/api/core
 vi.mock('@tauri-apps/api/core', () => ({
-  invoke: vi.fn((cmd: string) => {
+  invoke: vi.fn((cmd: string, args?: Record<string, unknown>) => {
     // Mocks para time tracking
     if (cmd === 'check_tracking_config') {
       return Promise.resolve(false);
@@ -121,7 +132,10 @@ vi.mock('@tauri-apps/api/core', () => ({
     }
     // Mocks para proyectos
     if (cmd === 'count_subprojects') {
-      return Promise.resolve(0);
+      const parentId = (args as { parentId?: number } | undefined)?.parentId;
+      return Promise.resolve(
+        parentId === undefined ? 0 : (subprojectCounts[parentId] ?? 0)
+      );
     }
     if (cmd === 'track_project_open') {
       return Promise.resolve();
@@ -308,6 +322,7 @@ afterEach(() => {
   systemPrefersDark = false;
   mediaListeners.clear();
   uiConfigOverrides = {};
+  subprojectCounts = {};
   document.documentElement.classList.remove('dark');
   // jsdom no siempre expone `localStorage` como global (depende del origin), y
   // el ThemeContext también lo accede defensivamente por el mismo motivo.
