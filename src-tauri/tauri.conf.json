@@ -27,41 +27,27 @@
       "capabilities": [
         {
           "identifier": "main-capability",
-          "description": "Capability for the main window with full filesystem access",
+          "description": "Ventana principal: dialogos nativos, atajos globales y escritura del markdown de backup en la carpeta que elige el usuario. El WebView no tiene lectura de filesystem.",
           "windows": ["main"],
           "permissions": [
             "core:default",
-            "shell:allow-open",
             "dialog:allow-open",
             "dialog:default",
             {
-              "identifier": "fs:default",
+              "identifier": "fs:allow-write-text-file",
               "allow": [
                 { "path": "$HOME/**" },
                 { "path": "/mnt/**" },
-                { "path": "/tmp/**" },
-                { "path": "/home/**" }
+                { "path": "/tmp/**" }
+              ],
+              "deny": [
+                { "path": "$HOME/.ssh/**" },
+                { "path": "$HOME/.gnupg/**" },
+                { "path": "$HOME/.aws/**" },
+                { "path": "$HOME/.config/**" },
+                { "path": "$HOME/.local/share/**" }
               ]
             },
-            {
-              "identifier": "fs:allow-read",
-              "allow": [
-                { "path": "$HOME/**" },
-                { "path": "/mnt/**" },
-                { "path": "/tmp/**" },
-                { "path": "/home/**" }
-              ]
-            },
-            {
-              "identifier": "fs:allow-write",
-              "allow": [
-                { "path": "$HOME/**" },
-                { "path": "/mnt/**" },
-                { "path": "/tmp/**" },
-                { "path": "/home/**" }
-              ]
-            },
-            "fs:allow-exists",
             "global-shortcut:allow-register",
             "global-shortcut:allow-register-all",
             "global-shortcut:allow-unregister",
