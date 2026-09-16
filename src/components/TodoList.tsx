@@ -8,6 +8,7 @@ import {
 } from '../services/api';
 import { useConfig } from '../contexts/ConfigContext';
 import { shouldConfirm } from '../utils/confirm';
+import { logger } from '../utils/logger';
 
 interface TodoListProps {
   projectId: number;
@@ -32,7 +33,7 @@ export default function TodoList(props: TodoListProps) {
       const data = await getProjectTodos(props.projectId);
       setTodos(data);
     } catch (err) {
-      console.error('Error loading todos:', err);
+      logger.error('Error loading todos:', err);
       setError('Error al cargar las tareas');
     } finally {
       setLoading(false);
@@ -51,7 +52,7 @@ export default function TodoList(props: TodoListProps) {
       setNewTodoContent('');
       await loadTodos();
     } catch (err) {
-      console.error('Error creating todo:', err);
+      logger.error('Error creating todo:', err);
       setError('Error al crear tarea');
     }
   };
@@ -63,7 +64,7 @@ export default function TodoList(props: TodoListProps) {
       });
       await loadTodos();
     } catch (err) {
-      console.error('Error toggling todo:', err);
+      logger.error('Error toggling todo:', err);
       setError('Error al actualizar tarea');
     }
   };
@@ -82,7 +83,7 @@ export default function TodoList(props: TodoListProps) {
       await deleteTodo(id);
       await loadTodos();
     } catch (err) {
-      console.error('Error deleting todo:', err);
+      logger.error('Error deleting todo:', err);
       setError('Error al eliminar tarea');
     }
   };

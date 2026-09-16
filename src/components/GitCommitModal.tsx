@@ -1,6 +1,7 @@
 import { Component, createSignal, Show, For, onMount } from 'solid-js';
 import toast from 'solid-toast';
 import { gitCommit, gitPush, getGitModifiedFiles } from '../services/api';
+import { logger } from '../utils/logger';
 
 interface GitCommitModalProps {
   projectPath: string;
@@ -20,7 +21,7 @@ const GitCommitModal: Component<GitCommitModalProps> = (props) => {
       const files = await getGitModifiedFiles(props.projectPath);
       setStagedFiles(files);
     } catch (error) {
-      console.error('Error loading files:', error);
+      logger.error('Error loading files:', error);
     }
   });
 

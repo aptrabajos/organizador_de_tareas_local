@@ -2,6 +2,7 @@ import { Component, createSignal, Show, onMount, For } from 'solid-js';
 import type { Project } from '../types/project';
 import MarkdownEditor from './MarkdownEditor';
 import { getRootProjects } from '../services/api';
+import { logger } from '../utils/logger';
 
 interface ProjectFormProps {
   project?: Project;
@@ -69,7 +70,7 @@ const ProjectForm: Component<ProjectFormProps> = (props) => {
         selfId != null ? groups.filter((g) => g.id !== selfId) : groups
       );
     } catch (err) {
-      console.error('Error cargando grupos:', err);
+      logger.error('Error cargando grupos:', err);
     }
   });
 
@@ -142,10 +143,10 @@ const ProjectForm: Component<ProjectFormProps> = (props) => {
   const handleSubmit = (e: SubmitEvent) => {
     e.preventDefault();
 
-    console.log('🔧 [FRONTEND] Formulario enviado - INICIO');
-    console.log('🔧 [FRONTEND] Evento:', e);
-    console.log('🔧 [FRONTEND] Props:', props);
-    console.log('📝 [FRONTEND] Datos del formulario:', {
+    logger.debug('🔧 [FRONTEND] Formulario enviado - INICIO');
+    logger.debug('🔧 [FRONTEND] Evento:', e);
+    logger.debug('🔧 [FRONTEND] Props:', props);
+    logger.debug('📝 [FRONTEND] Datos del formulario:', {
       name: name(),
       description: description(),
       local_path: localPath(),
@@ -155,7 +156,7 @@ const ProjectForm: Component<ProjectFormProps> = (props) => {
     });
 
     if (!name().trim() || !description().trim() || !localPath().trim()) {
-      console.log('❌ [FRONTEND] Validación falló - campos requeridos vacíos');
+      logger.debug('❌ [FRONTEND] Validación falló - campos requeridos vacíos');
       return;
     }
 
@@ -173,7 +174,7 @@ const ProjectForm: Component<ProjectFormProps> = (props) => {
       parent_id: parentId(), // v0.4.0 - ID del grupo padre (ruteado por assignToGroup en edición)
     };
 
-    console.log('✅ [FRONTEND] Enviando datos:', formData);
+    logger.debug('✅ [FRONTEND] Enviando datos:', formData);
     props.onSubmit(formData);
   };
 

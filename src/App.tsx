@@ -22,6 +22,7 @@ import { shouldConfirm } from './utils/confirm';
 import type { Project } from './types/project';
 import { confirm } from '@tauri-apps/plugin-dialog';
 import { getConfig, countSubprojects } from './services/api';
+import { logger } from './utils/logger';
 
 // Componente interno que usa shortcuts
 const AppContent: Component = () => {
@@ -59,18 +60,18 @@ const AppContent: Component = () => {
         setShowWelcome(true);
       }
     } catch (err) {
-      console.error('Error cargando config:', err);
+      logger.error('Error cargando config:', err);
     }
 
     // Registrar handlers de shortcuts
     shortcuts.registerHandler('new_project', () => {
-      console.log('🎯 [SHORTCUT] Nuevo proyecto');
+      logger.debug('🎯 [SHORTCUT] Nuevo proyecto');
       setShowForm(true);
       setEditingProject(null);
     });
 
     shortcuts.registerHandler('search', () => {
-      console.log('🎯 [SHORTCUT] Focus en búsqueda');
+      logger.debug('🎯 [SHORTCUT] Focus en búsqueda');
       const searchInput = document.querySelector(
         'input[type="text"]'
       ) as HTMLInputElement;
@@ -80,17 +81,17 @@ const AppContent: Component = () => {
     });
 
     shortcuts.registerHandler('settings', () => {
-      console.log('🎯 [SHORTCUT] Abrir configuración');
+      logger.debug('🎯 [SHORTCUT] Abrir configuración');
       setShowSettings(true);
     });
 
     shortcuts.registerHandler('about', () => {
-      console.log('🎯 [SHORTCUT] Abrir acerca de');
+      logger.debug('🎯 [SHORTCUT] Abrir acerca de');
       setShowAbout(true);
     });
 
     shortcuts.registerHandler('refresh', () => {
-      console.log('🎯 [SHORTCUT] Recargar proyectos');
+      logger.debug('🎯 [SHORTCUT] Recargar proyectos');
       if (store.viewMode() === 'groups') {
         store.loadRootProjects();
       } else if (store.currentGroup()) {
@@ -99,7 +100,7 @@ const AppContent: Component = () => {
     });
 
     shortcuts.registerHandler('close_modal', () => {
-      console.log('🎯 [SHORTCUT] Cerrar modal');
+      logger.debug('🎯 [SHORTCUT] Cerrar modal');
       if (showForm()) {
         setShowForm(false);
         setEditingProject(null);
@@ -112,11 +113,11 @@ const AppContent: Component = () => {
       }
     });
 
-    console.log(
+    logger.debug(
       '🚀 [SHORTCUTS] Todos los handlers registrados, activando shortcuts globales'
     );
     shortcuts.reregisterShortcuts().catch((err) => {
-      console.error('❌ [SHORTCUTS] Error registrando shortcuts:', err);
+      logger.error('❌ [SHORTCUTS] Error registrando shortcuts:', err);
     });
   });
 
@@ -181,11 +182,11 @@ const AppContent: Component = () => {
   };
 
   const handleFormSubmit = async (data: ProjectFormData) => {
-    console.log('🔧 [APP] handleFormSubmit iniciado con datos:', data);
-    console.log('🔧 [APP] editingProject:', editingProject());
+    logger.debug('🔧 [APP] handleFormSubmit iniciado con datos:', data);
+    logger.debug('🔧 [APP] editingProject:', editingProject());
     try {
       if (editingProject()) {
-        console.log('🔧 [APP] Llamando a store.updateProject...');
+        logger.debug('🔧 [APP] Llamando a store.updateProject...');
         const editing = editingProject()!;
         const id = editing.id;
         // parent_id necesita NULL real para poder DESAGRUPAR: se rutea por
@@ -199,18 +200,18 @@ const AppContent: Component = () => {
         if (newParent !== oldParent) {
           await store.assignToGroup(id, newParent);
         }
-        console.log('✅ [APP] store.updateProject exitoso');
+        logger.debug('✅ [APP] store.updateProject exitoso');
       } else {
-        console.log('🔧 [APP] Llamando a store.createProject...');
+        logger.debug('🔧 [APP] Llamando a store.createProject...');
         await store.createProject(data);
-        console.log('✅ [APP] store.createProject exitoso');
+        logger.debug('✅ [APP] store.createProject exitoso');
       }
-      console.log('🔧 [APP] Cerrando formulario...');
+      logger.debug('🔧 [APP] Cerrando formulario...');
       setShowForm(false);
       setEditingProject(null);
-      console.log('✅ [APP] Formulario cerrado exitosamente');
+      logger.debug('✅ [APP] Formulario cerrado exitosamente');
     } catch (err) {
-      console.error('❌ [APP] Error en handleFormSubmit:', err);
+      logger.error('❌ [APP] Error en handleFormSubmit:', err);
       alert('Error al guardar el proyecto: ' + getErrorMessage(err));
     }
   };

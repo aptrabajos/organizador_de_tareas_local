@@ -7,15 +7,16 @@ import {
 import type { DashboardData } from '../types/dashboard';
 import type { Project } from '../types/project';
 import toast from 'solid-toast';
+import { logger } from '../utils/logger';
 
 interface DashboardProps {
   onProjectClick?: (project: Project) => void;
 }
 
 const Dashboard: Component<DashboardProps> = (props) => {
-  console.log('Dashboard component mounted');
+  logger.debug('Dashboard component mounted');
   const [data] = createResource<DashboardData>(() => {
-    console.log('createResource fetching data...');
+    logger.debug('createResource fetching data...');
     return getDashboardData();
   });
 
@@ -58,7 +59,7 @@ const Dashboard: Component<DashboardProps> = (props) => {
       await openTerminal(project.local_path);
       toast.success(`Abriendo ${project.name}...`, { duration: 2000 });
     } catch (error) {
-      console.error('Error al abrir proyecto:', error);
+      logger.error('Error al abrir proyecto:', error);
       toast.error('Error al abrir el proyecto');
     }
   };

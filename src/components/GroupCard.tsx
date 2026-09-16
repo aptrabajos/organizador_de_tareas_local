@@ -2,6 +2,7 @@ import { Component, createSignal, onMount, For, Show } from 'solid-js';
 import { createDroppable } from '@thisbeyond/solid-dnd';
 import type { Project } from '../types/project';
 import { countSubprojects, getSubprojects } from '../services/api';
+import { logger } from '../utils/logger';
 
 interface GroupCardProps {
   project: Project;
@@ -55,7 +56,7 @@ const GroupCard: Component<GroupCardProps> = (props) => {
       const count = await countSubprojects(props.project.id);
       setSubprojectCount(count);
     } catch (err) {
-      console.error('Error counting subprojects:', err);
+      logger.error('Error counting subprojects:', err);
     }
   });
 
@@ -68,7 +69,7 @@ const GroupCard: Component<GroupCardProps> = (props) => {
         const projects = await getSubprojects(props.project.id);
         setSubprojects(projects);
       } catch (err) {
-        console.error('Error loading subprojects:', err);
+        logger.error('Error loading subprojects:', err);
       } finally {
         setLoadingSubprojects(false);
       }

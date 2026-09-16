@@ -12,6 +12,7 @@ import {
   gitPush,
   gitPull,
 } from '../services/api';
+import { logger } from '../utils/logger';
 
 interface EnhancedGitInfoProps {
   projectPath: string;
@@ -86,7 +87,7 @@ const EnhancedGitInfo: Component<EnhancedGitInfoProps> = (props) => {
     try {
       const result = await gitPush(props.projectPath);
       toast.success('✅ Push exitoso');
-      console.log(result);
+      logger.debug(result);
       await loadGitInfo();
     } catch (error) {
       toast.error(`Error en push: ${error}`);
@@ -102,7 +103,7 @@ const EnhancedGitInfo: Component<EnhancedGitInfoProps> = (props) => {
     try {
       const result = await gitPull(props.projectPath);
       toast.success('✅ Pull exitoso');
-      console.log(result);
+      logger.debug(result);
       await loadGitInfo();
     } catch (error) {
       toast.error(`Error en pull: ${error}`);

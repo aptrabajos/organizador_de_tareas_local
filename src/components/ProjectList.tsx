@@ -34,6 +34,7 @@ import {
 import { open } from '@tauri-apps/plugin-dialog';
 import { writeTextFile } from '@tauri-apps/plugin-fs';
 import { join, normalize, sep } from '@tauri-apps/api/path';
+import { logger } from '../utils/logger';
 
 // Configurar marked para soportar GFM y checkboxes
 marked.use({
@@ -112,7 +113,7 @@ const ProjectList: Component<ProjectListProps> = (props) => {
               groupIds.add(project.id);
             }
           } catch (err) {
-            console.error('Error contando subproyectos:', err);
+            logger.error('Error contando subproyectos:', err);
           }
         }
         if (token !== projectGroupsToken) return; // corrida obsoleta, descartar
@@ -178,7 +179,7 @@ const ProjectList: Component<ProjectListProps> = (props) => {
 
       // Iniciar sesión de trabajo (tracking automático de tiempo)
       const session = await startWorkSession(project.id);
-      console.log(`🕒 Sesión de trabajo iniciada: ${session.project_name}`);
+      logger.debug(`🕒 Sesión de trabajo iniciada: ${session.project_name}`);
 
       if (session.tracking_initialized) {
         toast.success(`📁 Tracking activado para ${project.name}`, {
@@ -192,7 +193,7 @@ const ProjectList: Component<ProjectListProps> = (props) => {
       // Abrir terminal
       await props.onOpenTerminal(project);
     } catch (error) {
-      console.error('Error al abrir proyecto:', error);
+      logger.error('Error al abrir proyecto:', error);
       // Aunque falle el tracking, abrimos el terminal igual
       await props.onOpenTerminal(project);
     }
@@ -211,7 +212,7 @@ const ProjectList: Component<ProjectListProps> = (props) => {
         props.onProjectsChanged();
       }
     } catch (error) {
-      console.error('Error al cambiar pin:', error);
+      logger.error('Error al cambiar pin:', error);
       toast.error('Error al cambiar favorito');
     }
   };
@@ -226,7 +227,7 @@ const ProjectList: Component<ProjectListProps> = (props) => {
         props.onProjectsChanged();
       }
     } catch (error) {
-      console.error('Error al cambiar estado:', error);
+      logger.error('Error al cambiar estado:', error);
       toast.error('Error al cambiar estado');
     }
   };
@@ -257,7 +258,7 @@ const ProjectList: Component<ProjectListProps> = (props) => {
         props.onProjectsChanged();
       }
     } catch (error) {
-      console.error('Error al asignar proyecto a grupo:', error);
+      logger.error('Error al asignar proyecto a grupo:', error);
       // Surfacea el mensaje del backend (ej. validación de ciclo en español)
       toast.error(getErrorMessage(error));
       throw error;
@@ -280,7 +281,7 @@ const ProjectList: Component<ProjectListProps> = (props) => {
         props.onProjectsChanged();
       }
     } catch (error) {
-      console.error('Error al remover proyecto del grupo:', error);
+      logger.error('Error al remover proyecto del grupo:', error);
       toast.error('Error al remover proyecto del grupo');
     }
   };
@@ -310,7 +311,7 @@ const ProjectList: Component<ProjectListProps> = (props) => {
       } catch (error) {
         // handleDropOnGroup ya mostró el toast de error (con el mensaje específico
         // del backend); acá solo logueamos para no duplicarlo.
-        console.error('Error al asignar proyecto a grupo:', error);
+        logger.error('Error al asignar proyecto a grupo:', error);
       }
       return;
     }
@@ -341,7 +342,7 @@ const ProjectList: Component<ProjectListProps> = (props) => {
       );
 
       if (failures.length > 0) {
-        console.error('Error al actualizar orden (parcial):', failures);
+        logger.error('Error al actualizar orden (parcial):', failures);
         toast.error(
           'Error al actualizar el orden; se resincronizó la lista con la base de datos'
         );
@@ -361,7 +362,7 @@ const ProjectList: Component<ProjectListProps> = (props) => {
         props.onProjectsChanged();
       }
     } catch (error) {
-      console.error('Error al actualizar orden:', error);
+      logger.error('Error al actualizar orden:', error);
       toast.error('Error al actualizar orden');
       // También resincronizamos ante un fallo inesperado antes de llegar al
       // Promise.allSettled (p.ej. el propio armado del array reordenado).
@@ -413,11 +414,11 @@ const ProjectList: Component<ProjectListProps> = (props) => {
           duration: 5000,
         });
       } catch (error) {
-        console.error('Error al crear backup:', error);
+        logger.error('Error al crear backup:', error);
         toast.error(`Error al crear backup: ${error}`, { id: toastId });
       }
     } catch (error) {
-      console.error('Error abriendo selector:', error);
+      logger.error('Error abriendo selector:', error);
       toast.error(`Error al abrir selector de carpetas: ${error}`);
     }
   };
@@ -431,7 +432,7 @@ const ProjectList: Component<ProjectListProps> = (props) => {
         duration: 6000,
       });
     } catch (error) {
-      console.error('Error al exportar PDF:', error);
+      logger.error('Error al exportar PDF:', error);
       toast.error(`❌ Error al exportar PDF: ${error}`, { id: toastId });
     }
   };
@@ -453,11 +454,11 @@ const ProjectList: Component<ProjectListProps> = (props) => {
           duration: 5000,
         });
       } catch (error) {
-        console.error('Error al sincronizar con rsync:', error);
+        logger.error('Error al sincronizar con rsync:', error);
         toast.error(`Error al sincronizar: ${error}`, { id: toastId });
       }
     } catch (error) {
-      console.error('Error:', error);
+      logger.error('Error:', error);
       toast.error(`Error: ${error}`);
     }
   };

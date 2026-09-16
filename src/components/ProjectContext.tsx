@@ -15,6 +15,7 @@ import {
 } from '../services/api';
 import { getImageDataUrl } from '../utils/attachments';
 import TimeTracker from './TimeTracker';
+import { logger } from '../utils/logger';
 
 interface ProjectContextProps {
   projectId: number;
@@ -59,7 +60,7 @@ export default function ProjectContext(props: ProjectContextProps) {
       setLinks(linksData);
       setAttachments(attachmentsData);
     } catch (err) {
-      console.error('Error al cargar contexto del proyecto:', err);
+      logger.error('Error al cargar contexto del proyecto:', err);
       setError('Error al cargar el contexto del proyecto');
     } finally {
       setLoading(false);

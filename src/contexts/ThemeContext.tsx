@@ -9,6 +9,7 @@ import {
 import type { ThemeMode } from '../types/config';
 import { useConfig } from './ConfigContext';
 import { getErrorMessage } from '../utils/errors';
+import { logger } from '../utils/logger';
 
 // El tipo vive en types/config.ts porque es el MISMO que viaja en la config de
 // Rust (`ui.theme`). Antes acá había un `Theme = 'light' | 'dark'` paralelo que
@@ -108,7 +109,7 @@ export const ThemeProvider: ParentComponent = (props) => {
     } catch (err) {
       // No revertimos: el tema ya aplicado es lo que el usuario pidió. Lo que se
       // pierde es la persistencia, y el próximo cambio exitoso la recupera.
-      console.error('No se pudo persistir el tema:', getErrorMessage(err));
+      logger.error('No se pudo persistir el tema:', getErrorMessage(err));
     }
   };
 

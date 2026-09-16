@@ -9,6 +9,7 @@ import {
 import type { CreateLinkDTO } from '../services/api';
 import { useConfig } from '../contexts/ConfigContext';
 import { shouldConfirm } from '../utils/confirm';
+import { logger } from '../utils/logger';
 
 interface ProjectLinksProps {
   projectId: number;
@@ -82,7 +83,7 @@ const ProjectLinks: Component<ProjectLinksProps> = (props) => {
       const projectLinks = await getProjectLinks(props.projectId);
       setLinks(projectLinks);
     } catch (error) {
-      console.error('Error cargando enlaces:', error);
+      logger.error('Error cargando enlaces:', error);
     } finally {
       setIsLoading(false);
     }
@@ -112,7 +113,7 @@ const ProjectLinks: Component<ProjectLinksProps> = (props) => {
       setShowAddForm(false);
       await loadLinks();
     } catch (error) {
-      console.error('Error creando enlace:', error);
+      logger.error('Error creando enlace:', error);
       alert('Error al crear el enlace');
     } finally {
       setIsLoading(false);
@@ -132,7 +133,7 @@ const ProjectLinks: Component<ProjectLinksProps> = (props) => {
       await deleteProjectLink(linkId);
       await loadLinks();
     } catch (error) {
-      console.error('Error eliminando enlace:', error);
+      logger.error('Error eliminando enlace:', error);
       alert('Error al eliminar el enlace');
     } finally {
       setIsLoading(false);
@@ -143,7 +144,7 @@ const ProjectLinks: Component<ProjectLinksProps> = (props) => {
     try {
       await openUrl(url);
     } catch (error) {
-      console.error('Error abriendo URL:', error);
+      logger.error('Error abriendo URL:', error);
       alert('Error al abrir el enlace');
     }
   };

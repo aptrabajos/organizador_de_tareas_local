@@ -21,6 +21,7 @@ import {
 import { getErrorMessage } from '../utils/errors';
 import { useTheme } from '../contexts/ThemeContext';
 import { SHORTCUT_METADATA, type ThemeMode } from '../types/config';
+import { logger } from '../utils/logger';
 
 type Tab = 'programs' | 'backup' | 'ui' | 'shortcuts' | 'advanced';
 
@@ -64,7 +65,7 @@ export default function Settings(props: { onClose: () => void }) {
       setBackupList(list);
     } catch (err) {
       // No bloquea la pantalla: solo se loguea
-      console.error('Error al listar backups:', getErrorMessage(err));
+      logger.error('Error al listar backups:', getErrorMessage(err));
     }
   };
 
@@ -164,7 +165,7 @@ export default function Settings(props: { onClose: () => void }) {
       const programs = await detectPrograms();
       setDetectedPrograms(programs);
     } catch (err) {
-      console.error('Error detectando programas:', err);
+      logger.error('Error detectando programas:', err);
     }
   };
 

@@ -1,5 +1,6 @@
 import { createSignal, For, Index } from 'solid-js';
 import { getConfig, updateConfig } from '../services/api';
+import { logger } from '../utils/logger';
 
 export default function WelcomeScreen(props: { onClose: () => void }) {
   const [currentStep, setCurrentStep] = createSignal(0);
@@ -72,7 +73,7 @@ export default function WelcomeScreen(props: { onClose: () => void }) {
         },
       });
     } catch (err) {
-      console.error('Error actualizando config:', err);
+      logger.error('Error actualizando config:', err);
     }
     props.onClose();
   };

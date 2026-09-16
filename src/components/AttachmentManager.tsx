@@ -9,6 +9,7 @@ import type { ProjectAttachment, CreateAttachmentDTO } from '../types/project';
 import { getImageDataUrl } from '../utils/attachments';
 import { useConfig } from '../contexts/ConfigContext';
 import { shouldConfirm } from '../utils/confirm';
+import { logger } from '../utils/logger';
 
 interface AttachmentManagerProps {
   projectId: number;
@@ -33,7 +34,7 @@ const AttachmentManager: Component<AttachmentManagerProps> = (props) => {
       const files = await getAttachments(props.projectId);
       setAttachments(files);
     } catch (err) {
-      console.error('Error loading attachments:', err);
+      logger.error('Error loading attachments:', err);
       setError('Error al cargar archivos adjuntos');
     }
   };
@@ -76,7 +77,7 @@ const AttachmentManager: Component<AttachmentManagerProps> = (props) => {
       await addAttachment(attachmentData);
       await loadAttachments();
     } catch (err) {
-      console.error('Error uploading file:', err);
+      logger.error('Error uploading file:', err);
       setError('Error al subir el archivo');
       setTimeout(() => setError(null), 3000);
     } finally {
@@ -96,7 +97,7 @@ const AttachmentManager: Component<AttachmentManagerProps> = (props) => {
       await deleteAttachment(id);
       await loadAttachments();
     } catch (err) {
-      console.error('Error deleting attachment:', err);
+      logger.error('Error deleting attachment:', err);
       setError('Error al eliminar el archivo');
       setTimeout(() => setError(null), 3000);
     }
@@ -123,7 +124,7 @@ const AttachmentManager: Component<AttachmentManagerProps> = (props) => {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (err) {
-      console.error('Error downloading file:', err);
+      logger.error('Error downloading file:', err);
       setError('Error al descargar el archivo');
       setTimeout(() => setError(null), 3000);
     }

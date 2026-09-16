@@ -5,6 +5,7 @@ import {
   checkTrackingConfig,
   initTracking,
 } from '../services/api';
+import { logger } from '../utils/logger';
 
 interface TimeTrackerProps {
   projectId: number;
@@ -284,7 +285,7 @@ const TimeTracker: Component<TimeTrackerProps> = (props) => {
         setStats(timeStats);
       }
     } catch (error) {
-      console.error('Error loading tracking data:', error);
+      logger.error('Error loading tracking data:', error);
     } finally {
       setIsLoading(false);
     }
@@ -307,7 +308,7 @@ const TimeTracker: Component<TimeTrackerProps> = (props) => {
       setHasTracking(true);
       await loadTrackingData();
     } catch (error) {
-      console.error('Error initializing tracking:', error);
+      logger.error('Error initializing tracking:', error);
       alert('Error al inicializar tracking: ' + error);
     } finally {
       setIsInitializing(false);
