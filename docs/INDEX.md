@@ -26,6 +26,7 @@ Solo cinco documentos viven en la raíz. Si agregás uno nuevo, va en `docs/`.
 | --------- | ------ |
 | [`GUIA-DESARROLLO.md`](./GUIA-DESARROLLO.md) | Guía detallada de desarrollo: cómo levantar la app nativa, capturar logs, matar instancias colgadas. |
 | [`ESTADO-FUNCIONALIDADES.md`](./ESTADO-FUNCIONALIDADES.md) | Inventario de funcionalidades implementadas y pendientes. Última actualización: octubre 2025. |
+| [`reporte-fixes-v0.6.1.md`](./reporte-fixes-v0.6.1.md) | Reporte de cierre del plan de arreglo de bugs: 26 de 27 bugs corregidos, las dos decisiones de producto que quedaron (B17, B14), cómo se validó y qué falta. **Histórico de una entrega**, por eso lleva la versión en el nombre. |
 
 ## `docs/sesiones/` — bitácoras de sesiones de trabajo
 
