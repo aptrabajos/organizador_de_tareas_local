@@ -76,7 +76,7 @@ export function createProjectStore() {
       const data = await api.getAllProjects();
       setProjects(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error desconocido');
+      setError(getErrorMessage(err));
     } finally {
       setIsLoading(false);
     }
@@ -116,7 +116,7 @@ export function createProjectStore() {
       console.log('✅ [STORE] Proyectos recargados exitosamente');
     } catch (err) {
       console.error('❌ [STORE] Error en updateProject:', err);
-      setError(err instanceof Error ? err.message : 'Error desconocido');
+      setError(getErrorMessage(err));
       throw err;
     } finally {
       setIsLoading(false);
@@ -193,7 +193,7 @@ export function createProjectStore() {
       setDataVersion((v) => v + 1);
     } catch (err) {
       if (requestId !== latestLoadRequestId) return;
-      setError(err instanceof Error ? err.message : 'Error desconocido');
+      setError(getErrorMessage(err));
     } finally {
       if (requestId === latestLoadRequestId) {
         setIsLoading(false);
@@ -205,7 +205,7 @@ export function createProjectStore() {
     try {
       await api.openTerminal(path);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al abrir terminal');
+      setError(getErrorMessage(err));
       throw err;
     }
   }
@@ -225,7 +225,7 @@ export function createProjectStore() {
       setDataVersion((v) => v + 1);
     } catch (err) {
       if (requestId !== latestLoadRequestId) return;
-      setError(err instanceof Error ? err.message : 'Error desconocido');
+      setError(getErrorMessage(err));
     } finally {
       if (requestId === latestLoadRequestId) {
         setIsLoading(false);
@@ -244,7 +244,7 @@ export function createProjectStore() {
       setDataVersion((v) => v + 1);
     } catch (err) {
       if (requestId !== latestLoadRequestId) return;
-      setError(err instanceof Error ? err.message : 'Error desconocido');
+      setError(getErrorMessage(err));
     } finally {
       if (requestId === latestLoadRequestId) {
         setIsLoading(false);

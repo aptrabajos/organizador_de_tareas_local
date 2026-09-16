@@ -150,7 +150,7 @@ export default function Settings(props: { onClose: () => void }) {
       const cfg = await getConfig();
       setConfig(cfg);
     } catch (err) {
-      setError(`Error al cargar configuración: ${err}`);
+      setError(`Error al cargar configuración: ${getErrorMessage(err)}`);
     } finally {
       setIsLoading(false);
     }
@@ -177,7 +177,7 @@ export default function Settings(props: { onClose: () => void }) {
       setSuccessMessage('✅ Configuración guardada exitosamente');
       window.setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err) {
-      setError(`Error al guardar: ${err}`);
+      setError(`Error al guardar: ${getErrorMessage(err)}`);
     } finally {
       setIsSaving(false);
     }
@@ -199,7 +199,7 @@ export default function Settings(props: { onClose: () => void }) {
       setSuccessMessage('✅ Configuración reseteada');
       window.setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err) {
-      setError(`Error al resetear: ${err}`);
+      setError(`Error al resetear: ${getErrorMessage(err)}`);
     } finally {
       setIsLoading(false);
     }

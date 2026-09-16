@@ -9,6 +9,9 @@
  */
 export function getErrorMessage(err: unknown): string {
   if (typeof err === 'string') return err;
+  // Única excepción permitida a la regla `no-restricted-syntax` que prohíbe
+  // `instanceof Error`: este es EL lugar donde se centraliza ese chequeo.
+  // eslint-disable-next-line no-restricted-syntax
   if (err instanceof Error) return err.message;
   return 'Error desconocido';
 }
