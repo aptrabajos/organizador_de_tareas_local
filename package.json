@@ -1,6 +1,6 @@
 {
   "name": "gestor-proyectos",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "Gestor de proyectos multiplataforma con código optimizado y 100% tipado",
   "type": "module",
   "scripts": {

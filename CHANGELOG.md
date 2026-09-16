@@ -2,6 +2,59 @@
 
 Historial detallado de cambios del proyecto Gestor de Proyectos.
 
+## 2026-09-16 - v0.6.1
+
+**Nuevas caracteristicas:**
+
+- "Confirmar antes de eliminar" finalmente gobierna los borrados reversibles (B5)
+- unifica el tema en una sola fuente de verdad con modo auto real (B6)
+
+**Correcciones:**
+
+- el Dashboard muestra el error real del backend, y lo muestra (cierre de B7)
+- un panic con el lock tomado ya no deja la app muerta hasta el reinicio (B15)
+- el PDF repagina en vez de descartar el contenido sobrante (B3)
+- traduce al espanol los mensajes de error que el usuario puede accionar (B27)
+- get_work_session_status devuelve el path real y no el nombre del proyecto (B2)
+- get_project filtra la papelera y las dos operaciones de dos pasos van en transaccion (B4, B8)
+- compone el data URL del adjunto en un helper compartido (B1)
+- propaga el mensaje real del backend en vez de "Error desconocido" (B7)
+
+**Tests:**
+
+- guardia permanente del CABLEADO de ui.confirm_delete (cierre de B5)
+- alinea el mock de get_git_file_count con el contrato real (B21)
+- reemplaza el gate e2e falso de CSP por uno que si puede fallar (correccion de B9)
+
+**Otros cambios:**
+
+- merge: plan de fixes 26/27 bugs (fixes-base)
+- docs: actualiza ARQUITECTURA.md y CLAUDE.md tras eliminar el socket (B17)
+- chore: elimina los scripts de shell hook del socket borrado (B17)
+- chore: limpia el frontend del tracking manual eliminado (B17)
+- elimina los comandos de tracking manual sin consumidores (B17)
+- elimina TimeAggregator y conserva los tipos de sesion (B17)
+- elimina el socket de tracking manual y el SessionManager (B17)
+- chore: saca del indice los 30,9 MB de binarios de release-v0.3.0 (cierre de B26)
+- perf(db): los enlaces se cargan en lote y las 23 columnas viven en un solo lugar (B16)
+- perf: el conteo de subproyectos deja de ser secuencial y de pedirse dos veces (B18)
+- refactor(frontend): las 104 llamadas a console pasan por un logger con guarda de entorno (B23, parte 2/2)
+- refactor(backend): logging con niveles y la perilla log_level finalmente conectada (B23, parte 1/2)
+- una sola definicion de cada tipo y los atajos de Settings en un <For> (B20)
+- elimina GitInfo.tsx, componente sin ningun consumidor (B19)
+- borra los tres logs que nunca se ejecutan en Dashboard (B22)
+- chore: regenera los schemas de ACL tras quitar tauri-plugin-shell
+- chore: elimina la dependencia muerta de tauri-plugin-shell
+- security: restaura fs:deny-default y quita permisos sin consumidor (correccion de B10)
+- security: exige proyecto registrado y activo para operar git (B11)
+- docs: reorganiza la documentacion y la desacopla del numero de version (B25)
+- chore: saca artefactos binarios y el lockfile de npm del indice (B24, B26)
+- security: elimina los dos comandos de escritura sin validar y unifica el saneado de nombres (B12, B12b)
+- security: declara una CSP explicita y saca devtools de la config de ventana (B9)
+- security: reduce la capability del WebView al minimo que la app usa (B10, opcion B)
+- versiona src-tauri/Cargo.lock
+---
+
 ## 2026-08-14 - v0.6.0
 
 **Otros cambios:**
