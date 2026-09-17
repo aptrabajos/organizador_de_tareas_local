@@ -144,6 +144,41 @@ Los binarios estarán en `src-tauri/target/release/bundle/`
 3. **Trabajar**: Click en "🚀 Trabajar" abre terminal en la ruta del proyecto
 4. **Gestionar**: Editar, eliminar o abrir documentación
 
+## 💻 CLI `gestor` (desde la terminal)
+
+Además de la app gráfica hay una **CLI externa** que lee la misma base SQLite:
+navegá tus proyectos sin abrir la ventana. Te da un menú interactivo con `fzf` y
+comandos directos que te **llevan** a la carpeta del proyecto (`cd` real en tu shell).
+
+```bash
+# Menú interactivo: elegís y te deja parado en la carpeta
+gestor
+
+# Ir derecho a un proyecto (TAB completa los nombres existentes)
+gestor abrir CRM_Multas        # nombre exacto: va derecho
+gestor abrir multas            # varios matches: abre el menú ya acotado
+
+# Listar
+gestor list                    # nombre + ruta, uno por línea
+gestor list --grupos           # agrupado por grupo padre
+gestor list --con-papelera     # incluye los borrados
+
+# Dar de alta un proyecto
+gestor crear                   # asistente paso a paso, campo por campo
+                               # si la carpeta no existe, pregunta si crearla
+gestor crear "Mi Proyecto" --ruta ~/proyectos/mi_proyecto   # directo
+
+# Ayuda
+gestor ayuda
+```
+
+> **Cómo está montada:** el binario vive en `~/.local/bin/gestor` y hay una
+> **función de shell** en `~/.bashrc` / `~/.zshrc` que es la que hace el `cd` real
+> (un script hijo no puede cambiar el directorio del shell padre).
+> Requisitos: `sqlite3` (obligatorio) y `fzf` (opcional, mejora el menú).
+>
+> **📖 Documentación completa:** [`docs/cli.md`](./docs/cli.md)
+
 ## 📁 Estructura del Proyecto
 
 ```
@@ -201,6 +236,7 @@ _(Agregar screenshots cuando la UI esté lista)_
 
 - [`ARQUITECTURA.md`](./ARQUITECTURA.md) - **Arquitectura completa del proyecto** (¿Qué es Vite? ¿Cómo funciona todo? ¿Qué hace cada módulo Rust?)
 - [`docs/GUIA-DESARROLLO.md`](./docs/GUIA-DESARROLLO.md) - Guía completa de desarrollo
+- [`docs/cli.md`](./docs/cli.md) - La CLI `gestor`: menú `fzf`, `abrir`, `crear` y completado con TAB
 - [`docs/ESTADO-FUNCIONALIDADES.md`](./docs/ESTADO-FUNCIONALIDADES.md) - Qué está implementado y qué falta
 - [`TROUBLESHOOTING.md`](./TROUBLESHOOTING.md) - Problemas conocidos y soluciones
 - [`CLAUDE.md`](./CLAUDE.md) - Guía para desarrollo con Claude
