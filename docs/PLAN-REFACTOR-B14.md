@@ -73,9 +73,35 @@ Eso significa que el contrato que hay que preservar es chiquito y explícito. Lo
 
 ### 1.2 Dominios funcionales
 
-Rangos de línea sobre el código de producción. El archivo **ya trae separadores
-`// ==== ... ====`** por dominio, así que los cortes no son inventados: están
-marcados en el código.
+Rangos de línea sobre el código de producción. Los cortes **no son inventados**,
+pero tampoco salen de leer los separadores del archivo: cada rango se validó por
+inspección directa, contrastándolo contra las firmas de funciones y la estructura
+de bloques del `impl Database`, uno por uno. **La tabla de abajo es la fuente de
+verdad del corte.**
+
+Conviene ser exacto con lo que el archivo trae y lo que no, porque el ejecutor va
+a buscar esos separadores. Existen, pero con el formato largo —
+`// ==================== MÉTODOS PARA ARCHIVOS ADJUNTOS ====================` —
+y **solo cubren 7 de los 13 dominios de producción**:
+
+| Dominio con separador | Línea |
+| --------------------- | ----: |
+| Adjuntos | 1207 |
+| Journal | 1288 |
+| Todos | 1405 |
+| Estado / favoritos | 1528 |
+| Dashboard | 1628 |
+| Grupos de proyectos | 1719 |
+| Time tracking | 1896 |
+
+**Los otros seis dominios no tienen separador propio**: schema/migraciones,
+mantenimiento, proyectos, papelera, enlaces y actividad. Para esos, el corte se
+apoya únicamente en las firmas y en el inventario de esta sección.
+
+Dentro de `mod tests` hay otros cuatro separadores, con el mismo formato largo:
+*"Paso 1: Inicialización y CRUD de Proyectos"* (2412), *"Paso 2: CRUD de Links"*
+(2882), *"Paso 3: Journal, Todos, Attachments"* (3016) y *"Paso 4: Analytics,
+Status, Groups, Dashboard, Time Tracking"* (3306).
 
 | # | Dominio | Rango(s) de línea | Líneas aprox. | Funciones públicas | Privadas |
 | - | ------- | ----------------- | ------------: | ------------------ | -------- |
@@ -274,7 +300,8 @@ Eso es toda la fachada. No hay `pub use` de métodos, porque no hacen falta.
 ### 2.5 Los tests
 
 Los 86 tests **viajan con su dominio**, aprovechando que ya están agrupados por
-los separadores `// ==== Paso N: … ====` del archivo actual. Cada módulo termina
+los cuatro separadores `// ==================== Paso N: … ====================`
+del `mod tests` actual (2412, 2882, 3016, 3306). Cada módulo termina
 con su propio `#[cfg(test)] mod tests`.
 
 Los 7 helpers compartidos (`test_db`, `seed_project_at`, `seed_link`,
@@ -306,8 +333,31 @@ Eso importa para la verificación del punto 5.
    con sus comentarios, sus `debug!`/`error!`, su formato y hasta sus espacios.
    Prohibido "ya que estoy" arreglar un nombre, un `clippy`, un typo o un SQL.
 4. **El único cambio tolerado dentro de un commit de movimiento** es el mínimo
-   inevitable por visibilidad: `fn` → `pub(super) fn` en los cuatro helpers
-   cruzados, más la cabecera de `use` del archivo nuevo. Nada más.
+   inevitable por visibilidad y por imports: `fn` → `pub(super) fn` en los cuatro
+   helpers cruzados, la cabecera de `use` del archivo nuevo, y **retirar de
+   `mod.rs` los `use` que ese mismo corte dejó huérfanos**. Nada más.
+
+   > **Por qué el `use` huérfano se limpia acá y no recién en el commit 17.** La
+   > regla 2 y el criterio de salida de cada fase exigen
+   > `cargo clippy --all-targets -- -D warnings` limpio en **cada** commit. Al
+   > sacar un dominio de `mod.rs`, los `use` que solo ese dominio consumía quedan
+   > sin usuario: clippy los marca `unused_imports` y, con `-D warnings`, el
+   > commit falla **a mitad del refactor**. Peor todavía, el ejecutor no puede
+   > distinguir "corté mal el dominio" de "me sobró un `use`", que son problemas
+   > de gravedad opuesta.
+   >
+   > Sacar esos `use` es limpieza de imports, **no** un cambio de comportamiento:
+   > no toca una sola línea ejecutable y no viola el espíritu del *move* puro. El
+   > alcance es estricto — **solo** los `use` que quedaron huérfanos por ese corte,
+   > verificables porque clippy los nombra uno por uno. Cualquier otro `use` no se
+   > toca.
+   >
+   > *Opción B, evaluada y descartada:* correr clippy **sin** `-D warnings` durante
+   > las fases 1–3 y exigirlo estricto recién en la Fase 4. Funciona, pero apaga la
+   > red de seguridad justo en los 15 commits donde más código se mueve, que es
+   > exactamente cuando más la necesitás. **Se elige la opción A: `-D warnings`
+   > estricto de punta a punta, y el `use` huérfano se retira en el mismo commit
+   > que lo dejó huérfano.**
 5. **Cero cambios de esquema.** Ni una `ALTER TABLE`, ni un índice, ni un
    `PRAGMA`. El bloque de migraciones se mueve entero y tal cual.
 
@@ -326,7 +376,9 @@ Para cada dominio D, en el commit de D:
 6. `cargo build` → resolver **solo** errores de visibilidad y de `use` faltante.
    Si aparece un error que no es de esos dos tipos, **parate**: algo se movió mal.
 7. `cargo test` → 168 verdes, ni uno menos.
-8. `cargo clippy --all-targets -- -D warnings` → limpio (ver 4.6 sobre el orden).
+8. Retirar de `mod.rs` los `use` que el corte dejó huérfanos (regla 4 de 3.1:
+   solo esos, nada más) y correr
+   `cargo clippy --all-targets -- -D warnings` → limpio.
 9. `git add -A && git commit -m "checkpoint: extrae db/D.rs del monolito"`.
 
 ### 3.3 Orden de extracción (de lo más independiente a lo más acoplado)
@@ -382,7 +434,7 @@ español siguiendo `checkpoint: <descripción>` según `CLAUDE.md`.
 | Rama | `git switch -c refactor/db-modulos` |
 | Baseline de tests | `cd src-tauri && cargo test 2>&1 \| tee /tmp/db-refactor-baseline-tests.txt` |
 | Lista de tests | `cargo test -- --list \| sort > /tmp/db-refactor-baseline-testnames.txt` |
-| Snapshot de símbolos | `rg -n '^\s*(pub )?fn \|^pub (struct\|enum\|const)' src/db/mod.rs \| sd '^\d+:\s*' '' \| sort > /tmp/db-refactor-baseline-symbols.txt` |
+| Snapshot de símbolos | `rg -n '^\s*(pub )?fn \|^pub (struct\|enum\|const)' src/db/mod.rs \| sed -E 's/^[0-9]+:\s*//' \| sort > /tmp/db-refactor-baseline-symbols.txt` |
 | Snapshot de consumidores | `rg -no 'db\.[a-z_]+\(\|db::[A-Za-z_]+' src --glob '!src/db/**' \| sort > /tmp/db-refactor-baseline-consumers.txt` |
 | Clippy base | `cargo clippy --all-targets 2>&1 \| tail -20` |
 
@@ -413,7 +465,10 @@ checkpoint: extrae db/test_support.rs con los helpers compartidos de test
 ```
 
 **Criterio de salida por commit:** `cargo build` limpio, `cargo test` = 168 OK,
-`cargo clippy --all-targets -- -D warnings` sin hallazgos nuevos.
+`cargo clippy --all-targets -- -D warnings` sin hallazgos nuevos — **retirando en
+ese mismo commit los `use` que el corte dejó huérfanos en `mod.rs`** (regla 4 de
+3.1). El `-D warnings` es estricto desde el commit 1: no se afloja en las fases
+1–3 para reapretarlo en la 4.
 
 ---
 
@@ -446,11 +501,31 @@ checkpoint: extrae db/status.rs con estado, pin y orden de proyectos
 checkpoint: extrae db/tracking.rs con las sesiones de time tracking
 ```
 
-**Criterio de salida por commit:** idéntico a la Fase 1.
+**Criterio de salida por commit:** idéntico a la Fase 1 — incluida la limpieza de
+los `use` huérfanos de `mod.rs` dentro del mismo commit, que en esta fase es donde
+más va a aparecer (ocho dominios salen de golpe).
 **Nota sobre el commit 3:** es el más grande (247 líneas de producción) pero el
 más inofensivo — `new()` no llama a nada de ningún otro dominio. El riesgo no es
-técnico, es de dedo: cuidado con no perder ninguna de las **17** `ALTER TABLE`.
-Contalas antes y después: `rg -c 'ALTER TABLE' src/db/schema.rs` debe dar **17**.
+técnico, es de dedo: cuidado con no perder ninguna de las **17** `ALTER TABLE`
+de producción (líneas 143–293, todas dentro de `Database::new`). Contalas antes y
+después **anclando en la comilla de apertura del string SQL**:
+
+```bash
+rg -c '"ALTER TABLE' src/db/schema.rs      # debe dar 17
+```
+
+> **Por qué la comilla y no `rg -c 'ALTER TABLE'` a secas:** el conteo global
+> sobre el archivo da **19**, no 17, y confundiría al ejecutor. Son las 17 de
+> producción **más 2 menciones del texto en comentarios** que viajan con este
+> mismo commit: `mod.rs:3672` (*"las 21 `ALTER TABLE` de `Database::new()`"*) y
+> `mod.rs:3748` (*"Las columnas que las ALTER TABLE agregan"*), ambas dentro del
+> test de migraciones — que en esta tabla se mueve a `schema.rs` en los rangos
+> 2802–2816 y 3686–3844. Las dos menciones usan backtick o texto pelado, nunca
+> `"ALTER TABLE`, así que el ancla de la comilla las excluye y deja las 17 netas.
+>
+> Tampoco sirve anclar a principio de línea (`rg -c '^\s*"ALTER TABLE'`): da
+> **16**, porque una de las migraciones va inline dentro de su `conn.execute(...)`
+> en vez de ir sola en su línea.
 
 > **Dato verificado, y no coincide con lo que dice el código:** el comentario del
 > test de migraciones (`mod.rs:3672`) habla de *"las 21 `ALTER TABLE` de
@@ -484,7 +559,8 @@ checkpoint: extrae db/dashboard.rs con las consultas agregadas
 checkpoint: extrae db/trash.rs con la papelera y el tipo TrashItem
 ```
 
-**Criterio de salida por commit:** el mismo, más —solo en el commit 15— verificar
+**Criterio de salida por commit:** el mismo —con la limpieza de `use` huérfanos
+de `mod.rs` en el propio commit—, más —solo en el commit 15— verificar
 a mano que `commands/mod.rs:185` sigue compilando sin modificar (`crate::db::TrashItem`).
 
 ---
@@ -497,7 +573,7 @@ a mano que `commands/mod.rs:185` sigue compilando sin modificar (`crate::db::Tra
 | Commit | Archivos tocados | Qué hace |
 | ------ | ---------------- | -------- |
 | 16 | `db/mod.rs` | Deja solo: `use` mínimos, las 15 declaraciones `mod`, `pub use trash::TrashItem`, `struct Database`, `impl Database { fn conn() }`. Borra el `mod tests` vacío. |
-| 17 | todos los `db/*.rs` | Limpieza de imports: saca los `use` que quedaron sin usar, corre `cargo fmt` sobre `src/db/`, y cierra los warnings de `clippy`. |
+| 17 | todos los `db/*.rs` | Limpieza final: los `use` huérfanos de `mod.rs` ya se fueron commit a commit (regla 4 de 3.1); acá se barren los que quedaron **en los archivos nuevos**, se corre `cargo fmt` sobre `src/db/`, y se cierra cualquier warning residual de `clippy`. |
 
 **Commits sugeridos:**
 ```
@@ -558,7 +634,7 @@ diff <(rg -o '[a-z_0-9]+: test$' /tmp/db-refactor-baseline-testnames.txt | sort)
 **b) La superficie pública es la misma.**
 
 ```bash
-rg -n '^\s*pub fn |^\s*pub\(crate\) fn ' src/db/*.rs | sd '^.*?:\s*' '' | sort \
+rg -n '^\s*pub fn |^\s*pub\(crate\) fn ' src/db/*.rs | sed -E 's/^[^:]+:[0-9]+:\s*//' | sort \
   > /tmp/db-refactor-after-symbols.txt
 diff /tmp/db-refactor-baseline-symbols.txt /tmp/db-refactor-after-symbols.txt
 ```
@@ -618,8 +694,12 @@ El refactor está **listo** cuando, y solo cuando, se cumplen las ocho:
    aparece en el diff.
 6. `git diff --stat main..refactor/db-modulos -- src-tauri/src` toca **solo**
    `src-tauri/src/db/`.
-7. **Cero cambios de esquema**: `rg -c 'ALTER TABLE|CREATE TABLE|CREATE INDEX|PRAGMA' src/db/schema.rs`
-   da los mismos conteos que el baseline sobre `mod.rs`.
+7. **Cero cambios de esquema**:
+   `rg -c '"ALTER TABLE' src/db/schema.rs` da **17** (ver la nota del commit 3 de
+   la Fase 2: sin el ancla de la comilla el conteo se va a 19 por dos menciones
+   en comentarios del test de migraciones), y
+   `rg -c 'CREATE TABLE|CREATE INDEX|PRAGMA' src/db/schema.rs` da los mismos
+   conteos que el baseline sobre `mod.rs`.
 8. La app levanta con `pnpm run tauri:dev` y se ejerce a mano el recorrido
    completo: crear proyecto → agregar enlace / adjunto / entrada de journal /
    todo → armar un grupo con subproyecto → mandarlo a la papelera → restaurarlo →
@@ -755,7 +835,7 @@ comentarios son el registro de cuatro bugs ya pagados.**
 tiene **139 líneas de doc comment `///`**. Chequeo al final:
 
 ```bash
-rg -c '^\s*///' src/db/*.rs | sd '^.*:' '' | paste -sd+ | bc
+rg -c '^\s*///' src/db/*.rs | sed -E 's/^.*://' | awk '{t+=$1} END {print t}'
 ```
 
 Tiene que dar **139 o más** (más, solo si agregaste un doc comment de módulo por
