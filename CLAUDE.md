@@ -247,6 +247,10 @@ El script actualiza la versión en `package.json`, `Cargo.toml` y `tauri.conf.js
 - **Commits en español**: `checkpoint: <descripción de la tarea>`
 - Ejemplo: `checkpoint: implementa exportación a PDF`
 - **Releases**: `release: v{VERSION}` (generado por `scripts/release.sh`)
+- **Nada de commits automáticos**: cada commit se hace a mano y con `git add` de
+  archivos concretos, nunca `git add .`. Lint/tests automáticos, si hacen falta, van
+  como hooks en `.claude/settings.json`; `.mcp.json` es solo para servidores MCP
+  reales (procesos que quedan vivos), no para comandos sueltos.
 
 ---
 
