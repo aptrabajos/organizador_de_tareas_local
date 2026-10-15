@@ -64,3 +64,9 @@ gestor_de_proyectos_*.pdf
 
 # Archivo local: artefactos sacados del indice pero conservados en disco
 _archivo_local/
+
+# Caché generada por graphify (regenerable)
+graphify-out/
+
+# Registro de skills generado por gentle-ai (rutas absolutas de la máquina local)
+.atl/
