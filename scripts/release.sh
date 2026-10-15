@@ -12,6 +12,7 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 # Archivos de version
 PKG_JSON="$PROJECT_ROOT/package.json"
 CARGO_TOML="$PROJECT_ROOT/src-tauri/Cargo.toml"
+CARGO_LOCK="$PROJECT_ROOT/src-tauri/Cargo.lock"
 TAURI_CONF="$PROJECT_ROOT/src-tauri/tauri.conf.json"
 CHANGELOG="$PROJECT_ROOT/CHANGELOG.md"
 
@@ -90,6 +91,14 @@ update_version_files() {
     sed -i "s/^version = \"$old\"/version = \"$new\"/" "$CARGO_TOML"
     if ! grep -q "^version = \"$new\"" "$CARGO_TOML"; then
         echo -e "${RED}Error: no se pudo actualizar la version en Cargo.toml (esperaba \"$new\")${NC}" >&2
+        exit 1
+    fi
+
+    # Cargo.lock - sincroniza solo la entrada del propio paquete (--workspace
+    # no toca dependencias; --offline evita ir a la red)
+    cargo update --offline --workspace --quiet --manifest-path "$CARGO_TOML"
+    if ! grep -A1 '^name = "gestor-proyectos"$' "$CARGO_LOCK" | grep -q "^version = \"$new\""; then
+        echo -e "${RED}Error: no se pudo actualizar la version en Cargo.lock (esperaba \"$new\")${NC}" >&2
         exit 1
     fi
 
@@ -215,9 +224,9 @@ fi
 # Verificar que los archivos de version no tengan cambios sin commitear
 # (evita que una interrupcion a mitad de un release deje un bump sin
 # commitear que una re-ejecucion podria leer como version actual)
-if ! git diff --quiet HEAD -- "$PKG_JSON" "$CARGO_TOML" "$TAURI_CONF" "$CHANGELOG"; then
+if ! git diff --quiet HEAD -- "$PKG_JSON" "$CARGO_TOML" "$CARGO_LOCK" "$TAURI_CONF" "$CHANGELOG"; then
     echo -e "${RED}Error: hay cambios sin commitear en los archivos de version${NC}"
-    echo -e "${RED}(package.json, Cargo.toml, tauri.conf.json o CHANGELOG.md).${NC}"
+    echo -e "${RED}(package.json, Cargo.toml, Cargo.lock, tauri.conf.json o CHANGELOG.md).${NC}"
     echo -e "${RED}Commiteá o descartá esos cambios antes de correr release.sh.${NC}"
     exit 1
 fi
@@ -242,6 +251,7 @@ if $DRY_RUN; then
     echo -e "${YELLOW}[DRY RUN] Se actualizarian los siguientes archivos:${NC}"
     echo "  - package.json"
     echo "  - src-tauri/Cargo.toml"
+    echo "  - src-tauri/Cargo.lock"
     echo "  - src-tauri/tauri.conf.json"
     echo "  - CHANGELOG.md"
     echo ""
@@ -261,6 +271,7 @@ echo -e "${BLUE}[1/4] Actualizando version en archivos...${NC}"
 update_version_files "$CURRENT_VERSION" "$NEW_VERSION"
 echo "  ✓ package.json"
 echo "  ✓ src-tauri/Cargo.toml"
+echo "  ✓ src-tauri/Cargo.lock"
 echo "  ✓ src-tauri/tauri.conf.json"
 echo ""
 
@@ -273,7 +284,7 @@ echo ""
 
 # Paso 3: Commit
 echo -e "${BLUE}[3/4] Creando commit...${NC}"
-git add "$PKG_JSON" "$CARGO_TOML" "$TAURI_CONF" "$CHANGELOG"
+git add "$PKG_JSON" "$CARGO_TOML" "$CARGO_LOCK" "$TAURI_CONF" "$CHANGELOG"
 git commit -m "release: v${NEW_VERSION}"
 echo "  ✓ Commit creado"
 echo ""

@@ -238,7 +238,7 @@ Reglas de redacción para los de español:
 ./scripts/release.sh patch --dry-run    # muestra cambios sin aplicar
 ```
 
-El script actualiza la versión en `package.json`, `Cargo.toml` y `tauri.conf.json`, genera entrada en CHANGELOG.md desde los commits, crea commit (`release: vX.Y.Z`) y tag (`vX.Y.Z`).
+El script actualiza la versión en `package.json`, `Cargo.toml`, `Cargo.lock` (solo la entrada del propio paquete, vía `cargo update --offline --workspace`) y `tauri.conf.json`, genera entrada en CHANGELOG.md desde los commits, crea commit (`release: vX.Y.Z`) y tag (`vX.Y.Z`).
 
 ---
 
