@@ -379,7 +379,16 @@ Para cada dominio D, en el commit de D:
 8. Retirar de `mod.rs` los `use` que el corte dejó huérfanos (regla 4 de 3.1:
    solo esos, nada más) y correr
    `cargo clippy --all-targets -- -D warnings` → limpio.
-9. `git add -A && git commit -m "checkpoint: extrae db/D.rs del monolito"`.
+9. `git add` de los archivos concretos (`db/mod.rs`, `db/D.rs`, su spec) y
+   `git commit -m "checkpoint: extrae db/D.rs del monolito"`. Nunca `git add -A`
+   (regla de `CLAUDE.md`, "Nada de commits automáticos").
+
+> **Notas de ejecución (2026-10-16, desde el commit 4).** Los pasos 2–8 están
+> automatizados en `scripts/refactor-b14/` (ver su `README.md`). Los números de
+> línea de este plan son de `main@839a8e0`: cada commit los corre, así que los
+> rangos se ubican por nombre de función. El criterio de clippy `-D warnings` se
+> pudo exigir completo recién después de `05fa427`, que limpió 8 hallazgos previos
+> ubicados fuera de `db/`.
 
 ### 3.3 Orden de extracción (de lo más independiente a lo más acoplado)
 
