@@ -88,6 +88,24 @@ pub fn shell_escape_posix(value: &str) -> String {
     format!("'{}'", value.replace('\'', "'\\''"))
 }
 
+/// Obtener instancia de PlatformOperations según el OS actual
+pub fn get_platform() -> Box<dyn PlatformOperations> {
+    #[cfg(target_os = "windows")]
+    {
+        Box::new(windows::WindowsPlatform::new())
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        Box::new(linux::LinuxPlatform::new())
+    }
+
+    #[cfg(not(any(target_os = "windows", target_os = "linux")))]
+    {
+        panic!("Sistema operativo no soportado")
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -105,23 +123,5 @@ mod tests {
         let malicious = "foo'; rm -rf ~ #";
         let escaped = shell_escape_posix(malicious);
         assert_eq!(escaped, "'foo'\\''; rm -rf ~ #'");
-    }
-}
-
-/// Obtener instancia de PlatformOperations según el OS actual
-pub fn get_platform() -> Box<dyn PlatformOperations> {
-    #[cfg(target_os = "windows")]
-    {
-        Box::new(windows::WindowsPlatform::new())
-    }
-
-    #[cfg(target_os = "linux")]
-    {
-        Box::new(linux::LinuxPlatform::new())
-    }
-
-    #[cfg(not(any(target_os = "windows", target_os = "linux")))]
-    {
-        panic!("Sistema operativo no soportado")
     }
 }

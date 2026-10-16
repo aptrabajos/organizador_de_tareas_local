@@ -251,7 +251,7 @@ mod tests {
 
     /// Busca en el directorio del archivo original un sibling cuyo nombre empiece
     /// con `<nombre original>.corrupto-`, generado por `backup_corrupt_file`.
-    fn find_corrupt_backup(path: &PathBuf) -> Option<PathBuf> {
+    fn find_corrupt_backup(path: &std::path::Path) -> Option<PathBuf> {
         let dir = path.parent()?;
         let file_name = path.file_name()?.to_string_lossy().to_string();
         let prefix = format!("{}.corrupto-", file_name);

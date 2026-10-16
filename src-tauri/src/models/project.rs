@@ -119,6 +119,10 @@ pub struct UpdateProjectDTO {
     pub notes: Option<String>,
     pub image_data: Option<String>,
     // Group fields (v0.4.0)
+    /// Se acepta en el payload pero `update_project` lo ignora a propósito: el
+    /// cambio de grupo va solo por `assign_project_to_group`, que valida ciclos.
+    /// Lo cubre `test_update_project_does_not_change_parent_id`.
+    #[allow(dead_code)]
     pub parent_id: Option<i64>,
     pub group_color: Option<String>,
     pub group_icon: Option<String>,

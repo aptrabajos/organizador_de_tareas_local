@@ -160,21 +160,16 @@ impl LogLevel {
 }
 
 /// Sistema operativo a utilizar
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum OsOverride {
     /// Detectar automáticamente el sistema operativo
+    #[default]
     Auto,
     /// Forzar comportamiento de Linux
     Linux,
     /// Forzar comportamiento de Windows
     Windows,
-}
-
-impl Default for OsOverride {
-    fn default() -> Self {
-        Self::Auto
-    }
 }
 
 /// Programa detectado en el sistema
@@ -198,16 +193,6 @@ pub struct DetectedPrograms {
     pub browsers: Vec<DetectedProgram>,
     pub file_managers: Vec<DetectedProgram>,
     pub text_editors: Vec<DetectedProgram>,
-}
-
-/// Resultado de validación de script
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct ValidationResult {
-    pub valid: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub error: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub warning: Option<String>,
 }
 
 impl Default for ProgramConfig {
@@ -300,7 +285,6 @@ mod tests {
     fn test_shortcuts_config_default_keys() {
         let config = ShortcutsConfig::default();
         assert!(config.enabled);
-        let keys: Vec<&String> = config.shortcuts.keys().collect();
         assert_eq!(config.shortcuts.len(), 6);
         assert!(config.shortcuts.contains_key("new_project"));
         assert!(config.shortcuts.contains_key("search"));

@@ -18,7 +18,7 @@ pub struct TimeTrackingSession {
 }
 
 /// Estadísticas de tiempo para un proyecto
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct TimeStats {
     /// Tiempo total en segundos
     pub total_seconds: i64,
@@ -32,19 +32,6 @@ pub struct TimeStats {
     pub today_seconds: i64,
     /// Tiempo esta semana en segundos
     pub week_seconds: i64,
-}
-
-impl Default for TimeStats {
-    fn default() -> Self {
-        Self {
-            total_seconds: 0,
-            session_count: 0,
-            avg_session_seconds: 0,
-            longest_session_seconds: 0,
-            today_seconds: 0,
-            week_seconds: 0,
-        }
-    }
 }
 
 // ==================== TESTS ====================

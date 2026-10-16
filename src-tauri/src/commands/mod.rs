@@ -15,6 +15,7 @@ use std::sync::Mutex;
 // ==================== ACTIVE SESSION STATE ====================
 
 /// Estado global de la sesión de tracking activa
+#[derive(Default)]
 pub struct ActiveSessionState {
     pub session_id: Option<i64>,
     pub project_id: Option<i64>,
@@ -24,18 +25,6 @@ pub struct ActiveSessionState {
     /// o sea devolvía un nombre donde el contrato promete una ruta.
     pub project_path: Option<String>,
     pub started_at: Option<std::time::Instant>,
-}
-
-impl Default for ActiveSessionState {
-    fn default() -> Self {
-        Self {
-            session_id: None,
-            project_id: None,
-            project_name: None,
-            project_path: None,
-            started_at: None,
-        }
-    }
 }
 
 /// Wrapper thread-safe para el estado de sesión activa
