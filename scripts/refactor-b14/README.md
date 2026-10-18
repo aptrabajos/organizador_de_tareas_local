@@ -40,12 +40,14 @@ git commit -m "checkpoint: extrae db/<dominio>.rs ..."
   "name": "maintenance",
   "uses": ["use rusqlite::{params, Connection, Result};"],
   "test_uses": ["    use super::super::test_support::*;", "    use crate::db::Database;"],
+  "items": [],
   "prod":  [[58, 80, "texto exacto de la línea 58", "texto exacto de la línea 80"]],
   "tests": [[2182, 2210, "    #[test]", "    }"]]
 }
 ```
 
-Rangos 1-indexados e inclusivos. Cada rango se lleva también la línea en blanco
+`items` (opcional) son ítems de nivel módulo, como un `struct`, que van fuera del
+`impl Database`. Rangos 1-indexados e inclusivos. Cada rango se lleva también la línea en blanco
 que lo sigue. Si el rango es el último del bloque (lo sigue la llave `}` de cierre
 del `impl` o del `mod tests`), la llave se queda y se lleva la línea en blanco
 anterior.

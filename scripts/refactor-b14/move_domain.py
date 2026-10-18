@@ -9,6 +9,7 @@ spec = {
   "name": "maintenance",
   "uses": ["use rusqlite::...;", ...],          # cabecera del archivo nuevo
   "test_uses": ["use super::super::test_support::*;", ...],
+  "items": [[...], ...],                         # opcional: ítems de nivel módulo (fuera del impl)
   "prod":  [[inicio, fin, "texto exacto línea inicio", "texto exacto línea fin"], ...],
   "tests": [[inicio, fin, "texto inicio", "texto fin"], ...]
 }
@@ -56,10 +57,12 @@ def take(ranges):
     return blocks, removed
 
 
+item_blocks, rm_items = take(spec.get("items", []))
 prod_blocks, rm_prod = take(spec["prod"])
 test_blocks, rm_tests = take(spec.get("tests", []))
-if rm_prod & rm_tests:
-    sys.exit("rangos de producción y tests se superponen")
+if (rm_items & rm_prod) or (rm_items & rm_tests) or (rm_prod & rm_tests):
+    sys.exit("hay rangos que se superponen")
+rm_prod |= rm_items
 
 
 def join(blocks):
@@ -71,7 +74,11 @@ def join(blocks):
     return out
 
 
-body = list(spec["uses"]) + ["", "use super::Database;", "", "impl Database {"]
+body = list(spec["uses"]) + ["", "use super::Database;", ""]
+if item_blocks:
+    # Ítems de nivel módulo (structs, tipos) que van fuera del impl.
+    body += join(item_blocks) + [""]
+body += ["impl Database {"]
 body += join(prod_blocks) + ["}"]
 if test_blocks:
     body += ["", "#[cfg(test)]", "mod tests {"] + list(spec["test_uses"]) + [""]
