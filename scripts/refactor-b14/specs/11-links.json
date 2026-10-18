@@ -1,0 +1,20 @@
+{
+  "name": "links",
+  "uses": [
+    "use rusqlite::{params, Connection, Result};",
+    "use std::collections::HashMap;",
+    "",
+    "use crate::models::project::{CreateLinkDTO, ProjectLink, UpdateLinkDTO};"
+  ],
+  "test_uses": [
+    "    use super::super::test_support::*;",
+    "    use crate::models::project::{CreateLinkDTO, CreateProjectDTO, UpdateLinkDTO};"
+  ],
+  "prod": [
+    [587, 766, "    // Métodos para manejar enlaces de proyectos", "    }"]
+  ],
+  "tests": [
+    [1076, 1162, "    // ==================== B16: los enlaces se cargan en lote ====================", "    }"],
+    [1707, 1839, "    // ==================== Paso 2: CRUD de Links ====================", "    }"]
+  ]
+}
