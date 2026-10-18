@@ -5,17 +5,17 @@ use std::sync::Mutex;
 mod common;
 mod schema;
 mod maintenance;
+mod projects;
+mod trash;
+mod links;
+mod activity;
 mod attachments;
 mod journal;
 mod todos;
-mod activity;
 mod status;
-mod tracking;
-mod links;
-mod projects;
-mod groups;
 mod dashboard;
-mod trash;
+mod groups;
+mod tracking;
 
 #[cfg(test)]
 mod test_support;
@@ -94,8 +94,4 @@ mod tests {
         seed_project_at(&db, "Después del panic", "/tmp/despues");
         assert_eq!(db.get_all_projects().unwrap().len(), 2);
     }
-
-    // ==================== Paso 3: Journal, Todos, Attachments ====================
-
-    // ==================== Paso 4: Analytics, Status, Groups, Dashboard, Time Tracking ====================
 }
