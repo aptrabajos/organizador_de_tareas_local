@@ -72,11 +72,16 @@ for line in removed:
         available[line] -= 1
     else:
         missing.append(line)
-# Regla 4 del plan: retirar `use` huérfanos está permitido; se listan para revisión.
+# Regla 4 del plan: retirar `use` huérfanos y pasar un helper de `fn` a
+# `pub(super) fn` están permitidos; se listan aparte para revisión.
 uses = [l for l in missing if l.strip().startswith("use ")]
-code = [l for l in missing if l not in uses]
+indent = lambda l: l[: len(l) - len(l.lstrip())]
+vis = [l for l in missing if l.lstrip().startswith("fn ")
+       and available[indent(l) + "pub(super) " + l.lstrip()] > 0]
+code = [l for l in missing if l not in uses and l not in vis]
 print(f"{len(removed)} líneas no vacías quitadas de mod.rs")
 print(f"  `use` retirados (confirmar que clippy los marcaba huérfanos): {uses}")
+print(f"  `fn` -> `pub(super) fn` (regla 4): {[l.strip() for l in vis]}")
 print(f"  código faltante en {sys.argv[2]}: {code}")
 sys.exit(1 if code else 0)
 EOF
