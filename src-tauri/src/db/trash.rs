@@ -169,12 +169,30 @@ impl Database {
     /// Borrado físico de un proyecto y todos sus datos. Recibe la transacción
     /// YA abierta; NO valida el estado de papelera (eso es del caller).
     fn purge_project_internal(tx: &Connection, id: i64) -> Result<()> {
-        tx.execute("DELETE FROM project_links WHERE project_id = ?1", params![id])?;
-        tx.execute("DELETE FROM project_attachments WHERE project_id = ?1", params![id])?;
-        tx.execute("DELETE FROM project_journal WHERE project_id = ?1", params![id])?;
-        tx.execute("DELETE FROM project_todos WHERE project_id = ?1", params![id])?;
-        tx.execute("DELETE FROM project_activity WHERE project_id = ?1", params![id])?;
-        tx.execute("DELETE FROM time_tracking_sessions WHERE project_id = ?1", params![id])?;
+        tx.execute(
+            "DELETE FROM project_links WHERE project_id = ?1",
+            params![id],
+        )?;
+        tx.execute(
+            "DELETE FROM project_attachments WHERE project_id = ?1",
+            params![id],
+        )?;
+        tx.execute(
+            "DELETE FROM project_journal WHERE project_id = ?1",
+            params![id],
+        )?;
+        tx.execute(
+            "DELETE FROM project_todos WHERE project_id = ?1",
+            params![id],
+        )?;
+        tx.execute(
+            "DELETE FROM project_activity WHERE project_id = ?1",
+            params![id],
+        )?;
+        tx.execute(
+            "DELETE FROM time_tracking_sessions WHERE project_id = ?1",
+            params![id],
+        )?;
         tx.execute("DELETE FROM projects WHERE id = ?1", params![id])?;
         Ok(())
     }
@@ -185,9 +203,7 @@ impl Database {
         let conn = self.conn();
 
         let ids: Vec<i64> = {
-            let mut stmt = conn.prepare(
-                "SELECT id FROM projects WHERE deleted_at IS NOT NULL",
-            )?;
+            let mut stmt = conn.prepare("SELECT id FROM projects WHERE deleted_at IS NOT NULL")?;
             let rows = stmt.query_map([], |row| row.get::<_, i64>(0))?;
             rows.collect::<Result<Vec<_>>>()?
         };
@@ -274,8 +290,16 @@ mod tests {
         let created = db.create_project(test_project_dto()).unwrap();
         db.delete_project(created.id).unwrap();
         // No aparece en la lista principal ni en raíz...
-        assert!(db.get_all_projects().unwrap().iter().all(|p| p.id != created.id));
-        assert!(db.get_root_projects().unwrap().iter().all(|p| p.id != created.id));
+        assert!(db
+            .get_all_projects()
+            .unwrap()
+            .iter()
+            .all(|p| p.id != created.id));
+        assert!(db
+            .get_root_projects()
+            .unwrap()
+            .iter()
+            .all(|p| p.id != created.id));
         // ...pero SÍ está en la papelera...
         assert!(db.list_trash().unwrap().iter().any(|p| p.id == created.id));
         // ...y get_project YA NO lo devuelve (B4).
@@ -297,7 +321,11 @@ mod tests {
         db.delete_project(created.id).unwrap();
         db.restore_project(created.id).unwrap();
         // Vuelve a la lista y sale de la papelera.
-        assert!(db.get_all_projects().unwrap().iter().any(|p| p.id == created.id));
+        assert!(db
+            .get_all_projects()
+            .unwrap()
+            .iter()
+            .any(|p| p.id == created.id));
         assert!(db.list_trash().unwrap().is_empty());
     }
 
@@ -334,7 +362,8 @@ mod tests {
         let mut child_dto = test_project_dto();
         child_dto.name = "Hijo".to_string();
         let child = db.create_project(child_dto).unwrap();
-        db.assign_project_to_group(child.id, Some(group.id)).unwrap();
+        db.assign_project_to_group(child.id, Some(group.id))
+            .unwrap();
 
         db.delete_project(group.id).unwrap();
         // Grupo + hijo en la papelera, ninguno visible (sin huérfanos colgados).

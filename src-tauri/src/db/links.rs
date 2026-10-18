@@ -17,11 +17,11 @@ impl Database {
         )?;
 
         let id = conn.last_insert_rowid();
-        
+
         let mut stmt = conn.prepare(
             "SELECT id, project_id, link_type, title, url, created_at FROM project_links WHERE id = ?1"
         )?;
-        
+
         let link = stmt.query_row(params![id], |row| {
             Ok(ProjectLink {
                 id: row.get(0)?,
@@ -101,10 +101,14 @@ impl Database {
         Ok(by_project)
     }
 
-    pub(super) fn get_project_links_internal(&self, project_id: i64, conn: &Connection) -> Result<Vec<ProjectLink>> {
+    pub(super) fn get_project_links_internal(
+        &self,
+        project_id: i64,
+        conn: &Connection,
+    ) -> Result<Vec<ProjectLink>> {
         let mut stmt = conn.prepare(
             "SELECT id, project_id, link_type, title, url, created_at FROM project_links 
-             WHERE project_id = ?1 ORDER BY created_at DESC"
+             WHERE project_id = ?1 ORDER BY created_at DESC",
         )?;
 
         let links = stmt
@@ -157,7 +161,10 @@ impl Database {
         );
 
         // Crear parámetros con el ID al final
-        let mut params: Vec<&dyn rusqlite::ToSql> = param_values.iter().map(|s| s as &dyn rusqlite::ToSql).collect();
+        let mut params: Vec<&dyn rusqlite::ToSql> = param_values
+            .iter()
+            .map(|s| s as &dyn rusqlite::ToSql)
+            .collect();
         params.push(&id);
 
         conn.execute(&query, &*params)?;
@@ -166,7 +173,7 @@ impl Database {
         let mut stmt = conn.prepare(
             "SELECT id, project_id, link_type, title, url, created_at FROM project_links WHERE id = ?1"
         )?;
-        
+
         let updated_link = stmt.query_row(params![id], |row| {
             Ok(ProjectLink {
                 id: row.get(0)?,
@@ -203,11 +210,7 @@ mod tests {
         seed_link(&db, id, "beta");
         seed_link(&db, id, "gamma");
 
-        let esperado = vec![
-            "alfa".to_string(),
-            "beta".to_string(),
-            "gamma".to_string(),
-        ];
+        let esperado = vec!["alfa".to_string(), "beta".to_string(), "gamma".to_string()];
 
         // Los tres caminos de lectura comparten el mismo batch: si el agrupado por
         // project_id se rompe, se rompe en los tres.
@@ -234,7 +237,10 @@ mod tests {
             .links
             .as_ref()
             .expect("links debe ser Some(vec![]), no None");
-        assert!(links.is_empty(), "un proyecto sin enlaces no debe traer ninguno");
+        assert!(
+            links.is_empty(),
+            "un proyecto sin enlaces no debe traer ninguno"
+        );
     }
 
     #[test]
@@ -252,7 +258,10 @@ mod tests {
         // Este es el test que detecta un error de agrupación en el HashMap: con una
         // sola consulta para toda la lista, un `entry()` mal armado le cuelga los dos
         // enlaces al proyecto equivocado, o se los cuelga a los dos.
-        assert_eq!(link_titles(del_con), vec!["alfa".to_string(), "beta".to_string()]);
+        assert_eq!(
+            link_titles(del_con),
+            vec!["alfa".to_string(), "beta".to_string()]
+        );
         assert_eq!(link_titles(del_sin), Vec::<String>::new());
     }
 

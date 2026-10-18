@@ -13,7 +13,11 @@ impl Database {
         conn.execute(
             "INSERT INTO project_journal (project_id, content, tags)
              VALUES (?1, ?2, ?3)",
-            params![entry.project_id, entry.content, entry.tags.and_then(Self::empty_to_null)],
+            params![
+                entry.project_id,
+                entry.content,
+                entry.tags.and_then(Self::empty_to_null)
+            ],
         )?;
 
         let id = conn.last_insert_rowid();
@@ -63,7 +67,11 @@ impl Database {
         Ok(entries)
     }
 
-    pub fn update_journal_entry(&self, id: i64, updates: UpdateJournalEntryDTO) -> Result<JournalEntry> {
+    pub fn update_journal_entry(
+        &self,
+        id: i64,
+        updates: UpdateJournalEntryDTO,
+    ) -> Result<JournalEntry> {
         let conn = self.conn();
 
         let mut set_clauses = Vec::new();

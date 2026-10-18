@@ -2,20 +2,20 @@ use log::error;
 use rusqlite::Connection;
 use std::sync::Mutex;
 
-mod common;
-mod schema;
-mod maintenance;
-mod projects;
-mod trash;
-mod links;
 mod activity;
 mod attachments;
-mod journal;
-mod todos;
-mod status;
+mod common;
 mod dashboard;
 mod groups;
+mod journal;
+mod links;
+mod maintenance;
+mod projects;
+mod schema;
+mod status;
+mod todos;
 mod tracking;
+mod trash;
 
 #[cfg(test)]
 mod test_support;

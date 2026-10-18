@@ -52,15 +52,9 @@ impl Database {
             [],
         );
 
-        let _ = conn.execute(
-            "ALTER TABLE projects ADD COLUMN notes TEXT",
-            [],
-        );
+        let _ = conn.execute("ALTER TABLE projects ADD COLUMN notes TEXT", []);
 
-        let _ = conn.execute(
-            "ALTER TABLE projects ADD COLUMN image_data TEXT",
-            [],
-        );
+        let _ = conn.execute("ALTER TABLE projects ADD COLUMN image_data TEXT", []);
 
         // Agregar campos de tracking para analytics
         let _ = conn.execute(
@@ -163,20 +157,11 @@ impl Database {
         );
 
         // Agregar campos para sistema de grupos de proyectos (v0.4.0)
-        let _ = conn.execute(
-            "ALTER TABLE projects ADD COLUMN parent_id INTEGER",
-            [],
-        );
+        let _ = conn.execute("ALTER TABLE projects ADD COLUMN parent_id INTEGER", []);
 
-        let _ = conn.execute(
-            "ALTER TABLE projects ADD COLUMN group_color TEXT",
-            [],
-        );
+        let _ = conn.execute("ALTER TABLE projects ADD COLUMN group_color TEXT", []);
 
-        let _ = conn.execute(
-            "ALTER TABLE projects ADD COLUMN group_icon TEXT",
-            [],
-        );
+        let _ = conn.execute("ALTER TABLE projects ADD COLUMN group_icon TEXT", []);
 
         let _ = conn.execute(
             "ALTER TABLE projects ADD COLUMN is_group_expanded BOOLEAN DEFAULT 1",

@@ -12,12 +12,13 @@ impl Database {
     pub fn get_root_projects(&self) -> Result<Vec<Project>> {
         let conn = self.conn();
 
-        let mut stmt = conn.prepare(
-            &format!("SELECT {}
+        let mut stmt = conn.prepare(&format!(
+            "SELECT {}
              FROM projects
              WHERE parent_id IS NULL AND deleted_at IS NULL
-             ORDER BY display_order ASC, is_pinned DESC, pinned_order ASC, updated_at DESC", PROJECT_COLUMNS)
-        )?;
+             ORDER BY display_order ASC, is_pinned DESC, pinned_order ASC, updated_at DESC",
+            PROJECT_COLUMNS
+        ))?;
 
         let projects_without_links = stmt
             .query_map([], row_to_project)?
@@ -33,8 +34,7 @@ impl Database {
         let projects: Vec<Project> = projects_without_links
             .into_iter()
             .map(|mut project| {
-                project.links =
-                    Some(links_by_project.remove(&project.id).unwrap_or_default());
+                project.links = Some(links_by_project.remove(&project.id).unwrap_or_default());
                 project
             })
             .collect();
@@ -46,12 +46,13 @@ impl Database {
     pub fn get_subprojects(&self, parent_id: i64) -> Result<Vec<Project>> {
         let conn = self.conn();
 
-        let mut stmt = conn.prepare(
-            &format!("SELECT {}
+        let mut stmt = conn.prepare(&format!(
+            "SELECT {}
              FROM projects
              WHERE parent_id = ?1 AND deleted_at IS NULL
-             ORDER BY display_order ASC, name ASC", PROJECT_COLUMNS)
-        )?;
+             ORDER BY display_order ASC, name ASC",
+            PROJECT_COLUMNS
+        ))?;
 
         let projects_without_links = stmt
             .query_map([parent_id], row_to_project)?
@@ -67,8 +68,7 @@ impl Database {
         let projects: Vec<Project> = projects_without_links
             .into_iter()
             .map(|mut project| {
-                project.links =
-                    Some(links_by_project.remove(&project.id).unwrap_or_default());
+                project.links = Some(links_by_project.remove(&project.id).unwrap_or_default());
                 project
             })
             .collect();
@@ -252,7 +252,8 @@ mod tests {
         child_dto.name = "Standalone".to_string();
         let child = db.create_project(child_dto).unwrap();
         // Move into group
-        db.assign_project_to_group(child.id, Some(group.id)).unwrap();
+        db.assign_project_to_group(child.id, Some(group.id))
+            .unwrap();
         let subs = db.get_subprojects(group.id).unwrap();
         assert_eq!(subs.len(), 1);
         // Move back to root
@@ -266,7 +267,11 @@ mod tests {
         let db = test_db();
         let p = db.create_project(test_project_dto()).unwrap();
         let err = db.assign_project_to_group(p.id, Some(p.id)).unwrap_err();
-        assert!(err.contains("propio grupo padre"), "msg inesperado: {}", err);
+        assert!(
+            err.contains("propio grupo padre"),
+            "msg inesperado: {}",
+            err
+        );
         // No se escribió: sigue siendo raíz
         assert_eq!(db.get_project(p.id).unwrap().parent_id, None);
     }
@@ -304,7 +309,8 @@ mod tests {
         let mut child_dto = test_project_dto();
         child_dto.name = "Child".to_string();
         let child = db.create_project(child_dto).unwrap();
-        db.assign_project_to_group(child.id, Some(group.id)).unwrap();
+        db.assign_project_to_group(child.id, Some(group.id))
+            .unwrap();
 
         // Intentar cambiar parent_id por update_project debe ser IGNORADO
         db.update_project(

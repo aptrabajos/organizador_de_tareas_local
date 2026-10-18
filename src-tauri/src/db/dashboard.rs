@@ -10,13 +10,14 @@ impl Database {
 
     pub fn get_recent_projects(&self) -> Result<Vec<Project>> {
         let conn = self.conn();
-        let mut stmt = conn.prepare(
-            &format!("SELECT {}
+        let mut stmt = conn.prepare(&format!(
+            "SELECT {}
              FROM projects
              WHERE last_opened_at IS NOT NULL AND deleted_at IS NULL
              ORDER BY last_opened_at DESC
-             LIMIT 5", PROJECT_COLUMNS)
-        )?;
+             LIMIT 5",
+            PROJECT_COLUMNS
+        ))?;
 
         // `links` queda en None, igual que antes: el dashboard no los muestra.
         let projects_iter = stmt.query_map([], row_to_project)?;
@@ -38,7 +39,7 @@ impl Database {
              FROM project_todos pt
              JOIN projects p ON pt.project_id = p.id
              WHERE pt.is_completed = 0 AND p.deleted_at IS NULL
-             ORDER BY pt.created_at DESC"
+             ORDER BY pt.created_at DESC",
         )?;
 
         let todos_iter = stmt.query_map([], |row| {
@@ -62,7 +63,9 @@ impl Database {
         Ok(todos)
     }
 
-    pub fn get_recent_journal_entries(&self) -> Result<Vec<crate::models::project::DashboardJournalEntry>> {
+    pub fn get_recent_journal_entries(
+        &self,
+    ) -> Result<Vec<crate::models::project::DashboardJournalEntry>> {
         use crate::models::project::{DashboardJournalEntry, JournalEntry};
         let conn = self.conn();
         let mut stmt = conn.prepare(
@@ -73,7 +76,7 @@ impl Database {
              JOIN projects p ON pj.project_id = p.id
              WHERE p.deleted_at IS NULL
              ORDER BY pj.created_at DESC
-             LIMIT 5"
+             LIMIT 5",
         )?;
 
         let entries_iter = stmt.query_map([], |row| {

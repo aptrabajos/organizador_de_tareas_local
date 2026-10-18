@@ -49,8 +49,11 @@ impl Database {
         let id = conn.last_insert_rowid();
 
         let project = conn.query_row(
-            &format!("SELECT {}
-             FROM projects WHERE id = ?1", PROJECT_COLUMNS),
+            &format!(
+                "SELECT {}
+             FROM projects WHERE id = ?1",
+                PROJECT_COLUMNS
+            ),
             params![id],
             row_to_project,
         )?;
@@ -61,12 +64,13 @@ impl Database {
     pub fn get_all_projects(&self) -> Result<Vec<Project>> {
         let conn = self.conn();
 
-        let mut stmt = conn.prepare(
-            &format!("SELECT {}
+        let mut stmt = conn.prepare(&format!(
+            "SELECT {}
              FROM projects
              WHERE deleted_at IS NULL
-             ORDER BY display_order ASC, is_pinned DESC, pinned_order ASC, updated_at DESC", PROJECT_COLUMNS)
-        )?;
+             ORDER BY display_order ASC, is_pinned DESC, pinned_order ASC, updated_at DESC",
+            PROJECT_COLUMNS
+        ))?;
 
         let projects_without_links = stmt
             .query_map([], row_to_project)?
@@ -82,8 +86,7 @@ impl Database {
         let projects: Vec<Project> = projects_without_links
             .into_iter()
             .map(|mut project| {
-                project.links =
-                    Some(links_by_project.remove(&project.id).unwrap_or_default());
+                project.links = Some(links_by_project.remove(&project.id).unwrap_or_default());
                 project
             })
             .collect();
@@ -116,14 +119,17 @@ impl Database {
                 error!("❌ [DB] No se pudo obtener lock de conexión - posible deadlock");
                 return Err(rusqlite::Error::SqliteFailure(
                     rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_BUSY),
-                    None
+                    None,
                 ));
             }
         };
 
         let mut project = conn.query_row(
-            &format!("SELECT {}
-             FROM projects WHERE id = ?1 AND deleted_at IS NULL", PROJECT_COLUMNS),
+            &format!(
+                "SELECT {}
+             FROM projects WHERE id = ?1 AND deleted_at IS NULL",
+                PROJECT_COLUMNS
+            ),
             params![id],
             row_to_project,
         )?;
@@ -139,8 +145,11 @@ impl Database {
     }
 
     pub fn update_project(&self, id: i64, updates: UpdateProjectDTO) -> Result<Project> {
-        debug!("🗄️ [DB] Iniciando update_project en base de datos para ID: {}", id);
-        
+        debug!(
+            "🗄️ [DB] Iniciando update_project en base de datos para ID: {}",
+            id
+        );
+
         // Intentar obtener la conexión con timeout
         let conn = match self.conn.try_lock() {
             Ok(conn) => conn,
@@ -148,7 +157,7 @@ impl Database {
                 error!("❌ [DB] No se pudo obtener lock de conexión en update_project - posible deadlock");
                 return Err(rusqlite::Error::SqliteFailure(
                     rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_BUSY),
-                    None
+                    None,
                 ));
             }
         };
@@ -218,10 +227,13 @@ impl Database {
         // Para diagnosticar alcanza con el id afectado y las filas modificadas.
 
         let params_ref: Vec<&dyn rusqlite::ToSql> = params.iter().map(|p| p.as_ref()).collect();
-        
+
         match conn.execute(&query, params_ref.as_slice()) {
             Ok(rows_affected) => {
-                debug!("🗄️ [DB] UPDATE ejecutado exitosamente, filas afectadas: {}", rows_affected);
+                debug!(
+                    "🗄️ [DB] UPDATE ejecutado exitosamente, filas afectadas: {}",
+                    rows_affected
+                );
             }
             Err(e) => {
                 debug!("🗄️ [DB] ERROR en UPDATE: {}", e);
@@ -232,7 +244,7 @@ impl Database {
         // Liberar la conexión antes de llamar a get_project
         debug!("🔓 [DB] Liberando conexión después del UPDATE");
         drop(conn); // Liberar explícitamente la conexión
-        
+
         debug!("🔍 [DB] Obteniendo proyecto actualizado con ID: {}", id);
         let result = self.get_project(id);
         match &result {
@@ -274,8 +286,7 @@ impl Database {
     /// './' intermedio, symlink) apuntando al mismo directorio real.
     pub fn active_project_paths(&self) -> Result<Vec<String>> {
         let conn = self.conn();
-        let mut stmt =
-            conn.prepare("SELECT local_path FROM projects WHERE deleted_at IS NULL")?;
+        let mut stmt = conn.prepare("SELECT local_path FROM projects WHERE deleted_at IS NULL")?;
         let rows = stmt.query_map([], |row| row.get::<_, String>(0))?;
         rows.collect()
     }
@@ -305,8 +316,7 @@ impl Database {
         let projects: Vec<Project> = projects_without_links
             .into_iter()
             .map(|mut project| {
-                project.links =
-                    Some(links_by_project.remove(&project.id).unwrap_or_default());
+                project.links = Some(links_by_project.remove(&project.id).unwrap_or_default());
                 project
             })
             .collect();
@@ -327,7 +337,9 @@ mod tests {
         let db = test_db();
         let created = db.create_project(test_project_dto()).unwrap();
 
-        let fetched = db.get_project(created.id).expect("un proyecto activo debe leerse");
+        let fetched = db
+            .get_project(created.id)
+            .expect("un proyecto activo debe leerse");
         assert_eq!(fetched.id, created.id);
     }
 
@@ -394,7 +406,9 @@ mod tests {
 
         assert!(!db.is_registered_project_path("/home/user/alpha/").unwrap());
         assert!(!db.is_registered_project_path("/home/user/./alpha").unwrap());
-        assert!(!db.is_registered_project_path("/home/user/alpha/sub").unwrap());
+        assert!(!db
+            .is_registered_project_path("/home/user/alpha/sub")
+            .unwrap());
     }
 
     #[test]
@@ -440,8 +454,14 @@ mod tests {
             group_icon: Some("rocket".to_string()),
         };
         let project = db.create_project(dto).unwrap();
-        assert_eq!(project.documentation_url.as_deref(), Some("https://docs.example.com"));
-        assert_eq!(project.drive_link.as_deref(), Some("https://drive.google.com/xxx"));
+        assert_eq!(
+            project.documentation_url.as_deref(),
+            Some("https://docs.example.com")
+        );
+        assert_eq!(
+            project.drive_link.as_deref(),
+            Some("https://drive.google.com/xxx")
+        );
         assert_eq!(project.notes.as_deref(), Some("Some notes"));
         assert_eq!(project.group_color.as_deref(), Some("#FF0000"));
         assert_eq!(project.group_icon.as_deref(), Some("rocket"));

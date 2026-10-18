@@ -39,7 +39,7 @@ impl Database {
     }
 
     pub fn get_project_stats(&self) -> Result<crate::models::project::ProjectStats> {
-        use crate::models::project::{ProjectStats, ProjectActivity};
+        use crate::models::project::{ProjectActivity, ProjectStats};
 
         let conn = self.conn();
 
@@ -51,12 +51,14 @@ impl Database {
         )?;
 
         // Proyectos activos hoy
-        let active_today: i64 = conn.query_row(
-            "SELECT COUNT(DISTINCT project_id) FROM project_activity
+        let active_today: i64 = conn
+            .query_row(
+                "SELECT COUNT(DISTINCT project_id) FROM project_activity
              WHERE DATE(created_at) = DATE('now')",
-            [],
-            |row| row.get(0),
-        ).unwrap_or(0);
+                [],
+                |row| row.get(0),
+            )
+            .unwrap_or(0);
 
         // Tiempo total en horas
         let total_seconds: i64 = conn.query_row(
@@ -80,20 +82,21 @@ impl Database {
             "SELECT id, project_id, activity_type, description, duration_seconds, created_at
              FROM project_activity
              ORDER BY created_at DESC
-             LIMIT 20"
+             LIMIT 20",
         )?;
 
-        let activities = stmt.query_map([], |row| {
-            Ok(ProjectActivity {
-                id: row.get(0)?,
-                project_id: row.get(1)?,
-                activity_type: row.get(2)?,
-                description: row.get(3)?,
-                duration_seconds: row.get(4)?,
-                created_at: row.get(5)?,
-            })
-        })?
-        .collect::<Result<Vec<_>>>()?;
+        let activities = stmt
+            .query_map([], |row| {
+                Ok(ProjectActivity {
+                    id: row.get(0)?,
+                    project_id: row.get(1)?,
+                    activity_type: row.get(2)?,
+                    description: row.get(3)?,
+                    duration_seconds: row.get(4)?,
+                    created_at: row.get(5)?,
+                })
+            })?
+            .collect::<Result<Vec<_>>>()?;
 
         Ok(ProjectStats {
             total_projects,
@@ -104,7 +107,11 @@ impl Database {
         })
     }
 
-    pub fn get_project_activities(&self, project_id: i64, limit: i64) -> Result<Vec<crate::models::project::ProjectActivity>> {
+    pub fn get_project_activities(
+        &self,
+        project_id: i64,
+        limit: i64,
+    ) -> Result<Vec<crate::models::project::ProjectActivity>> {
         use crate::models::project::ProjectActivity;
 
         let conn = self.conn();
@@ -114,20 +121,21 @@ impl Database {
              FROM project_activity
              WHERE project_id = ?1
              ORDER BY created_at DESC
-             LIMIT ?2"
+             LIMIT ?2",
         )?;
 
-        let activities = stmt.query_map(params![project_id, limit], |row| {
-            Ok(ProjectActivity {
-                id: row.get(0)?,
-                project_id: row.get(1)?,
-                activity_type: row.get(2)?,
-                description: row.get(3)?,
-                duration_seconds: row.get(4)?,
-                created_at: row.get(5)?,
-            })
-        })?
-        .collect::<Result<Vec<_>>>()?;
+        let activities = stmt
+            .query_map(params![project_id, limit], |row| {
+                Ok(ProjectActivity {
+                    id: row.get(0)?,
+                    project_id: row.get(1)?,
+                    activity_type: row.get(2)?,
+                    description: row.get(3)?,
+                    duration_seconds: row.get(4)?,
+                    created_at: row.get(5)?,
+                })
+            })?
+            .collect::<Result<Vec<_>>>()?;
 
         Ok(activities)
     }

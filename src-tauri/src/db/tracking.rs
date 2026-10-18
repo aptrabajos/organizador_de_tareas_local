@@ -47,7 +47,11 @@ impl Database {
     }
 
     /// Obtener sesiones de tracking de un proyecto
-    pub fn get_tracking_sessions(&self, project_id: i64, limit: i64) -> Result<Vec<crate::tracking::aggregator::TimeTrackingSession>> {
+    pub fn get_tracking_sessions(
+        &self,
+        project_id: i64,
+        limit: i64,
+    ) -> Result<Vec<crate::tracking::aggregator::TimeTrackingSession>> {
         use crate::tracking::aggregator::TimeTrackingSession;
 
         let conn = self.conn();
@@ -57,38 +61,44 @@ impl Database {
              FROM time_tracking_sessions
              WHERE project_id = ?1
              ORDER BY started_at DESC
-             LIMIT ?2"
+             LIMIT ?2",
         )?;
 
-        let sessions = stmt.query_map(params![project_id, limit], |row| {
-            Ok(TimeTrackingSession {
-                id: row.get(0)?,
-                project_id: row.get(1)?,
-                started_at: row.get(2)?,
-                ended_at: row.get(3)?,
-                duration_seconds: row.get(4)?,
-                source: row.get(5)?,
-            })
-        })?
-        .collect::<Result<Vec<_>>>()?;
+        let sessions = stmt
+            .query_map(params![project_id, limit], |row| {
+                Ok(TimeTrackingSession {
+                    id: row.get(0)?,
+                    project_id: row.get(1)?,
+                    started_at: row.get(2)?,
+                    ended_at: row.get(3)?,
+                    duration_seconds: row.get(4)?,
+                    source: row.get(5)?,
+                })
+            })?
+            .collect::<Result<Vec<_>>>()?;
 
         Ok(sessions)
     }
 
     /// Obtener estadísticas de tiempo para un proyecto
-    pub fn get_time_stats(&self, project_id: i64) -> Result<crate::tracking::aggregator::TimeStats> {
+    pub fn get_time_stats(
+        &self,
+        project_id: i64,
+    ) -> Result<crate::tracking::aggregator::TimeStats> {
         use crate::tracking::aggregator::TimeStats;
 
         let conn = self.conn();
 
         // Tiempo total y número de sesiones
-        let (total_seconds, session_count): (i64, i64) = conn.query_row(
-            "SELECT COALESCE(SUM(duration_seconds), 0), COUNT(*)
+        let (total_seconds, session_count): (i64, i64) = conn
+            .query_row(
+                "SELECT COALESCE(SUM(duration_seconds), 0), COUNT(*)
              FROM time_tracking_sessions
              WHERE project_id = ?1 AND duration_seconds IS NOT NULL",
-            params![project_id],
-            |row| Ok((row.get(0)?, row.get(1)?)),
-        ).unwrap_or((0, 0));
+                params![project_id],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .unwrap_or((0, 0));
 
         // Promedio de duración
         let avg_session_seconds = if session_count > 0 {
@@ -98,31 +108,37 @@ impl Database {
         };
 
         // Sesión más larga
-        let longest_session_seconds: i64 = conn.query_row(
-            "SELECT COALESCE(MAX(duration_seconds), 0)
+        let longest_session_seconds: i64 = conn
+            .query_row(
+                "SELECT COALESCE(MAX(duration_seconds), 0)
              FROM time_tracking_sessions
              WHERE project_id = ?1",
-            params![project_id],
-            |row| row.get(0),
-        ).unwrap_or(0);
+                params![project_id],
+                |row| row.get(0),
+            )
+            .unwrap_or(0);
 
         // Tiempo hoy
-        let today_seconds: i64 = conn.query_row(
-            "SELECT COALESCE(SUM(duration_seconds), 0)
+        let today_seconds: i64 = conn
+            .query_row(
+                "SELECT COALESCE(SUM(duration_seconds), 0)
              FROM time_tracking_sessions
              WHERE project_id = ?1 AND DATE(started_at) = DATE('now')",
-            params![project_id],
-            |row| row.get(0),
-        ).unwrap_or(0);
+                params![project_id],
+                |row| row.get(0),
+            )
+            .unwrap_or(0);
 
         // Tiempo esta semana (últimos 7 días)
-        let week_seconds: i64 = conn.query_row(
-            "SELECT COALESCE(SUM(duration_seconds), 0)
+        let week_seconds: i64 = conn
+            .query_row(
+                "SELECT COALESCE(SUM(duration_seconds), 0)
              FROM time_tracking_sessions
              WHERE project_id = ?1 AND started_at >= DATE('now', '-7 days')",
-            params![project_id],
-            |row| row.get(0),
-        ).unwrap_or(0);
+                params![project_id],
+                |row| row.get(0),
+            )
+            .unwrap_or(0);
 
         Ok(TimeStats {
             total_seconds,

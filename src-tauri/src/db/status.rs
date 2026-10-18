@@ -33,11 +33,13 @@ impl Database {
         // Si se está fijando, asignar un orden
         if new_pinned {
             // Obtener el máximo orden actual
-            let max_order: i64 = conn.query_row(
-                "SELECT COALESCE(MAX(pinned_order), 0) FROM projects WHERE is_pinned = 1",
-                [],
-                |row| row.get(0),
-            ).unwrap_or(0);
+            let max_order: i64 = conn
+                .query_row(
+                    "SELECT COALESCE(MAX(pinned_order), 0) FROM projects WHERE is_pinned = 1",
+                    [],
+                    |row| row.get(0),
+                )
+                .unwrap_or(0);
 
             conn.execute(
                 "UPDATE projects
@@ -114,7 +116,8 @@ mod tests {
     fn test_update_project_status() {
         let db = test_db();
         let p = db.create_project(test_project_dto()).unwrap();
-        db.update_project_status(p.id, "pausado".to_string()).unwrap();
+        db.update_project_status(p.id, "pausado".to_string())
+            .unwrap();
         let fetched = db.get_project(p.id).unwrap();
         assert_eq!(fetched.status.as_deref(), Some("pausado"));
     }
@@ -156,7 +159,8 @@ mod tests {
             ids.push(p.id);
         }
         // Reorder: [3, 1, 2]
-        db.reorder_pinned_projects(vec![ids[2], ids[0], ids[1]]).unwrap();
+        db.reorder_pinned_projects(vec![ids[2], ids[0], ids[1]])
+            .unwrap();
         let f0 = db.get_project(ids[2]).unwrap();
         let f1 = db.get_project(ids[0]).unwrap();
         let f2 = db.get_project(ids[1]).unwrap();
