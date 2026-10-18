@@ -46,4 +46,6 @@ git commit -m "checkpoint: extrae db/<dominio>.rs ..."
 ```
 
 Rangos 1-indexados e inclusivos. Cada rango se lleva también la línea en blanco
-que lo sigue, que tiene que estar vacía.
+que lo sigue. Si el rango es el último del bloque (lo sigue la llave `}` de cierre
+del `impl` o del `mod tests`), la llave se queda y se lleva la línea en blanco
+anterior.

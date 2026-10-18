@@ -35,8 +35,10 @@ def check(rng):
         sys.exit(f"guarda: línea {start} = {lines[start - 1]!r}, esperaba {first!r}")
     if lines[end - 1] != last:
         sys.exit(f"guarda: línea {end} = {lines[end - 1]!r}, esperaba {last!r}")
-    if lines[end] != "":
-        sys.exit(f"guarda: línea {end + 1} debería estar vacía: {lines[end]!r}")
+    if lines[end] not in ("", "}"):
+        sys.exit(f"guarda: línea {end + 1} debería estar vacía o ser '}}': {lines[end]!r}")
+    if lines[end] == "}" and lines[start - 2] != "":
+        sys.exit(f"guarda: el último bloque debe tener una línea vacía antes (línea {start - 1})")
 
 
 def take(ranges):
@@ -45,7 +47,12 @@ def take(ranges):
         check(rng)
         start, end = rng[0], rng[1]
         blocks.append(lines[start - 1:end])
-        removed |= set(range(start, end + 2))  # + la línea en blanco siguiente
+        if lines[end] == "":
+            removed |= set(range(start, end + 2))  # + la línea en blanco siguiente
+        else:
+            # Último bloque antes de la llave de cierre: la llave se queda y se
+            # lleva la línea en blanco anterior para no dejar un hueco.
+            removed |= set(range(start - 1, end + 1))
     return blocks, removed
 
 
