@@ -1,0 +1,19 @@
+{
+  "name": "dashboard",
+  "uses": [
+    "use rusqlite::Result;",
+    "",
+    "use super::common::{row_to_project, PROJECT_COLUMNS};",
+    "use crate::models::project::Project;"
+  ],
+  "test_uses": [
+    "    use super::super::test_support::*;",
+    "    use crate::models::project::{CreateTodoDTO, UpdateTodoDTO};"
+  ],
+  "prod": [
+    [282, 371, "    // ==================== DASHBOARD METHODS ====================", "    }"]
+  ],
+  "tests": [
+    [609, 652, "    // --- Dashboard ---", "    }"]
+  ]
+}
