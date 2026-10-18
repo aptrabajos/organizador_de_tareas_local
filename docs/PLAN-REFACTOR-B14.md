@@ -384,7 +384,8 @@ Para cada dominio D, en el commit de D:
    (regla de `CLAUDE.md`, "Nada de commits automáticos").
 
 > **Notas de ejecución (2026-10-16, desde el commit 4).** Los pasos 2–8 están
-> automatizados en `scripts/refactor-b14/` (ver su `README.md`). Los números de
+> automatizados en `scripts/refactor-b14/` (ver su `README.md`; se borraron al
+> mergear el B14 y siguen disponibles en `git show 91a61b4:scripts/refactor-b14/README.md`). Los números de
 > línea de este plan son de `main@839a8e0`: cada commit los corre, así que los
 > rangos se ubican por nombre de función. El criterio de clippy `-D warnings` se
 > pudo exigir completo recién después de `05fa427`, que limpió 8 hallazgos previos
