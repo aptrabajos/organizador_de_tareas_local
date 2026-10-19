@@ -23,16 +23,27 @@ impl Database {
     /// Los dos UPDATE van en UNA transacción. Antes eran dos `execute` sueltos bajo el
     /// mismo lock: si el segundo fallaba, la sesión quedaba cerrada y el tiempo
     /// trabajado se perdía en silencio, sin error y sin forma de recuperarlo.
-    pub fn end_tracking_session(&self, session_id: i64, duration_seconds: i64) -> Result<()> {
+    ///
+    /// Idempotente (P2/B3): sólo cierra una sesión que siga abierta. Si el primer
+    /// UPDATE no afecta ninguna fila (ya estaba cerrada o el id no existe), el del
+    /// contador NO corre: filtrar sólo el primero no alcanzaba, porque el segundo
+    /// sumaba igual y cerrar dos veces acreditaba dos veces. Devuelve `true` si cerró
+    /// la sesión y `false` si no había nada que cerrar.
+    pub fn end_tracking_session(&self, session_id: i64, duration_seconds: i64) -> Result<bool> {
         let conn = self.conn();
         let tx = conn.unchecked_transaction()?;
 
-        tx.execute(
+        let cerradas = tx.execute(
             "UPDATE time_tracking_sessions
              SET ended_at = CURRENT_TIMESTAMP, duration_seconds = ?1
-             WHERE id = ?2",
+             WHERE id = ?2 AND ended_at IS NULL",
             params![duration_seconds, session_id],
         )?;
+
+        if cerradas == 0 {
+            // Nada que cerrar: soltar `tx` sin commit es un rollback.
+            return Ok(false);
+        }
 
         // También actualizar el tiempo total del proyecto
         tx.execute(
@@ -43,7 +54,7 @@ impl Database {
         )?;
 
         tx.commit()?;
-        Ok(())
+        Ok(true)
     }
 
     /// Obtener sesiones de tracking de un proyecto
@@ -185,8 +196,10 @@ mod tests {
         assert_eq!(db.get_project(p.id).unwrap().total_time_seconds, Some(300));
 
         // Sesión que no existe: no explota y no toca el total.
-        db.end_tracking_session(999_999, 5_000)
+        let cerro = db
+            .end_tracking_session(999_999, 5_000)
             .expect("cerrar una sesión inexistente no debe ser un error duro");
+        assert!(!cerro, "una sesión inexistente no se cierra");
 
         assert_eq!(
             db.get_project(p.id).unwrap().total_time_seconds,
@@ -194,6 +207,30 @@ mod tests {
             "una sesión inexistente no debe sumar tiempo a ningún proyecto"
         );
         assert_eq!(db.get_tracking_sessions(p.id, 10).unwrap().len(), 1);
+    }
+
+    /// P2/B3: cerrar dos veces la misma sesión suma UNA vez. El segundo cierre (una
+    /// carrera entre dos caminos que cierran) devuelve `false` y no toca ni el
+    /// contador del proyecto ni la duración ni el `ended_at` de la sesión.
+    #[test]
+    fn test_end_tracking_session_twice_credits_once() {
+        let db = test_db();
+        let p = db.create_project(test_project_dto()).unwrap();
+        let session_id = db.create_tracking_session(p.id, "test").unwrap();
+
+        assert!(db.end_tracking_session(session_id, 300).unwrap());
+        let antes = db.get_tracking_sessions(p.id, 10).unwrap();
+
+        assert!(
+            !db.end_tracking_session(session_id, 900).unwrap(),
+            "el segundo cierre no debe cerrar nada"
+        );
+
+        assert_eq!(db.get_project(p.id).unwrap().total_time_seconds, Some(300));
+        let despues = db.get_tracking_sessions(p.id, 10).unwrap();
+        assert_eq!(despues.len(), 1);
+        assert_eq!(despues[0].duration_seconds, Some(300));
+        assert_eq!(despues[0].ended_at, antes[0].ended_at);
     }
 
     #[test]
