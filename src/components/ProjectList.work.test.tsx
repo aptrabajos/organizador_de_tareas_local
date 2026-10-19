@@ -44,7 +44,8 @@ afterEach(() => {
 
 const renderLista = (
   projects: Project[] = [proyecto],
-  onOpenTerminal = vi.fn()
+  onOpenTerminal = vi.fn(),
+  onProjectsChanged = vi.fn()
 ) =>
   render(() => (
     <ProjectList
@@ -52,6 +53,7 @@ const renderLista = (
       onEdit={vi.fn()}
       onDelete={vi.fn()}
       onOpenTerminal={onOpenTerminal}
+      onProjectsChanged={onProjectsChanged}
     />
   ));
 
@@ -186,6 +188,60 @@ describe('ProjectList: Parar', () => {
       expect.stringContaining('guardada: 2m'),
       expect.anything()
     );
+  });
+
+  it('Parar con tiempo guardado recarga la lista y muestra minutos y segundos', async () => {
+    const user = userEvent.setup();
+    const onProjectsChanged = vi.fn();
+    sesionActivaEn(1);
+    pisarComando('stop_work_session', () => Promise.resolve(417));
+    renderLista([proyecto], vi.fn(), onProjectsChanged);
+
+    await user.click(await screen.findByRole('button', { name: /parar/i }));
+
+    await waitFor(() => {
+      expect(onProjectsChanged).toHaveBeenCalledTimes(1);
+    });
+    expect(toast.success).toHaveBeenCalledWith(
+      expect.stringContaining('guardada: 6m 57s'),
+      expect.anything()
+    );
+  });
+
+  it('Parar sin tiempo guardado no recarga la lista', async () => {
+    const user = userEvent.setup();
+    const onProjectsChanged = vi.fn();
+    sesionActivaEn(1);
+    pisarComando('stop_work_session', () => Promise.resolve(0));
+    renderLista([proyecto], vi.fn(), onProjectsChanged);
+
+    await user.click(await screen.findByRole('button', { name: /parar/i }));
+
+    await waitFor(() => {
+      expect(toast.success).toHaveBeenCalled();
+    });
+    expect(onProjectsChanged).not.toHaveBeenCalled();
+  });
+
+  it('Trabajar que cierra la sesión anterior recarga la lista', async () => {
+    const user = userEvent.setup();
+    const onProjectsChanged = vi.fn();
+    pisarComando('start_work_session', () =>
+      Promise.resolve({
+        session_id: 7,
+        project_id: 1,
+        project_name: 'Proyecto 1',
+        previous_session_stopped: true,
+        tracking_initialized: true,
+      })
+    );
+    renderLista([proyecto], vi.fn(), onProjectsChanged);
+
+    await user.click(screen.getByRole('button', { name: /trabajar/i }));
+
+    await waitFor(() => {
+      expect(onProjectsChanged).toHaveBeenCalledTimes(1);
+    });
   });
 
   it('una sesión de 0 s avisa que no suma tiempo', async () => {

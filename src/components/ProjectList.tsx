@@ -72,12 +72,17 @@ interface ProjectListProps {
   currentGroup?: Project | null; // Grupo actual al que se ingresó (para mostrar su tarjeta como cabecera)
 }
 
-/** Duración legible para el aviso de "Parar" (ej: "1h 5m", "3m", "40 s"). */
+/**
+ * Duración legible para el aviso de "Parar" (ej: "1h 5m", "6m 57s", "3m", "40 s").
+ * Por debajo de la hora muestra los segundos: truncar 6m 57s a "6m" escondía casi
+ * un minuto de lo que se acababa de guardar.
+ */
 function formatStoppedDuration(seconds: number): string {
   const hrs = Math.floor(seconds / 3600);
   const mins = Math.floor((seconds % 3600) / 60);
+  const secs = seconds % 60;
   if (hrs > 0) return mins > 0 ? `${hrs}h ${mins}m` : `${hrs}h`;
-  if (mins > 0) return `${mins}m`;
+  if (mins > 0) return secs > 0 ? `${mins}m ${secs}s` : `${mins}m`;
   return `${seconds} s`;
 }
 
@@ -227,6 +232,11 @@ const ProjectList: Component<ProjectListProps> = (props) => {
     );
     if (session) {
       setActiveWorkProjectId(session.project_id);
+      // Cerrar la sesión anterior le sumó tiempo a otro proyecto: sin recargar,
+      // su tarjeta seguiría mostrando el total viejo.
+      if (session.previous_session_stopped) {
+        props.onProjectsChanged?.();
+      }
     }
   };
 
@@ -234,6 +244,11 @@ const ProjectList: Component<ProjectListProps> = (props) => {
     try {
       const seconds = await stopWorkSession();
       setActiveWorkProjectId(null);
+      // La sesión cerrada cambió el tiempo total del proyecto: se recarga la lista
+      // para que la tarjeta no siga mostrando el valor de antes de "Trabajar".
+      if (seconds !== null && seconds > 0) {
+        props.onProjectsChanged?.();
+      }
       if (seconds === null) {
         toast('No había una sesión activa para parar', { icon: 'ℹ️' });
       } else if (seconds > 0) {
