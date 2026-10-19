@@ -23,14 +23,13 @@ import {
   openUrl,
   createProjectBackup,
   syncProjectToBackup,
-  trackProjectOpen,
   togglePinProject,
   updateProjectStatus,
   updateProjectOrder,
   countSubprojects,
   exportProjectToPdf,
-  startWorkSession,
 } from '../services/api';
+import { trabajarEnProyecto } from '../utils/workSession';
 import { open } from '@tauri-apps/plugin-dialog';
 import { writeTextFile } from '@tauri-apps/plugin-fs';
 import { join, normalize, sep } from '@tauri-apps/api/path';
@@ -187,30 +186,7 @@ const ProjectList: Component<ProjectListProps> = (props) => {
   };
 
   const handleOpenTerminal = async (project: Project) => {
-    try {
-      // Registrar apertura del proyecto para analytics
-      await trackProjectOpen(project.id);
-
-      // Iniciar sesión de trabajo (tracking automático de tiempo)
-      const session = await startWorkSession(project.id);
-      logger.debug(`🕒 Sesión de trabajo iniciada: ${session.project_name}`);
-
-      if (session.tracking_initialized) {
-        toast.success(`📁 Tracking activado para ${project.name}`, {
-          duration: 2000,
-        });
-      }
-      if (session.previous_session_stopped) {
-        toast('⏱️ Sesión anterior guardada', { duration: 1500, icon: '✓' });
-      }
-
-      // Abrir terminal
-      await props.onOpenTerminal(project);
-    } catch (error) {
-      logger.error('Error al abrir proyecto:', error);
-      // Aunque falle el tracking, abrimos el terminal igual
-      await props.onOpenTerminal(project);
-    }
+    await trabajarEnProyecto(project, (p) => props.onOpenTerminal(p));
   };
 
   const handleTogglePin = async (project: Project) => {
