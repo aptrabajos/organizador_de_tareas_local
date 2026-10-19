@@ -107,22 +107,14 @@ impl Database {
     /// `purge_project` hacen su propio `SELECT deleted_at ... WHERE id = ?1` y exigen
     /// que el proyecto SÍ esté en papelera.
     pub fn get_project(&self, id: i64) -> Result<Project> {
-        // Intentar obtener la conexión con timeout.
-        // NO tocar este try_lock: es la posible cicatriz de un deadlock por reentrancia
-        // del Mutex y nadie documentó el motivo original (§6.6 del plan de auditoría).
-        let conn = match self.conn.try_lock() {
-            Ok(conn) => conn,
-            Err(_) => {
-                // Este log SÍ se queda, y en nivel `error`: sólo dispara en el camino de
-                // deadlock, no en cada invocación. Es diagnóstico real, no ruido, y es
-                // justo lo que querés seguir viendo aunque el nivel esté en `error`.
-                error!("❌ [DB] No se pudo obtener lock de conexión - posible deadlock");
-                return Err(rusqlite::Error::SqliteFailure(
-                    rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_BUSY),
-                    None,
-                ));
-            }
-        };
+        // `conn()` espera el lock y se recupera del envenenamiento, como el resto de
+        // la capa (P16). Antes era un `try_lock` que devolvía `SQLITE_BUSY` al instante
+        // si el Mutex estaba ocupado, justificado como "posible cicatriz de deadlock por
+        // reentrancia" sin que nadie documentara el caso. No hay reentrancia: el guard
+        // se le pasa a `get_project_links_internal`, `update_project` lo suelta antes
+        // de llamar acá y `get_project_with_children` llama sin tenerlo. La espera
+        // queda acotada por la consulta de quien tenga el lock.
+        let conn = self.conn();
 
         let mut project = conn.query_row(
             &format!(
@@ -150,17 +142,8 @@ impl Database {
             id
         );
 
-        // Intentar obtener la conexión con timeout
-        let conn = match self.conn.try_lock() {
-            Ok(conn) => conn,
-            Err(_) => {
-                error!("❌ [DB] No se pudo obtener lock de conexión en update_project - posible deadlock");
-                return Err(rusqlite::Error::SqliteFailure(
-                    rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_BUSY),
-                    None,
-                ));
-            }
-        };
+        // Mismo criterio que `get_project`: esperar el lock en vez de fallar.
+        let conn = self.conn();
 
         debug!("🔒 [DB] Conexión obtenida exitosamente para update_project");
 
@@ -329,6 +312,82 @@ impl Database {
 mod tests {
     use super::super::test_support::*;
     use crate::models::project::{CreateProjectDTO, UpdateProjectDTO};
+
+    // ============ P16: get_project/update_project esperan el lock ============
+
+    fn solo_nombre(name: &str) -> UpdateProjectDTO {
+        UpdateProjectDTO {
+            name: Some(name.to_string()),
+            description: None,
+            local_path: None,
+            documentation_url: None,
+            ai_documentation_url: None,
+            drive_link: None,
+            notes: None,
+            image_data: None,
+            parent_id: None,
+            group_color: None,
+            group_icon: None,
+        }
+    }
+
+    /// Con `try_lock`, un lock tomado por otro hilo hacía fallar `get_project` al
+    /// instante con `SQLITE_BUSY` ("Trabajar" lo llama primero). Ahora espera.
+    #[test]
+    fn test_get_project_waits_for_held_lock() {
+        let db = test_db();
+        let created = db.create_project(test_project_dto()).unwrap();
+        let (tomado_tx, tomado_rx) = std::sync::mpsc::channel();
+
+        std::thread::scope(|scope| {
+            scope.spawn(|| {
+                let _guard = db.conn.lock().unwrap();
+                tomado_tx.send(()).unwrap();
+                std::thread::sleep(std::time::Duration::from_millis(200));
+            });
+            // Recién cuando el otro hilo tiene el lock.
+            tomado_rx.recv().unwrap();
+
+            let inicio = std::time::Instant::now();
+            let fetched = db
+                .get_project(created.id)
+                .expect("get_project debe esperar el lock, no fallar");
+            assert_eq!(fetched.id, created.id);
+            assert!(
+                inicio.elapsed() >= std::time::Duration::from_millis(100),
+                "get_project tenía que esperar a que se soltara el lock"
+            );
+
+            let updated = db
+                .update_project(created.id, solo_nombre("Renombrado"))
+                .expect("update_project debe esperar el lock, no fallar");
+            assert_eq!(updated.name, "Renombrado");
+        });
+    }
+
+    /// `try_lock` tampoco se recuperaba del envenenamiento; `conn()` sí (B15).
+    #[test]
+    fn test_get_project_and_update_project_survive_poisoned_mutex() {
+        let db = test_db();
+        let created = db.create_project(test_project_dto()).unwrap();
+
+        let panicked = std::thread::scope(|scope| {
+            scope
+                .spawn(|| {
+                    let _guard = db.conn.lock().expect("el mutex arranca sano");
+                    panic!("panic deliberado con el lock de la conexión tomado");
+                })
+                .join()
+        });
+        assert!(panicked.is_err(), "el hilo tenía que entrar en panic");
+
+        db.get_project(created.id)
+            .expect("get_project tiene que funcionar con el mutex envenenado");
+        let updated = db
+            .update_project(created.id, solo_nombre("Tras el panic"))
+            .expect("update_project tiene que funcionar con el mutex envenenado");
+        assert_eq!(updated.name, "Tras el panic");
+    }
 
     // ==================== B4: get_project filtra la papelera ====================
 
