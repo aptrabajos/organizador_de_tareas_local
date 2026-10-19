@@ -1,4 +1,11 @@
-import { Component, For, Show, createSignal, createEffect } from 'solid-js';
+import {
+  Component,
+  For,
+  Show,
+  createSignal,
+  createEffect,
+  onMount,
+} from 'solid-js';
 import toast from 'solid-toast';
 import { getErrorMessage } from '../utils/errors';
 import { marked } from 'marked';
@@ -28,6 +35,8 @@ import {
   updateProjectOrder,
   countSubprojects,
   exportProjectToPdf,
+  stopWorkSession,
+  getWorkSessionStatus,
 } from '../services/api';
 import { trabajarEnProyecto } from '../utils/workSession';
 import { open } from '@tauri-apps/plugin-dialog';
@@ -61,6 +70,15 @@ interface ProjectListProps {
   onViewGroup?: (project: Project) => void; // Callback para navegar a subproyectos
   searchActive?: boolean; // Indica si hay una búsqueda activa (mostrar todos los resultados)
   currentGroup?: Project | null; // Grupo actual al que se ingresó (para mostrar su tarjeta como cabecera)
+}
+
+/** Duración legible para el aviso de "Parar" (ej: "1h 5m", "3m", "40 s"). */
+function formatStoppedDuration(seconds: number): string {
+  const hrs = Math.floor(seconds / 3600);
+  const mins = Math.floor((seconds % 3600) / 60);
+  if (hrs > 0) return mins > 0 ? `${hrs}h ${mins}m` : `${hrs}h`;
+  if (mins > 0) return `${mins}m`;
+  return `${seconds} s`;
 }
 
 const ProjectList: Component<ProjectListProps> = (props) => {
@@ -185,8 +203,56 @@ const ProjectList: Component<ProjectListProps> = (props) => {
     return DOMPurify.sanitize(html);
   };
 
+  // Proyecto con la sesión de trabajo activa (la que mide "Trabajar"). Decide en
+  // qué tarjeta aparece el botón "Parar". Se lee del backend al montar porque la
+  // sesión pudo haber arrancado desde otra vista (el Dashboard).
+  const [activeWorkProjectId, setActiveWorkProjectId] = createSignal<
+    number | null
+  >(null);
+
+  onMount(async () => {
+    try {
+      const status = await getWorkSessionStatus();
+      setActiveWorkProjectId(
+        status.is_tracking ? (status.project_id ?? null) : null
+      );
+    } catch (error) {
+      logger.error('Error leyendo la sesión de trabajo activa:', error);
+    }
+  });
+
   const handleOpenTerminal = async (project: Project) => {
-    await trabajarEnProyecto(project, (p) => props.onOpenTerminal(p));
+    const session = await trabajarEnProyecto(project, (p) =>
+      props.onOpenTerminal(p)
+    );
+    if (session) {
+      setActiveWorkProjectId(session.project_id);
+    }
+  };
+
+  const handleStopWork = async (project: Project) => {
+    try {
+      const seconds = await stopWorkSession();
+      setActiveWorkProjectId(null);
+      if (seconds === null) {
+        toast('No había una sesión activa para parar', { icon: 'ℹ️' });
+      } else if (seconds > 0) {
+        toast.success(
+          `⏹️ Sesión de ${project.name} guardada: ${formatStoppedDuration(seconds)}`,
+          { duration: 2500 }
+        );
+      } else {
+        toast.success(
+          `⏹️ Sesión de ${project.name} parada. Duró muy poco y no suma tiempo.`,
+          { duration: 2500 }
+        );
+      }
+    } catch (error) {
+      logger.error('Error al parar la sesión de trabajo:', error);
+      toast.error(
+        `No se pudo parar la sesión: ${getErrorMessage(error)}. Probá de nuevo.`
+      );
+    }
   };
 
   const handleTogglePin = async (project: Project) => {
@@ -775,26 +841,46 @@ const ProjectList: Component<ProjectListProps> = (props) => {
 
         {/* Action Buttons - Auto-grow to bottom */}
         <div class="mt-auto pt-3">
-          {/* Primary Action */}
-          <button
-            onClick={() => handleOpenTerminal(project)}
-            class="btn-primary mb-2 w-full justify-center gap-2"
-          >
-            <svg
-              class="h-4 w-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
+          {/* Primary Action: "Trabajar" y, con la sesión de este proyecto
+              activa, "Parar" al lado */}
+          <div class="mb-2 flex gap-2">
+            <button
+              onClick={() => handleOpenTerminal(project)}
+              class="btn-primary flex-1 justify-center gap-2"
             >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M13 10V3L4 14h7v7l9-11h-7z"
-              />
-            </svg>
-            Trabajar
-          </button>
+              <svg
+                class="h-4 w-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M13 10V3L4 14h7v7l9-11h-7z"
+                />
+              </svg>
+              Trabajar
+            </button>
+            <Show when={activeWorkProjectId() === project.id}>
+              <button
+                onClick={() => handleStopWork(project)}
+                class="btn-danger justify-center gap-2"
+                title="Parar la sesión de trabajo y guardar el tiempo"
+              >
+                <svg
+                  class="h-4 w-4"
+                  fill="currentColor"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
+                  <rect x="6" y="6" width="12" height="12" rx="1.5" />
+                </svg>
+                Parar
+              </button>
+            </Show>
+          </div>
 
           {/* Secondary Actions Grid */}
           <div class="grid grid-cols-5 gap-1">
