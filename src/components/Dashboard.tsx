@@ -1,14 +1,11 @@
 import { Component, createResource, For, Show } from 'solid-js';
-import {
-  getDashboardData,
-  openTerminal,
-  trackProjectOpen,
-} from '../services/api';
+import { getDashboardData, openTerminal } from '../services/api';
 import type { DashboardData } from '../types/dashboard';
 import { getErrorMessage } from '../utils/errors';
 import type { Project } from '../types/project';
 import toast from 'solid-toast';
 import { logger } from '../utils/logger';
+import { trabajarEnProyecto } from '../utils/workSession';
 
 interface DashboardProps {
   onProjectClick?: (project: Project) => void;
@@ -52,17 +49,22 @@ const Dashboard: Component<DashboardProps> = (props) => {
     }
   };
 
-  const handleOpenProject = async (project: Project) => {
+  const abrirTerminal = async (project: Project) => {
     try {
-      // Registrar apertura para analytics
-      await trackProjectOpen(project.id);
-      // Abrir terminal en el proyecto
       await openTerminal(project.local_path);
       toast.success(`Abriendo ${project.name}...`, { duration: 2000 });
     } catch (error) {
       logger.error('Error al abrir proyecto:', error);
-      toast.error('Error al abrir el proyecto');
+      toast.error(
+        `No se pudo abrir el terminal de ${project.name}: ${getErrorMessage(error)}`
+      );
     }
+  };
+
+  // Mismo flujo que "Trabajar" en la tarjeta del proyecto (P8): antes este botón
+  // abría el terminal sin arrancar la sesión, y el tiempo no se medía.
+  const handleOpenProject = async (project: Project) => {
+    await trabajarEnProyecto(project, abrirTerminal);
   };
 
   const handleNavigateToProject = (project: Project) => {
@@ -229,7 +231,7 @@ const Dashboard: Component<DashboardProps> = (props) => {
                         <button
                           onClick={() => handleOpenProject(project)}
                           class="rounded-lg bg-accent-500 p-1.5 text-white transition-colors hover:bg-accent-600"
-                          title="Abrir terminal"
+                          title="Trabajar: abrir terminal y medir el tiempo"
                         >
                           <svg
                             class="h-4 w-4"

@@ -8,9 +8,16 @@ vi.mock('../services/api', () => ({
   getDashboardData: vi.fn(),
   openTerminal: vi.fn(),
   trackProjectOpen: vi.fn(),
+  startWorkSession: vi.fn(),
 }));
 
-import { getDashboardData } from '../services/api';
+import toast from 'solid-toast';
+import {
+  getDashboardData,
+  openTerminal,
+  startWorkSession,
+  trackProjectOpen,
+} from '../services/api';
 
 describe('Dashboard', () => {
   const mockProject: Project = {
@@ -212,6 +219,58 @@ describe('Dashboard', () => {
       expect(mockOnProjectClick).toHaveBeenCalledWith(
         mockDashboardData.recent_projects[0]
       );
+    });
+  });
+
+  describe('Abrir usa el flujo de Trabajar (P8)', () => {
+    const TITULO = 'Trabajar: abrir terminal y medir el tiempo';
+
+    const clickAbrir = async () => {
+      vi.mocked(getDashboardData).mockResolvedValue(mockDashboardData);
+      render(() => <Dashboard onProjectClick={mockOnProjectClick} />);
+      await waitFor(() => {
+        expect(screen.getAllByTitle(TITULO).length).toBeGreaterThan(0);
+      });
+      screen.getAllByTitle(TITULO)[0].click();
+    };
+
+    it('arranca la sesión de trabajo y abre el terminal', async () => {
+      vi.mocked(trackProjectOpen).mockResolvedValue(undefined);
+      vi.mocked(startWorkSession).mockResolvedValue({
+        session_id: 7,
+        project_id: 1,
+        project_name: 'Proyecto Alpha',
+        previous_session_stopped: false,
+        tracking_initialized: false,
+      });
+      vi.mocked(openTerminal).mockResolvedValue(undefined);
+
+      await clickAbrir();
+
+      await waitFor(() => {
+        expect(openTerminal).toHaveBeenCalledWith('/home/user/alpha');
+      });
+      expect(trackProjectOpen).toHaveBeenCalledWith(1);
+      expect(startWorkSession).toHaveBeenCalledWith(1);
+      expect(toast.error).not.toHaveBeenCalled();
+    });
+
+    it('si la sesión no arranca, avisa en español y abre el terminal igual', async () => {
+      vi.mocked(trackProjectOpen).mockResolvedValue(undefined);
+      vi.mocked(startWorkSession).mockRejectedValue(
+        'El directorio del proyecto no existe: /home/user/alpha'
+      );
+      vi.mocked(openTerminal).mockResolvedValue(undefined);
+
+      await clickAbrir();
+
+      await waitFor(() => {
+        expect(openTerminal).toHaveBeenCalledWith('/home/user/alpha');
+      });
+      expect(toast.error).toHaveBeenCalledTimes(1);
+      const mensaje = vi.mocked(toast.error).mock.calls[0][0] as string;
+      expect(mensaje).toContain('No se pudo empezar a medir el tiempo');
+      expect(mensaje).toContain('El directorio del proyecto no existe');
     });
   });
 
