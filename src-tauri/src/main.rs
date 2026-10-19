@@ -14,52 +14,46 @@ mod tracking;
 use commands::ActiveSession;
 use config::ConfigManager;
 use db::Database;
-use log::{info, warn};
+use log::{error, info, warn};
 use tauri::Manager;
 
 fn main() {
     // El logger va PRIMERO: todo lo que sigue (resolver la DB, leer la config,
     // el auto-backup) ya loguea, y sin logger instalado esos records se tiran.
-    // Arranca en Info; el nivel real de `advanced.log_level` se aplica abajo,
-    // apenas la config esté leída.
+    // Arranca en Info; el nivel real de `advanced.log_level` se aplica apenas la
+    // config esté leída.
     logging::init();
 
-    // Ruta de la DB viva: misma resolución que usa `backup::restore_backup` para
-    // reemplazarla, así ambas quedan garantizadas en sync (una sola fuente de verdad).
-    let db_path = backup::live_db_path().expect("No se pudo resolver la ruta de la base de datos");
-
-    let db = Database::new(db_path).expect("Error al inicializar la base de datos");
-    let config_manager = ConfigManager::new().expect("Error al inicializar la configuración");
-    let active_session = ActiveSession::default();
-
-    // Acá la perilla `advanced.log_level` de Settings empieza a gobernar de verdad:
-    // hasta ahora el campo se validaba, se persistía y no tenía ni un consumidor.
-    // Si la config no se pudo leer se sigue con el Info del arranque: quedarse sin
-    // logs por no poder leer una preferencia sería el peor de los dos mundos.
-    match config_manager.get_config() {
-        Ok(cfg) => logging::apply_level(cfg.advanced.log_level),
-        Err(e) => warn!(
-            "⚠️ [LOG] No se pudo leer advanced.log_level, se mantiene 'info': {}",
-            e
-        ),
+    if let Err(e) = run() {
+        // Un fallo de arranque (la base no abre, la config no se puede crear) sale
+        // con el motivo en el log y código 1, no con un panic sin contexto.
+        error!("❌ [ARRANQUE] {}", e);
+        std::process::exit(1);
     }
+}
 
-    // Auto-backup al arrancar: si está activado y pasó el intervalo desde el último,
-    // crea un backup verificado. Corre sincrónico antes de abrir la ventana (rápido
-    // para una DB local; un destino lento/de red podría demorar el arranque). Si falla
-    // NO aborta: se loguea y la app abre igual.
-    if let Err(e) = backup::maybe_auto_backup(&db, &config_manager) {
-        warn!(
-            "⚠️ [AUTO-BACKUP] No se pudo crear el backup automático: {}",
-            e
-        );
-    }
-
-    tauri::Builder::default()
+/// Arranca la app en el orden que impone Tauri 2 (P11/D15, 3.8 del diseño del
+/// tracker). Verificado en `tauri-2.8.5/src/app.rs`:
+///
+/// 1. `Builder::build()` corre `initialize_plugins` al final. Ahí el plugin de
+///    instancia única intenta tomar su nombre en D-Bus y, si ya hay otra instancia,
+///    le reenvía los argumentos y hace `std::process::exit(0)`. O sea: la segunda
+///    instancia sale DENTRO de `build()`, sin haber tocado la base.
+/// 2. Entre `build()` y `run()` se abre la base, se lee la config y se registra el
+///    estado con `app.manage(...)`, todo síncrono y sin nada lento.
+/// 3. `App::run` crea las ventanas de `tauri.conf.json` en el `Ready` del event
+///    loop y RECIÉN DESPUÉS llama al closure de `.setup()`. Por eso el estado no
+///    puede registrarse en `.setup()`: un `invoke` del primer render podría llegar
+///    antes y fallar con "state not managed".
+///
+/// El trabajo lento (auto-backup) va en un hilo lanzado desde `.setup()`.
+fn run() -> Result<(), String> {
+    let app = tauri::Builder::default()
         // Auditoría (ALTO): sin guard de instancia única, dos copias de la app corrían
         // en paralelo contra el mismo archivo SQLite, duplicando tiempo trackeado en
         // silencio. Debe ir primero: si ya hay una instancia corriendo, este plugin
-        // aborta el arranque de la nueva y en su lugar reenfoca la ventana existente.
+        // aborta el arranque de la nueva (dentro de `build()`, ver `run`) y en su
+        // lugar reenfoca la ventana existente.
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             if let Some(window) = app.webview_windows().values().next() {
                 let _ = window.set_focus();
@@ -69,9 +63,12 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
-        .manage(db)
-        .manage(config_manager)
-        .manage(active_session)
+        // Lo único que corre en `.setup()` es lo que puede esperar: la ventana ya
+        // existe y el estado ya está registrado (ver `run`).
+        .setup(|app| {
+            spawn_auto_backup(app.handle().clone());
+            Ok(())
+        })
         // Auditoría (CRÍTICO): antes no había ningún on_window_event/CloseRequested
         // registrado, así que `stop_work_session` nunca se llamaba al cerrar la app:
         // la sesión de tracking activa quedaba con ended_at/duration_seconds en NULL
@@ -186,6 +183,65 @@ fn main() {
             commands::list_backups,
             commands::restore_backup,
         ])
-        .run(tauri::generate_context!())
-        .expect("Error al ejecutar la aplicación Tauri");
+        .build(tauri::generate_context!())
+        .map_err(|e| format!("No se pudo construir la aplicación Tauri: {}", e))?;
+
+    // Si llegamos acá, esta es la única instancia: el plugin ya habría salido
+    // dentro de `build()`. Recién ahora se abre (y migra) la base.
+    init_state(&app)?;
+
+    app.run(|_, _| {});
+    Ok(())
+}
+
+/// Abre la base, lee la config y registra el estado de los comandos. Corre entre
+/// `build()` y `run()`, antes de que exista ninguna ventana que pueda invocar.
+fn init_state(app: &tauri::App) -> Result<(), String> {
+    // Ruta de la DB viva: misma resolución que usa `backup::restore_backup` para
+    // reemplazarla, así ambas quedan garantizadas en sync (una sola fuente de verdad).
+    let db_path = backup::live_db_path()?;
+    let db = Database::new(db_path.clone()).map_err(|e| {
+        format!(
+            "No se pudo abrir la base de datos {}: {}",
+            db_path.display(),
+            e
+        )
+    })?;
+    let config_manager = ConfigManager::new()
+        .map_err(|e| format!("No se pudo inicializar la configuración: {}", e))?;
+
+    // Acá la perilla `advanced.log_level` de Settings empieza a gobernar de verdad:
+    // hasta ahora el campo se validaba, se persistía y no tenía ni un consumidor.
+    // Si la config no se pudo leer se sigue con el Info del arranque: quedarse sin
+    // logs por no poder leer una preferencia sería el peor de los dos mundos.
+    match config_manager.get_config() {
+        Ok(cfg) => logging::apply_level(cfg.advanced.log_level),
+        Err(e) => warn!(
+            "⚠️ [LOG] No se pudo leer advanced.log_level, se mantiene 'info': {}",
+            e
+        ),
+    }
+
+    app.manage(db);
+    app.manage(config_manager);
+    app.manage(ActiveSession::default());
+    Ok(())
+}
+
+/// Auto-backup al arrancar: si está activado y pasó el intervalo desde el último,
+/// crea un backup verificado. Va en un hilo para no demorar la ventana (un destino
+/// lento o de red podía trabar el arranque). Si falla NO aborta: se loguea y la app
+/// sigue. Mientras el `VACUUM INTO` tiene tomada la conexión, los comandos que usan
+/// la base esperan su turno en el mutex, igual que con cualquier otro comando.
+fn spawn_auto_backup(handle: tauri::AppHandle) {
+    std::thread::spawn(move || {
+        let db = handle.state::<Database>();
+        let config_manager = handle.state::<ConfigManager>();
+        if let Err(e) = backup::maybe_auto_backup(&db, &config_manager) {
+            warn!(
+                "⚠️ [AUTO-BACKUP] No se pudo crear el backup automático: {}",
+                e
+            );
+        }
+    });
 }

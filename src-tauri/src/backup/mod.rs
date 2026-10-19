@@ -524,9 +524,9 @@ fn restore_backup_to(backup_path: &str, live_path: &Path) -> Result<RestoreResul
 }
 
 /// Auto-backup al ARRANCAR la app: si está activado y corresponde por intervalo,
-/// crea un backup. Se llama UNA vez en el arranque (sin timers ni hilos vivos). El
-/// run_backup es sincrónico (rápido para una DB local). Nunca debe romper el arranque:
-/// el caller loguea el Err y sigue.
+/// crea un backup. Se llama UNA vez en el arranque (sin timers), desde un hilo que
+/// lanza `.setup()` en `main.rs` para no demorar la ventana. Nunca debe romper el
+/// arranque: el caller loguea el Err y sigue.
 pub fn maybe_auto_backup(db: &Database, config_mgr: &ConfigManager) -> Result<(), String> {
     let cfg = config_mgr.get_config()?;
     if !cfg.backup.auto_backup_enabled {
