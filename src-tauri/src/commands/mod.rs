@@ -1652,27 +1652,13 @@ fn start_new_session_sync(
     if let (Some(prev_session_id), Some(started_at)) =
         (session_state.session_id, session_state.started_at)
     {
-        // Calcular duración de la sesión anterior
-        let duration = started_at.elapsed().as_secs() as i64;
-
-        // Solo guardar si duró más de 10 segundos (evitar sesiones accidentales)
-        if duration > 10 {
-            debug!(
-                "⏹️ [WORK] Parando sesión anterior {} ({}s)",
-                prev_session_id, duration
-            );
-            db.end_tracking_session(prev_session_id, duration)
-                .map_err(|e| format!("Error stopping previous session: {}", e))?;
-            previous_stopped = true;
-        } else {
-            // Eliminar sesión muy corta
-            debug!(
-                "🗑️ [WORK] Descartando sesión muy corta {} ({}s)",
-                prev_session_id, duration
-            );
-            // Marcar como 0 segundos para que no cuente
-            let _ = db.end_tracking_session(prev_session_id, 0);
-        }
+        // Si el cierre falla, el error sube y el estado en memoria queda como estaba:
+        // la sesión anterior sigue activa y no se crea una fila nueva. Antes el cierre
+        // de las sesiones cortas descartaba su error (`let _`) y la fila podía quedar
+        // abierta para siempre.
+        let guardado = cerrar_sesion_de_trabajo(db, prev_session_id, started_at)
+            .map_err(|e| format!("Error stopping previous session: {}", e))?;
+        previous_stopped = guardado > 0;
     }
 
     // Limpiar estado previo (todavía bajo el mismo lock)
@@ -1684,7 +1670,7 @@ fn start_new_session_sync(
 
     // Crear nueva sesión de tracking (todavía bajo el mismo lock)
     let session_id = db
-        .create_tracking_session(project_id, "work_button")
+        .create_tracking_session(project_id, FUENTE_TRABAJAR)
         .map_err(|e| format!("Error creating tracking session: {}", e))?;
 
     // Publicar el nuevo estado global (todavía bajo el mismo lock)
@@ -1697,11 +1683,60 @@ fn start_new_session_sync(
     Ok((session_id, previous_stopped))
 }
 
+/// Fuente con la que "Trabajar" abre sus sesiones (`time_tracking_sessions.source`).
+/// Todas las sesiones que maneja `ActiveSession` son de esta fuente.
+const FUENTE_TRABAJAR: &str = "work_button";
+
+/// Fuente de las sesiones que abrirá el demonio por cambios en archivos. No tiene
+/// regla de duración mínima: la cubre el margen por guardado (diseño, 3.4).
+const FUENTE_ARCHIVOS: &str = "file_watch";
+
+/// Una sesión de "Trabajar" (o de una fuente vieja) que dura esto o menos no cuenta.
+const DURACION_MINIMA_SEGUNDOS: i64 = 10;
+
+/// Regla única de duración mínima (M8): cuántos segundos se guardan al cerrar una
+/// sesión de `source` que midió `segundos`.
+///
+/// La usan TODOS los cierres (cambio de proyecto, Parar y cierre de ventana). Antes
+/// la regla de los 10 s vivía solo en el cambio de proyecto, así que la misma sesión
+/// corta valía 0 o 5 s según cómo se cerrara. La fila se conserva igual, con su
+/// `ended_at` real; con 0 s no suma tiempo.
+pub(crate) fn duracion_a_guardar(source: &str, segundos: i64) -> i64 {
+    if source == FUENTE_ARCHIVOS || segundos > DURACION_MINIMA_SEGUNDOS {
+        segundos
+    } else {
+        0
+    }
+}
+
+/// Cierra en la base una sesión de "Trabajar" que arrancó en `started_at`, aplicando
+/// `duracion_a_guardar`. Devuelve los segundos guardados. El error de la base se
+/// propaga siempre, también cuando se guardan 0 s.
+fn cerrar_sesion_de_trabajo(
+    db: &Database,
+    session_id: i64,
+    started_at: std::time::Instant,
+) -> rusqlite::Result<i64> {
+    let medido = started_at.elapsed().as_secs() as i64;
+    let guardado = duracion_a_guardar(FUENTE_TRABAJAR, medido);
+
+    info!(
+        "⏹️ [WORK] Cerrando sesión {}: medidos {} s, guardados {} s",
+        session_id, medido, guardado
+    );
+
+    db.end_tracking_session(session_id, guardado)?;
+    Ok(guardado)
+}
+
 /// Lógica compartida para parar la sesión de tracking activa (si existe) y persistir
 /// su duración final. La usan tanto el comando `stop_work_session` (parada manual desde
 /// la UI) como el handler `on_window_event(CloseRequested)` en `main.rs` (parada
 /// best-effort al cerrar la ventana). Es síncrona a propósito: ambos call sites pueden
 /// invocarla sin `.await` (el handler de cierre de ventana no es async).
+///
+/// Devuelve los segundos GUARDADOS (con la regla de `duracion_a_guardar`), o `None` si
+/// no había sesión activa.
 pub fn stop_active_session_sync(
     db: &Database,
     active_session: &ActiveSession,
@@ -1714,14 +1749,7 @@ pub fn stop_active_session_sync(
     if let (Some(session_id), Some(started_at)) =
         (session_state.session_id, session_state.started_at)
     {
-        let duration = started_at.elapsed().as_secs() as i64;
-
-        info!(
-            "⏹️ [WORK] Parando sesión {} con {} segundos",
-            session_id, duration
-        );
-
-        db.end_tracking_session(session_id, duration)
+        let duration = cerrar_sesion_de_trabajo(db, session_id, started_at)
             .map_err(|e| format!("Error stopping session: {}", e))?;
 
         // Limpiar estado
@@ -1905,12 +1933,14 @@ mod backup_filename_sanitization_tests {
 #[cfg(test)]
 mod work_session_tests {
     use super::{
-        start_new_session_sync, stop_active_session_sync, work_session_status_sync, ActiveSession,
+        duracion_a_guardar, start_new_session_sync, stop_active_session_sync,
+        work_session_status_sync, ActiveSession,
     };
     use crate::db::Database;
     use crate::models::project::CreateProjectDTO;
     use std::path::PathBuf;
     use std::sync::Arc;
+    use std::time::{Duration, Instant};
 
     fn test_db() -> Database {
         Database::new(PathBuf::from(":memory:")).expect("Failed to create in-memory database")
@@ -2180,5 +2210,180 @@ mod work_session_tests {
         let stopped = stop_active_session_sync(&db, &active_session)
             .expect("no debería fallar aunque no haya sesión activa");
         assert_eq!(stopped, None);
+    }
+
+    // ============ M8: regla única de duración mínima ============
+    //
+    // La duración se inyecta corriendo hacia atrás el `started_at` de la sesión activa:
+    // ningún test duerme.
+
+    /// Simula que la sesión activa arrancó hace `segundos`.
+    fn sesion_activa_hace(active_session: &ActiveSession, segundos: u64) {
+        let mut state = active_session.0.lock().unwrap();
+        state.started_at = Some(
+            Instant::now()
+                .checked_sub(Duration::from_secs(segundos))
+                .expect("el reloj monotónico no llega tan atrás"),
+        );
+    }
+
+    fn arrancar(db: &Database, active_session: &ActiveSession, project_id: i64) -> i64 {
+        start_new_session_sync(db, active_session, project_id, "Proyecto", "/tmp/x")
+            .expect("start_work_session no debería fallar")
+            .0
+    }
+
+    fn sesion(
+        db: &Database,
+        project_id: i64,
+        session_id: i64,
+    ) -> crate::tracking::aggregator::TimeTrackingSession {
+        db.get_tracking_sessions(project_id, 50)
+            .unwrap()
+            .into_iter()
+            .find(|s| s.id == Some(session_id))
+            .expect("la sesión debería existir")
+    }
+
+    /// Hace fallar cualquier cierre de sesión (UPDATE) desde la base.
+    fn romper_cierres(db: &Database) {
+        db.execute_batch_para_tests(
+            "CREATE TRIGGER cierre_roto BEFORE UPDATE ON time_tracking_sessions
+             BEGIN SELECT RAISE(ABORT, 'cierre roto'); END;",
+        );
+    }
+
+    #[test]
+    fn duracion_a_guardar_aplica_los_10_s_salvo_a_file_watch() {
+        assert_eq!(duracion_a_guardar("work_button", 0), 0);
+        assert_eq!(duracion_a_guardar("work_button", 5), 0);
+        assert_eq!(duracion_a_guardar("work_button", 10), 0);
+        assert_eq!(duracion_a_guardar("work_button", 11), 11);
+        // Fuentes viejas: misma regla que "Trabajar".
+        assert_eq!(duracion_a_guardar("shell_hook", 7), 0);
+        assert_eq!(duracion_a_guardar("shell_hook", 3600), 3600);
+        // `file_watch` no tiene regla de 10 s (la cubre el margen por guardado).
+        assert_eq!(duracion_a_guardar("file_watch", 5), 5);
+    }
+
+    #[test]
+    fn parar_a_los_5_s_guarda_0_con_ended_at_real() {
+        let db = test_db();
+        let active_session = ActiveSession::default();
+        let project_id = seed_project(&db, "P");
+        let id = arrancar(&db, &active_session, project_id);
+        sesion_activa_hace(&active_session, 5);
+
+        let guardado = stop_active_session_sync(&db, &active_session).unwrap();
+
+        assert_eq!(guardado, Some(0));
+        let s = sesion(&db, project_id, id);
+        assert!(s.ended_at.is_some(), "la fila se cierra con su ended_at");
+        assert_eq!(s.duration_seconds, Some(0));
+        assert_eq!(db.get_time_stats(project_id).unwrap().total_seconds, 0);
+    }
+
+    #[test]
+    fn cambio_de_proyecto_a_los_5_s_guarda_0() {
+        let db = test_db();
+        let active_session = ActiveSession::default();
+        let a = seed_project(&db, "A");
+        let b = seed_project(&db, "B");
+        let id_a = arrancar(&db, &active_session, a);
+        sesion_activa_hace(&active_session, 5);
+
+        let (_, previous_stopped) =
+            start_new_session_sync(&db, &active_session, b, "B", "/tmp/b").unwrap();
+
+        assert!(
+            !previous_stopped,
+            "una sesión de 0 s no cuenta como guardada"
+        );
+        let s = sesion(&db, a, id_a);
+        assert!(s.ended_at.is_some());
+        assert_eq!(s.duration_seconds, Some(0));
+    }
+
+    #[test]
+    fn once_segundos_se_guardan_tal_cual_al_cambiar_de_proyecto() {
+        let db = test_db();
+        let active_session = ActiveSession::default();
+        let a = seed_project(&db, "A");
+        let b = seed_project(&db, "B");
+        let id_a = arrancar(&db, &active_session, a);
+        sesion_activa_hace(&active_session, 11);
+
+        let (_, previous_stopped) =
+            start_new_session_sync(&db, &active_session, b, "B", "/tmp/b").unwrap();
+
+        assert!(previous_stopped);
+        assert_eq!(sesion(&db, a, id_a).duration_seconds, Some(11));
+    }
+
+    #[test]
+    fn once_segundos_se_guardan_tal_cual_al_parar() {
+        let db = test_db();
+        let active_session = ActiveSession::default();
+        let project_id = seed_project(&db, "P");
+        let id = arrancar(&db, &active_session, project_id);
+        sesion_activa_hace(&active_session, 11);
+
+        // Mismo camino que el comando `stop_work_session`.
+        let guardado = stop_active_session_sync(&db, &active_session).unwrap();
+
+        assert_eq!(guardado, Some(11));
+        assert_eq!(sesion(&db, project_id, id).duration_seconds, Some(11));
+    }
+
+    /// El cierre de ventana (`on_window_event(CloseRequested)` en `main.rs`) llama a
+    /// `stop_active_session_sync`, igual que Parar. Se prueba aparte para que el
+    /// camino quede cubierto por nombre aunque algún día diverjan.
+    #[test]
+    fn once_segundos_se_guardan_tal_cual_al_cerrar_la_ventana() {
+        let db = test_db();
+        let active_session = ActiveSession::default();
+        let project_id = seed_project(&db, "P");
+        let id = arrancar(&db, &active_session, project_id);
+        sesion_activa_hace(&active_session, 11);
+
+        stop_active_session_sync(&db, &active_session).unwrap();
+
+        assert_eq!(sesion(&db, project_id, id).duration_seconds, Some(11));
+        assert_eq!(db.get_time_stats(project_id).unwrap().total_seconds, 11);
+    }
+
+    #[test]
+    fn un_error_de_base_al_cerrar_con_0_s_en_el_cambio_de_proyecto_sube() {
+        let db = test_db();
+        let active_session = ActiveSession::default();
+        let a = seed_project(&db, "A");
+        let b = seed_project(&db, "B");
+        let id_a = arrancar(&db, &active_session, a);
+        sesion_activa_hace(&active_session, 5);
+        romper_cierres(&db);
+
+        let err = start_new_session_sync(&db, &active_session, b, "B", "/tmp/b")
+            .expect_err("el error del cierre de 0 s no debe descartarse");
+
+        assert!(err.contains("cierre roto"), "mensaje: {err}");
+        // La sesión anterior sigue siendo la activa y no se abrió otra fila.
+        assert_eq!(active_session.0.lock().unwrap().session_id, Some(id_a));
+        assert!(db.get_tracking_sessions(b, 10).unwrap().is_empty());
+    }
+
+    #[test]
+    fn un_error_de_base_al_parar_con_0_s_sube_y_la_sesion_sigue_activa() {
+        let db = test_db();
+        let active_session = ActiveSession::default();
+        let project_id = seed_project(&db, "P");
+        let id = arrancar(&db, &active_session, project_id);
+        sesion_activa_hace(&active_session, 5);
+        romper_cierres(&db);
+
+        let err = stop_active_session_sync(&db, &active_session)
+            .expect_err("el error del cierre de 0 s no debe descartarse");
+
+        assert!(err.contains("cierre roto"), "mensaje: {err}");
+        assert_eq!(active_session.0.lock().unwrap().session_id, Some(id));
     }
 }

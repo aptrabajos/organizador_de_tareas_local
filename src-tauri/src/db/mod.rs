@@ -57,6 +57,17 @@ impl Database {
     }
 }
 
+/// Acceso crudo a la conexión para los tests de otros módulos (p. ej. `commands`), que
+/// necesitan provocar errores de base (un trigger que aborta) sin API pública para eso.
+#[cfg(test)]
+impl Database {
+    pub(crate) fn execute_batch_para_tests(&self, sql: &str) {
+        self.conn()
+            .execute_batch(sql)
+            .expect("no se pudo ejecutar el SQL del test");
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::test_support::*;
