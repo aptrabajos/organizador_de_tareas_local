@@ -110,11 +110,10 @@ impl PlatformOperations for WindowsPlatform {
                     .as_ref()
                     .ok_or("Ruta de terminal personalizado no configurada")?;
 
-                let vars: HashMap<String, String> =
-                    [("path".to_string(), path.to_string())]
-                        .iter()
-                        .cloned()
-                        .collect();
+                let vars: HashMap<String, String> = [("path".to_string(), path.to_string())]
+                    .iter()
+                    .cloned()
+                    .collect();
 
                 let args: Vec<String> = config
                     .platform
@@ -139,11 +138,10 @@ impl PlatformOperations for WindowsPlatform {
                     .as_ref()
                     .ok_or("Script de terminal no configurado")?;
 
-                let vars: HashMap<String, String> =
-                    [("path".to_string(), path.to_string())]
-                        .iter()
-                        .cloned()
-                        .collect();
+                let vars: HashMap<String, String> = [("path".to_string(), path.to_string())]
+                    .iter()
+                    .cloned()
+                    .collect();
 
                 self.execute_script(script, vars)
             }
@@ -183,11 +181,10 @@ impl PlatformOperations for WindowsPlatform {
                     .as_ref()
                     .ok_or("Script de navegador no configurado")?;
 
-                let vars: HashMap<String, String> =
-                    [("url".to_string(), url.to_string())]
-                        .iter()
-                        .cloned()
-                        .collect();
+                let vars: HashMap<String, String> = [("url".to_string(), url.to_string())]
+                    .iter()
+                    .cloned()
+                    .collect();
 
                 self.execute_script(script, vars)
             }
@@ -236,11 +233,10 @@ impl PlatformOperations for WindowsPlatform {
                     .as_ref()
                     .ok_or("Script de editor no configurado")?;
 
-                let vars: HashMap<String, String> =
-                    [("path".to_string(), path.to_string())]
-                        .iter()
-                        .cloned()
-                        .collect();
+                let vars: HashMap<String, String> = [("path".to_string(), path.to_string())]
+                    .iter()
+                    .cloned()
+                    .collect();
 
                 self.execute_script(script, vars)
             }
@@ -248,28 +244,23 @@ impl PlatformOperations for WindowsPlatform {
     }
 
     fn get_config_dir(&self) -> Result<PathBuf, String> {
-        let appdata = dirs::config_dir()
-            .ok_or("No se pudo obtener directorio APPDATA")?;
+        let appdata = dirs::config_dir().ok_or("No se pudo obtener directorio APPDATA")?;
         Ok(appdata.join("gestor-proyectos"))
     }
 
     fn get_data_dir(&self) -> Result<PathBuf, String> {
-        let local_appdata = dirs::data_local_dir()
-            .ok_or("No se pudo obtener directorio LOCALAPPDATA")?;
+        let local_appdata =
+            dirs::data_local_dir().ok_or("No se pudo obtener directorio LOCALAPPDATA")?;
         Ok(local_appdata.join("gestor-proyectos"))
     }
 
     fn get_default_backup_path(&self) -> Result<PathBuf, String> {
-        let documents = dirs::document_dir()
-            .ok_or("No se pudo obtener directorio de Documentos")?;
+        let documents =
+            dirs::document_dir().ok_or("No se pudo obtener directorio de Documentos")?;
         Ok(documents.join("Backups").join("gestor-proyectos"))
     }
 
-    fn execute_script(
-        &self,
-        script: &str,
-        vars: HashMap<String, String>,
-    ) -> Result<(), String> {
+    fn execute_script(&self, script: &str, vars: HashMap<String, String>) -> Result<(), String> {
         // Reemplazar variables escapando cada valor como literal de
         // PowerShell. El script en sí lo escribe el usuario (modo "Custom
         // Script") y se ejecuta intencionalmente con `powershell -Command`,

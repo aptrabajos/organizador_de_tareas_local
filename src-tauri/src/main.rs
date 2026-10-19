@@ -5,15 +5,15 @@ mod backup;
 mod commands;
 mod config;
 mod db;
-mod models;
-mod platform;
 mod logging;
+mod models;
 mod pdf_export;
+mod platform;
 mod tracking;
 
-use db::Database;
-use config::ConfigManager;
 use commands::ActiveSession;
+use config::ConfigManager;
+use db::Database;
 use log::{info, warn};
 use tauri::Manager;
 
@@ -49,7 +49,10 @@ fn main() {
     // para una DB local; un destino lento/de red podría demorar el arranque). Si falla
     // NO aborta: se loguea y la app abre igual.
     if let Err(e) = backup::maybe_auto_backup(&db, &config_manager) {
-        warn!("⚠️ [AUTO-BACKUP] No se pudo crear el backup automático: {}", e);
+        warn!(
+            "⚠️ [AUTO-BACKUP] No se pudo crear el backup automático: {}",
+            e
+        );
     }
 
     tauri::Builder::default()
@@ -81,11 +84,17 @@ fn main() {
                 let active_session = window.state::<ActiveSession>();
                 match commands::stop_active_session_sync(&db, &active_session) {
                     Ok(Some(duration)) => {
-                        info!("⏹️ [WORK] Sesión activa cerrada al salir de la app ({}s)", duration);
+                        info!(
+                            "⏹️ [WORK] Sesión activa cerrada al salir de la app ({}s)",
+                            duration
+                        );
                     }
                     Ok(None) => {}
                     Err(e) => {
-                        warn!("⚠️ [WORK] No se pudo cerrar la sesión activa al salir: {}", e);
+                        warn!(
+                            "⚠️ [WORK] No se pudo cerrar la sesión activa al salir: {}",
+                            e
+                        );
                     }
                 }
             }

@@ -1,7 +1,7 @@
 use log::{debug, info, warn};
 
-use super::schema::*;
 use super::defaults::get_os_defaults;
+use super::schema::*;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -40,16 +40,15 @@ impl ConfigManager {
         #[cfg(target_os = "windows")]
         {
             // Windows: %APPDATA%/gestor-proyectos
-            let appdata = dirs::config_dir()
-                .ok_or("No se pudo obtener directorio APPDATA")?;
+            let appdata = dirs::config_dir().ok_or("No se pudo obtener directorio APPDATA")?;
             Ok(appdata.join("gestor-proyectos"))
         }
 
         #[cfg(target_os = "linux")]
         {
             // Linux: ~/.config/gestor-proyectos
-            let config_dir = dirs::config_dir()
-                .ok_or("No se pudo obtener directorio de configuración")?;
+            let config_dir =
+                dirs::config_dir().ok_or("No se pudo obtener directorio de configuración")?;
             Ok(config_dir.join("gestor-proyectos"))
         }
 
@@ -145,9 +144,8 @@ impl ConfigManager {
         tmp_name.push(".tmp");
         let tmp_path = PathBuf::from(tmp_name);
 
-        fs::write(&tmp_path, json).map_err(|e| {
-            format!("Error al escribir archivo temporal de configuración: {}", e)
-        })?;
+        fs::write(&tmp_path, json)
+            .map_err(|e| format!("Error al escribir archivo temporal de configuración: {}", e))?;
 
         fs::rename(&tmp_path, path)
             .map_err(|e| format!("Error al reemplazar archivo de configuración: {}", e))?;
@@ -171,7 +169,8 @@ impl ConfigManager {
 
         // Actualizar en memoria
         {
-            let mut config = self.config
+            let mut config = self
+                .config
                 .lock()
                 .map_err(|e| format!("Error al bloquear configuración: {}", e))?;
             *config = new_config.clone();
@@ -205,7 +204,10 @@ impl ConfigManager {
         if config.platform.terminal.mode == ProgramMode::Custom {
             if let Some(ref path) = config.platform.terminal.custom_path {
                 if !PathBuf::from(path).exists() {
-                    warn!("⚠️ [CONFIG] Ruta de terminal personalizada no existe: {}", path);
+                    warn!(
+                        "⚠️ [CONFIG] Ruta de terminal personalizada no existe: {}",
+                        path
+                    );
                 }
             }
         }
@@ -231,7 +233,10 @@ impl ConfigManager {
         // Por ahora solo tenemos la versión 0.2.0
         // En el futuro aquí iría la lógica de migración
         if config.version != "0.2.0" {
-            warn!("⚠️ Versión de configuración desconocida: {}", config.version);
+            warn!(
+                "⚠️ Versión de configuración desconocida: {}",
+                config.version
+            );
             debug!("💡 Considera resetear la configuración si hay problemas");
         }
 
@@ -256,14 +261,17 @@ mod tests {
         let file_name = path.file_name()?.to_string_lossy().to_string();
         let prefix = format!("{}.corrupto-", file_name);
 
-        fs::read_dir(dir).ok()?.filter_map(|e| e.ok()).find_map(|entry| {
-            let name = entry.file_name().to_string_lossy().to_string();
-            if name.starts_with(&prefix) {
-                Some(entry.path())
-            } else {
-                None
-            }
-        })
+        fs::read_dir(dir)
+            .ok()?
+            .filter_map(|e| e.ok())
+            .find_map(|entry| {
+                let name = entry.file_name().to_string_lossy().to_string();
+                if name.starts_with(&prefix) {
+                    Some(entry.path())
+                } else {
+                    None
+                }
+            })
     }
 
     #[test]
@@ -284,7 +292,10 @@ mod tests {
             s.push(".tmp");
             PathBuf::from(s)
         };
-        assert!(!tmp_path.exists(), "no debe quedar un .tmp tras un save exitoso");
+        assert!(
+            !tmp_path.exists(),
+            "no debe quedar un .tmp tras un save exitoso"
+        );
 
         let loaded = ConfigManager::load_from_file(&path);
         assert_eq!(loaded.version, config.version);
@@ -308,7 +319,10 @@ mod tests {
         assert_eq!(loaded.ui.theme, defaults.ui.theme);
 
         // El archivo corrupto se respalda y ya no queda en la ruta original.
-        assert!(!path.exists(), "el archivo corrupto debe haberse movido al backup");
+        assert!(
+            !path.exists(),
+            "el archivo corrupto debe haberse movido al backup"
+        );
         assert!(
             find_corrupt_backup(&path).is_some(),
             "debe existir un backup .corrupto-<timestamp> del archivo inválido"
@@ -331,7 +345,10 @@ mod tests {
         let defaults = get_os_defaults();
 
         assert_eq!(loaded.ui.theme, defaults.ui.theme);
-        assert!(!path.exists(), "el archivo inválido debe haberse movido al backup");
+        assert!(
+            !path.exists(),
+            "el archivo inválido debe haberse movido al backup"
+        );
         assert!(
             find_corrupt_backup(&path).is_some(),
             "debe existir un backup .corrupto-<timestamp> del archivo con enum inválido"
@@ -347,6 +364,9 @@ mod tests {
         // Ejercita el mismo camino que `load_or_create`, que es lo que usa
         // `ConfigManager::new()` internamente: no debe propagar un error de parseo.
         let result = ConfigManager::load_or_create(&path);
-        assert!(result.is_ok(), "load_or_create no debe fallar ante un config corrupto");
+        assert!(
+            result.is_ok(),
+            "load_or_create no debe fallar ante un config corrupto"
+        );
     }
 }

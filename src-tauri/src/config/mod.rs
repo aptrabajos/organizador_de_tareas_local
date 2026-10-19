@@ -1,6 +1,6 @@
-pub mod schema;
 pub mod defaults;
 pub mod manager;
+pub mod schema;
 
-pub use schema::*;
 pub use manager::*;
+pub use schema::*;

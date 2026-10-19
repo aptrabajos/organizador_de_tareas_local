@@ -71,9 +71,9 @@ impl<'a> PdfCursor<'a> {
     /// atar el préstamo y poder seguir llamando métodos `&mut self` del cursor.
     fn ensure_space(&mut self, needed_mm: f32) -> PdfLayerReference {
         if cursor_action(self.y.0, needed_mm) == CursorAction::NewPage {
-            let (page, layer) =
-                self.doc
-                    .add_page(Mm(PAGE_WIDTH_MM), Mm(PAGE_HEIGHT_MM), "Layer");
+            let (page, layer) = self
+                .doc
+                .add_page(Mm(PAGE_WIDTH_MM), Mm(PAGE_HEIGHT_MM), "Layer");
             self.layer = self.doc.get_page(page).get_layer(layer);
             self.y = Mm(CURSOR_TOP_MM);
         }
@@ -169,8 +169,12 @@ pub fn export_project_to_pdf(
     let current_layer = doc.get_page(page1).get_layer(layer1);
 
     // Cargar fuente built-in (Helvetica)
-    let font = doc.add_builtin_font(BuiltinFont::Helvetica).map_err(|e| e.to_string())?;
-    let font_bold = doc.add_builtin_font(BuiltinFont::HelveticaBold).map_err(|e| e.to_string())?;
+    let font = doc
+        .add_builtin_font(BuiltinFont::Helvetica)
+        .map_err(|e| e.to_string())?;
+    let font_bold = doc
+        .add_builtin_font(BuiltinFont::HelveticaBold)
+        .map_err(|e| e.to_string())?;
 
     let mut y_position = Mm(CURSOR_TOP_MM); // Comenzar desde arriba
 
@@ -189,7 +193,13 @@ pub fn export_project_to_pdf(
     // Descripción
     if !project.description.is_empty() {
         current_layer.set_fill_color(rgb(COLOR_GRAY));
-        current_layer.use_text(&project.description, FONT_SIZE_BODY, Mm(20.0), y_position, &font);
+        current_layer.use_text(
+            &project.description,
+            FONT_SIZE_BODY,
+            Mm(20.0),
+            y_position,
+            &font,
+        );
         y_position -= Mm(8.0);
     }
 
@@ -197,7 +207,13 @@ pub fn export_project_to_pdf(
     if let Some(status) = &project.status {
         current_layer.set_fill_color(rgb(COLOR_PRIMARY));
         let status_text = format!("Estado: {}", status.to_uppercase());
-        current_layer.use_text(&status_text, FONT_SIZE_BODY, Mm(20.0), y_position, &font_bold);
+        current_layer.use_text(
+            &status_text,
+            FONT_SIZE_BODY,
+            Mm(20.0),
+            y_position,
+            &font_bold,
+        );
         y_position -= Mm(8.0);
     }
 
@@ -280,7 +296,13 @@ pub fn export_project_to_pdf(
                     // Tipo de enlace en color normal
                     layer.set_fill_color(rgb(COLOR_TEXT));
                     let link_type_text = format!("• {} →", link.link_type);
-                    layer.use_text(&link_type_text, FONT_SIZE_BODY, Mm(20.0), cursor.y(), &font_bold);
+                    layer.use_text(
+                        &link_type_text,
+                        FONT_SIZE_BODY,
+                        Mm(20.0),
+                        cursor.y(),
+                        &font_bold,
+                    );
                     cursor.advance(5.0);
 
                     // URL en azul (una línea abajo)
@@ -306,7 +328,13 @@ pub fn export_project_to_pdf(
         if !notes.is_empty() {
             let layer = cursor.ensure_space(8.0 + 5.0);
             layer.set_fill_color(rgb(COLOR_PRIMARY));
-            layer.use_text("NOTAS", FONT_SIZE_SUBTITLE, Mm(20.0), cursor.y(), &font_bold);
+            layer.use_text(
+                "NOTAS",
+                FONT_SIZE_SUBTITLE,
+                Mm(20.0),
+                cursor.y(),
+                &font_bold,
+            );
             cursor.advance(8.0);
 
             for line in wrap_text(notes, NOTES_MAX_CHARS_PER_LINE) {
@@ -395,7 +423,10 @@ mod tests {
             paginas > 1,
             "200 entradas de 12mm no pueden caber en una sola página"
         );
-        assert!(y >= CURSOR_BOTTOM_MM - 12.0, "el cursor nunca se va al infinito");
+        assert!(
+            y >= CURSOR_BOTTOM_MM - 12.0,
+            "el cursor nunca se va al infinito"
+        );
     }
 
     // ==================== wrap_text ====================

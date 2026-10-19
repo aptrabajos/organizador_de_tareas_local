@@ -72,13 +72,23 @@ pub fn resolve_backup_dir(config: &AppConfig) -> Result<PathBuf, String> {
     };
 
     // Crear el directorio si no existe
-    fs::create_dir_all(&dir)
-        .map_err(|e| format!("No se pudo crear el directorio de backups '{}': {}", dir.display(), e))?;
+    fs::create_dir_all(&dir).map_err(|e| {
+        format!(
+            "No se pudo crear el directorio de backups '{}': {}",
+            dir.display(),
+            e
+        )
+    })?;
 
     // Prueba de escritura real: crear y borrar un archivo temporal
     let test_file = dir.join(".write_test");
-    fs::write(&test_file, b"test")
-        .map_err(|e| format!("El directorio de backups '{}' no es escribible: {}", dir.display(), e))?;
+    fs::write(&test_file, b"test").map_err(|e| {
+        format!(
+            "El directorio de backups '{}' no es escribible: {}",
+            dir.display(),
+            e
+        )
+    })?;
     let _ = fs::remove_file(&test_file);
 
     Ok(dir)
@@ -134,7 +144,10 @@ fn run_backup_to_dir(db: &Database, dir: &Path) -> Result<BackupResult, String> 
 
     // 4. Manifest de integridad: solo se escribe porque integrity_ok == true acá.
     // list_backups() lo usa para no re-correr integrity_check en cada refresh.
-    let mtime = fs::metadata(&dest).ok().map(|m| mtime_secs(&m)).unwrap_or(0);
+    let mtime = fs::metadata(&dest)
+        .ok()
+        .map(|m| mtime_secs(&m))
+        .unwrap_or(0);
     write_ok_manifest(&dest, size_bytes, mtime);
 
     // Timestamp legible para mostrar/persistir
@@ -345,7 +358,10 @@ fn mtime_secs(metadata: &fs::Metadata) -> i64 {
 /// Escribe el manifest de integridad. Best-effort: si falla, el peor caso es que
 /// list_backups() vuelva a correr integrity_check real la próxima vez.
 fn write_ok_manifest(backup_path: &Path, size_bytes: u64, mtime: i64) {
-    let _ = fs::write(ok_manifest_path(backup_path), format!("{}:{}", size_bytes, mtime));
+    let _ = fs::write(
+        ok_manifest_path(backup_path),
+        format!("{}:{}", size_bytes, mtime),
+    );
 }
 
 /// Lee el manifest de integridad si existe y es parseable.
@@ -395,8 +411,13 @@ pub fn live_db_path() -> Result<PathBuf, String> {
     let data_dir = dirs::data_local_dir()
         .ok_or_else(|| "No se pudo obtener el directorio de datos local".to_string())?
         .join("gestor-proyectos");
-    fs::create_dir_all(&data_dir)
-        .map_err(|e| format!("No se pudo crear el directorio de datos '{}': {}", data_dir.display(), e))?;
+    fs::create_dir_all(&data_dir).map_err(|e| {
+        format!(
+            "No se pudo crear el directorio de datos '{}': {}",
+            data_dir.display(),
+            e
+        )
+    })?;
     Ok(data_dir.join("projects.db"))
 }
 
@@ -447,8 +468,12 @@ fn restore_backup_to(backup_path: &str, live_path: &Path) -> Result<RestoreResul
     let live_dir = live_path.parent().ok_or_else(|| {
         "No se pudo determinar el directorio de la base de datos viva".to_string()
     })?;
-    fs::create_dir_all(live_dir)
-        .map_err(|e| format!("No se pudo preparar el directorio de la base de datos: {}", e))?;
+    fs::create_dir_all(live_dir).map_err(|e| {
+        format!(
+            "No se pudo preparar el directorio de la base de datos: {}",
+            e
+        )
+    })?;
 
     // 3. Copiar a un temporal EN EL MISMO DIRECTORIO que la DB viva.
     let tmp_path = live_dir.join(format!(
@@ -507,7 +532,10 @@ pub fn maybe_auto_backup(db: &Database, config_mgr: &ConfigManager) -> Result<()
     if !cfg.backup.auto_backup_enabled {
         return Ok(()); // desactivado por el usuario
     }
-    if !auto_backup_due(cfg.backup.last_backup.as_deref(), cfg.backup.auto_backup_interval) {
+    if !auto_backup_due(
+        cfg.backup.last_backup.as_deref(),
+        cfg.backup.auto_backup_interval,
+    ) {
         return Ok(()); // todavía no pasó el intervalo
     }
     // Reusa el flujo verificado (VACUUM INTO + verificación + retención + last_backup).
@@ -578,7 +606,11 @@ mod tests {
 
     #[test]
     fn due_when_timestamp_unparseable() {
-        assert!(auto_backup_due_at(Some("no-es-fecha"), 7, dt("2026-06-29 10:00:00")));
+        assert!(auto_backup_due_at(
+            Some("no-es-fecha"),
+            7,
+            dt("2026-06-29 10:00:00")
+        ));
     }
 
     // ==================== Helpers de tests de backup/restore ====================
@@ -610,7 +642,8 @@ mod tests {
             .write(true)
             .open(path)
             .expect("no se pudo abrir el archivo para ajustar su mtime");
-        file.set_modified(target).expect("no se pudo ajustar el mtime");
+        file.set_modified(target)
+            .expect("no se pudo ajustar el mtime");
     }
 
     /// Crea un backup real (`projects-<suffix>.db`) con `project_count` proyectos en
@@ -619,7 +652,8 @@ mod tests {
     fn make_backup_file(dir: &Path, suffix: &str, project_count: usize, days_ago: i64) -> PathBuf {
         let db = test_db();
         for i in 0..project_count {
-            db.create_project(test_project_dto(&format!("p{}", i))).unwrap();
+            db.create_project(test_project_dto(&format!("p{}", i)))
+                .unwrap();
         }
         let dest = dir.join(format!("{}{}{}", BACKUP_PREFIX, suffix, BACKUP_SUFFIX));
         db.backup_to(dest.to_str().unwrap()).unwrap();
@@ -639,8 +673,7 @@ mod tests {
         db.create_project(test_project_dto("uno")).unwrap();
         let tmp = tempfile::tempdir().unwrap();
 
-        let result =
-            run_backup_to_dir(&db, tmp.path()).expect("run_backup_to_dir debe funcionar");
+        let result = run_backup_to_dir(&db, tmp.path()).expect("run_backup_to_dir debe funcionar");
 
         assert!(
             result.integrity_ok,
@@ -653,7 +686,10 @@ mod tests {
         );
 
         let (ok, count) = Database::verify_db_file(&result.file_path).unwrap();
-        assert!(ok, "verify_db_file debe confirmar integridad del archivo generado");
+        assert!(
+            ok,
+            "verify_db_file debe confirmar integridad del archivo generado"
+        );
         assert_eq!(count, 1);
 
         // El manifest de integridad debe existir tras un backup exitoso, para que
@@ -712,7 +748,10 @@ mod tests {
 
         apply_retention(tmp.path(), 7).unwrap();
 
-        assert!(!oldest.exists(), "un backup viejo y no-protegido debe borrarse");
+        assert!(
+            !oldest.exists(),
+            "un backup viejo y no-protegido debe borrarse"
+        );
         assert!(
             !ok_manifest_path(&oldest).exists(),
             "el manifest .ok huérfano también debe limpiarse al borrar su backup"
@@ -749,7 +788,10 @@ mod tests {
         assert_eq!(result.project_count, 2);
         let (ok, count) = Database::verify_db_file(live_path.to_str().unwrap()).unwrap();
         assert!(ok);
-        assert_eq!(count, 2, "la DB viva debe tener el contenido del backup, no el viejo");
+        assert_eq!(
+            count, 2,
+            "la DB viva debe tener el contenido del backup, no el viejo"
+        );
 
         // No debe quedar ningún temporal de restauración huérfano.
         let leftovers: Vec<_> = fs::read_dir(live_dir.path())
@@ -782,7 +824,10 @@ mod tests {
 
         let (ok, count) = Database::verify_db_file(live_path.to_str().unwrap()).unwrap();
         assert!(ok, "la DB viva original debe seguir intacta");
-        assert_eq!(count, 1, "la DB viva NO debe haber cambiado ante un backup corrupto");
+        assert_eq!(
+            count, 1,
+            "la DB viva NO debe haber cambiado ante un backup corrupto"
+        );
     }
 
     #[test]
@@ -794,7 +839,10 @@ mod tests {
         drop(old_db);
 
         let res = restore_backup_to("/tmp/no-es-un-backup.txt", &live_path);
-        assert!(res.is_err(), "un path que no matchea 'projects-*.db' debe rechazarse");
+        assert!(
+            res.is_err(),
+            "un path que no matchea 'projects-*.db' debe rechazarse"
+        );
 
         let (ok, count) = Database::verify_db_file(live_path.to_str().unwrap()).unwrap();
         assert!(ok);

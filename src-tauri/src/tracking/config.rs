@@ -40,15 +40,13 @@ impl GestorConfig {
         let gestor_dir = project_path.join(GESTOR_DIR_NAME);
 
         // Crear directorio .gestor/ si no existe
-        fs::create_dir_all(&gestor_dir)
-            .map_err(|e| ConfigError::IoError(e.to_string()))?;
+        fs::create_dir_all(&gestor_dir).map_err(|e| ConfigError::IoError(e.to_string()))?;
 
         let config_path = gestor_dir.join(CONFIG_FILE_NAME);
         let json = serde_json::to_string_pretty(self)
             .map_err(|e| ConfigError::SerializationError(e.to_string()))?;
 
-        fs::write(&config_path, json)
-            .map_err(|e| ConfigError::IoError(e.to_string()))?;
+        fs::write(&config_path, json).map_err(|e| ConfigError::IoError(e.to_string()))?;
 
         Ok(config_path)
     }
@@ -58,14 +56,15 @@ impl GestorConfig {
         let config_path = project_path.join(GESTOR_DIR_NAME).join(CONFIG_FILE_NAME);
 
         if !config_path.exists() {
-            return Err(ConfigError::NotFound(config_path.to_string_lossy().to_string()));
+            return Err(ConfigError::NotFound(
+                config_path.to_string_lossy().to_string(),
+            ));
         }
 
-        let content = fs::read_to_string(&config_path)
-            .map_err(|e| ConfigError::IoError(e.to_string()))?;
+        let content =
+            fs::read_to_string(&config_path).map_err(|e| ConfigError::IoError(e.to_string()))?;
 
-        serde_json::from_str(&content)
-            .map_err(|e| ConfigError::DeserializationError(e.to_string()))
+        serde_json::from_str(&content).map_err(|e| ConfigError::DeserializationError(e.to_string()))
     }
 }
 
@@ -92,7 +91,11 @@ impl std::fmt::Display for ConfigError {
 impl std::error::Error for ConfigError {}
 
 /// Inicializar la carpeta .gestor/ en un proyecto
-pub fn init_gestor_config(project_path: &Path, project_id: i64, project_name: String) -> Result<GestorConfig, ConfigError> {
+pub fn init_gestor_config(
+    project_path: &Path,
+    project_id: i64,
+    project_name: String,
+) -> Result<GestorConfig, ConfigError> {
     let config = GestorConfig::new(project_id, project_name);
     config.save(project_path)?;
     Ok(config)
@@ -236,8 +239,7 @@ mod tests {
         assert!(!has_tracking_config(project_path));
 
         // Crear config
-        init_gestor_config(project_path, 111, "Test".to_string())
-            .expect("Should init");
+        init_gestor_config(project_path, 111, "Test".to_string()).expect("Should init");
 
         // Con config
         assert!(has_tracking_config(project_path));

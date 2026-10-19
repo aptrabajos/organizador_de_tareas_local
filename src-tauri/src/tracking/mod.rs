@@ -11,5 +11,5 @@
 // acá, implementados y testeados pero sin arrancarse nunca en producción. Se
 // eliminaron en el cierre del B17: ver ARQUITECTURA.md.
 
-pub mod config;
 pub mod aggregator;
+pub mod config;

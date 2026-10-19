@@ -39,11 +39,7 @@ pub trait PlatformOperations {
     fn get_default_backup_path(&self) -> Result<PathBuf, String>;
 
     /// Ejecutar script personalizado con variables
-    fn execute_script(
-        &self,
-        script: &str,
-        vars: HashMap<String, String>,
-    ) -> Result<(), String>;
+    fn execute_script(&self, script: &str, vars: HashMap<String, String>) -> Result<(), String>;
 
     /// Reemplazar variables en un string destinado a un argumento de proceso
     /// real (p. ej. `Command::arg`/`Command::args`). El valor sustituido NO

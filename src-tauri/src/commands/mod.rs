@@ -4,12 +4,12 @@ use log::{debug, error, info, warn};
 
 use guards::assert_registered_project_path;
 
-use crate::models::project::{
-    CreateProjectDTO, CreateLinkDTO, Project, ProjectLink, UpdateProjectDTO, UpdateLinkDTO, ProjectWithChildren,
-    DashboardData
-};
 use crate::config::{AppConfig, ConfigManager, DetectedPrograms};
 use crate::db::Database;
+use crate::models::project::{
+    CreateLinkDTO, CreateProjectDTO, DashboardData, Project, ProjectLink, ProjectWithChildren,
+    UpdateLinkDTO, UpdateProjectDTO,
+};
 use std::sync::Mutex;
 
 // ==================== ACTIVE SESSION STATE ====================
@@ -51,10 +51,10 @@ pub async fn get_dashboard_data(db: State<'_, Database>) -> Result<DashboardData
 }
 
 use crate::platform::{get_platform, ProgramDetector};
-use std::process::Command;
-use std::path::PathBuf;
-use tauri::State;
 use chrono::Local;
+use std::path::PathBuf;
+use std::process::Command;
+use tauri::State;
 
 // ==================== BACKUP DE LA BASE DE DATOS ====================
 
@@ -137,24 +137,29 @@ pub async fn update_project(
     id: i64,
     updates: UpdateProjectDTO,
 ) -> Result<Project, String> {
-    debug!("🔧 [UPDATE] Iniciando actualización del proyecto ID: {}", id);
+    debug!(
+        "🔧 [UPDATE] Iniciando actualización del proyecto ID: {}",
+        id
+    );
     debug!("📝 [UPDATE] Datos recibidos: {:?}", updates);
-    
-    let result = db.update_project(id, updates)
-        .map_err(|e| {
-            error!("❌ [UPDATE] Error en base de datos: {}", e);
-            format!("Error updating project: {}", e)
-        });
-    
+
+    let result = db.update_project(id, updates).map_err(|e| {
+        error!("❌ [UPDATE] Error en base de datos: {}", e);
+        format!("Error updating project: {}", e)
+    });
+
     match &result {
         Ok(project) => {
-            debug!("✅ [UPDATE] Proyecto actualizado exitosamente: '{}'", project.name);
+            debug!(
+                "✅ [UPDATE] Proyecto actualizado exitosamente: '{}'",
+                project.name
+            );
         }
         Err(error) => {
             error!("❌ [UPDATE] Error al actualizar proyecto: {}", error);
         }
     }
-    
+
     result
 }
 
@@ -217,7 +222,10 @@ pub async fn empty_trash(
 }
 
 #[tauri::command]
-pub async fn search_projects(db: State<'_, Database>, query: String) -> Result<Vec<Project>, String> {
+pub async fn search_projects(
+    db: State<'_, Database>,
+    query: String,
+) -> Result<Vec<Project>, String> {
     db.search_projects(&query)
         .map_err(|e| format!("Error searching projects: {}", e))
 }
@@ -234,10 +242,7 @@ pub async fn open_terminal(
 }
 
 #[tauri::command]
-pub async fn open_url(
-    config_manager: State<'_, ConfigManager>,
-    url: String,
-) -> Result<(), String> {
+pub async fn open_url(config_manager: State<'_, ConfigManager>, url: String) -> Result<(), String> {
     debug!("🌐 [URL] Abriendo URL: {}", url);
     let config = config_manager.get_config()?;
     let platform = get_platform();
@@ -274,17 +279,21 @@ pub async fn create_project_backup(
     db: State<'_, Database>,
     project_id: i64,
 ) -> Result<BackupData, String> {
-    debug!("🔵 [BACKUP] Iniciando backup del proyecto ID: {}", project_id);
+    debug!(
+        "🔵 [BACKUP] Iniciando backup del proyecto ID: {}",
+        project_id
+    );
 
     // Obtener datos del proyecto
-    let project = db
-        .get_project(project_id)
-        .map_err(|e| {
-            error!("❌ [BACKUP] Error obteniendo proyecto: {}", e);
-            format!("Error obteniendo proyecto: {}", e)
-        })?;
-    
-    debug!("✅ [BACKUP] Proyecto encontrado: '{}' ({})", project.name, project.local_path);
+    let project = db.get_project(project_id).map_err(|e| {
+        error!("❌ [BACKUP] Error obteniendo proyecto: {}", e);
+        format!("Error obteniendo proyecto: {}", e)
+    })?;
+
+    debug!(
+        "✅ [BACKUP] Proyecto encontrado: '{}' ({})",
+        project.name, project.local_path
+    );
 
     // Crear contenido del markdown
     let now = Local::now();
@@ -352,7 +361,10 @@ pub async fn create_project_backup(
     // Crear nombre del archivo. Sanear project.name contra path traversal: reemplazar
     // espacios NO alcanza, hay que neutralizar separadores de path y '..' o un nombre
     // de proyecto malicioso podría escapar la carpeta destino elegida por el usuario.
-    let filename = format!("{}_BACKUP.md", sanitize_backup_filename_component(&project.name));
+    let filename = format!(
+        "{}_BACKUP.md",
+        sanitize_backup_filename_component(&project.name)
+    );
     let backup_path = PathBuf::from(&project.local_path).join(&filename);
 
     let result_path = backup_path
@@ -362,7 +374,10 @@ pub async fn create_project_backup(
 
     debug!("📄 [BACKUP] Nombre de archivo: {}", filename);
     debug!("📁 [BACKUP] Ruta sugerida: {}", result_path);
-    debug!("📊 [BACKUP] Tamaño del contenido: {} bytes", markdown_content.len());
+    debug!(
+        "📊 [BACKUP] Tamaño del contenido: {} bytes",
+        markdown_content.len()
+    );
     debug!("✅ [BACKUP] Datos de backup generados exitosamente");
 
     Ok(BackupData {
@@ -395,7 +410,10 @@ pub async fn sync_project_to_backup(
 
     // Validar el origen: debe existir y ser un directorio
     if source_path.trim().is_empty() || !std::path::Path::new(&source_path).is_dir() {
-        return Err(format!("El directorio de origen no existe: {}", source_path));
+        return Err(format!(
+            "El directorio de origen no existe: {}",
+            source_path
+        ));
     }
 
     // Sanear project_name contra path traversal: join() con una ruta absoluta o con
@@ -419,9 +437,23 @@ pub async fn sync_project_to_backup(
     // Exclusiones por argumento (NO se escribe ningún .rsyncignore en el repo del usuario).
     // Se excluyen artefactos de build/caches, NO .git (la historia es parte del backup).
     let excludes = [
-        "node_modules/", "dist/", "build/", "out/", ".next/", ".nuxt/", ".cache/",
-        ".parcel-cache/", "coverage/", ".nyc_output/", "logs/", "*.log", "*.tmp",
-        "*.bak", ".DS_Store", "Thumbs.db", "*.swp",
+        "node_modules/",
+        "dist/",
+        "build/",
+        "out/",
+        ".next/",
+        ".nuxt/",
+        ".cache/",
+        ".parcel-cache/",
+        "coverage/",
+        ".nyc_output/",
+        "logs/",
+        "*.log",
+        "*.tmp",
+        "*.bak",
+        ".DS_Store",
+        "Thumbs.db",
+        "*.swp",
     ];
     let mut args: Vec<String> = vec!["-a".into(), "--update".into()];
     for ex in excludes {
@@ -460,7 +492,10 @@ pub async fn get_project_links(
     db: State<'_, Database>,
     project_id: i64,
 ) -> Result<Vec<ProjectLink>, String> {
-    debug!("🔗 [LINK] Obteniendo enlaces para proyecto ID: {}", project_id);
+    debug!(
+        "🔗 [LINK] Obteniendo enlaces para proyecto ID: {}",
+        project_id
+    );
     db.get_project_links(project_id)
         .map_err(|e| format!("Error getting links: {}", e))
 }
@@ -477,10 +512,7 @@ pub async fn update_project_link(
 }
 
 #[tauri::command]
-pub async fn delete_project_link(
-    db: State<'_, Database>,
-    id: i64,
-) -> Result<(), String> {
+pub async fn delete_project_link(db: State<'_, Database>, id: i64) -> Result<(), String> {
     debug!("🔗 [LINK] Eliminando enlace ID: {}", id);
     db.delete_link(id)
         .map_err(|e| format!("Error deleting link: {}", e))
@@ -488,11 +520,11 @@ pub async fn delete_project_link(
 
 // Comandos para Analytics y Tracking
 #[tauri::command]
-pub async fn track_project_open(
-    db: State<'_, Database>,
-    project_id: i64,
-) -> Result<(), String> {
-    debug!("📊 [ANALYTICS] Registrando apertura del proyecto ID: {}", project_id);
+pub async fn track_project_open(db: State<'_, Database>, project_id: i64) -> Result<(), String> {
+    debug!(
+        "📊 [ANALYTICS] Registrando apertura del proyecto ID: {}",
+        project_id
+    );
     db.track_project_open(project_id)
         .map_err(|e| format!("Error tracking project open: {}", e))
 }
@@ -503,7 +535,10 @@ pub async fn add_project_time(
     project_id: i64,
     seconds: i64,
 ) -> Result<(), String> {
-    debug!("⏱️ [ANALYTICS] Agregando {} segundos al proyecto ID: {}", seconds, project_id);
+    debug!(
+        "⏱️ [ANALYTICS] Agregando {} segundos al proyecto ID: {}",
+        seconds, project_id
+    );
     db.add_project_time(project_id, seconds)
         .map_err(|e| format!("Error adding project time: {}", e))
 }
@@ -523,7 +558,10 @@ pub async fn get_project_activities(
     project_id: i64,
     limit: i64,
 ) -> Result<Vec<crate::models::project::ProjectActivity>, String> {
-    debug!("📋 [ANALYTICS] Obteniendo actividades del proyecto ID: {}", project_id);
+    debug!(
+        "📋 [ANALYTICS] Obteniendo actividades del proyecto ID: {}",
+        project_id
+    );
     db.get_project_activities(project_id, limit)
         .map_err(|e| format!("Error getting project activities: {}", e))
 }
@@ -535,7 +573,10 @@ pub async fn add_attachment(
     db: State<'_, Database>,
     attachment: crate::models::project::CreateAttachmentDTO,
 ) -> Result<crate::models::project::ProjectAttachment, String> {
-    debug!("📎 [ATTACHMENT] Agregando archivo: {} ({} bytes)", attachment.filename, attachment.file_size);
+    debug!(
+        "📎 [ATTACHMENT] Agregando archivo: {} ({} bytes)",
+        attachment.filename, attachment.file_size
+    );
     // Prefijo en español: transporta la validación del límite de 5 MB, que el usuario
     // puede corregir eligiendo otro archivo.
     db.add_attachment(attachment)
@@ -547,16 +588,16 @@ pub async fn get_attachments(
     db: State<'_, Database>,
     project_id: i64,
 ) -> Result<Vec<crate::models::project::ProjectAttachment>, String> {
-    debug!("📎 [ATTACHMENT] Obteniendo archivos del proyecto ID: {}", project_id);
+    debug!(
+        "📎 [ATTACHMENT] Obteniendo archivos del proyecto ID: {}",
+        project_id
+    );
     db.get_attachments(project_id)
         .map_err(|e| format!("Error getting attachments: {}", e))
 }
 
 #[tauri::command]
-pub async fn delete_attachment(
-    db: State<'_, Database>,
-    id: i64,
-) -> Result<(), String> {
+pub async fn delete_attachment(db: State<'_, Database>, id: i64) -> Result<(), String> {
     debug!("🗑️ [ATTACHMENT] Eliminando archivo ID: {}", id);
     db.delete_attachment(id)
         .map_err(|e| format!("Error deleting attachment: {}", e))
@@ -569,7 +610,10 @@ pub async fn create_journal_entry(
     db: State<'_, Database>,
     entry: crate::models::project::CreateJournalEntryDTO,
 ) -> Result<crate::models::project::JournalEntry, String> {
-    debug!("📓 [JOURNAL] Creando entrada de diario para proyecto ID: {}", entry.project_id);
+    debug!(
+        "📓 [JOURNAL] Creando entrada de diario para proyecto ID: {}",
+        entry.project_id
+    );
     db.create_journal_entry(entry)
         .map_err(|e| format!("Error creating journal entry: {}", e))
 }
@@ -579,7 +623,10 @@ pub async fn get_journal_entries(
     db: State<'_, Database>,
     project_id: i64,
 ) -> Result<Vec<crate::models::project::JournalEntry>, String> {
-    debug!("📓 [JOURNAL] Obteniendo entradas de diario para proyecto ID: {}", project_id);
+    debug!(
+        "📓 [JOURNAL] Obteniendo entradas de diario para proyecto ID: {}",
+        project_id
+    );
     db.get_journal_entries(project_id)
         .map_err(|e| format!("Error getting journal entries: {}", e))
 }
@@ -596,10 +643,7 @@ pub async fn update_journal_entry(
 }
 
 #[tauri::command]
-pub async fn delete_journal_entry(
-    db: State<'_, Database>,
-    id: i64,
-) -> Result<(), String> {
+pub async fn delete_journal_entry(db: State<'_, Database>, id: i64) -> Result<(), String> {
     debug!("📓 [JOURNAL] Eliminando entrada de diario ID: {}", id);
     db.delete_journal_entry(id)
         .map_err(|e| format!("Error deleting journal entry: {}", e))
@@ -612,7 +656,10 @@ pub async fn create_todo(
     db: State<'_, Database>,
     todo: crate::models::project::CreateTodoDTO,
 ) -> Result<crate::models::project::ProjectTodo, String> {
-    debug!("✅ [TODO] Creando TODO para proyecto ID: {}", todo.project_id);
+    debug!(
+        "✅ [TODO] Creando TODO para proyecto ID: {}",
+        todo.project_id
+    );
     db.create_todo(todo)
         .map_err(|e| format!("Error creating todo: {}", e))
 }
@@ -622,7 +669,10 @@ pub async fn get_project_todos(
     db: State<'_, Database>,
     project_id: i64,
 ) -> Result<Vec<crate::models::project::ProjectTodo>, String> {
-    debug!("✅ [TODO] Obteniendo TODOs para proyecto ID: {}", project_id);
+    debug!(
+        "✅ [TODO] Obteniendo TODOs para proyecto ID: {}",
+        project_id
+    );
     db.get_project_todos(project_id)
         .map_err(|e| format!("Error getting todos: {}", e))
 }
@@ -639,10 +689,7 @@ pub async fn update_todo(
 }
 
 #[tauri::command]
-pub async fn delete_todo(
-    db: State<'_, Database>,
-    id: i64,
-) -> Result<(), String> {
+pub async fn delete_todo(db: State<'_, Database>, id: i64) -> Result<(), String> {
     debug!("✅ [TODO] Eliminando TODO ID: {}", id);
     db.delete_todo(id)
         .map_err(|e| format!("Error deleting todo: {}", e))
@@ -656,17 +703,20 @@ pub async fn update_project_status(
     project_id: i64,
     status: String,
 ) -> Result<(), String> {
-    debug!("🔄 [STATUS] Actualizando estado del proyecto ID: {} a '{}'", project_id, status);
+    debug!(
+        "🔄 [STATUS] Actualizando estado del proyecto ID: {} a '{}'",
+        project_id, status
+    );
     db.update_project_status(project_id, status)
         .map_err(|e| format!("Error updating project status: {}", e))
 }
 
 #[tauri::command]
-pub async fn toggle_pin_project(
-    db: State<'_, Database>,
-    project_id: i64,
-) -> Result<bool, String> {
-    debug!("⭐ [PIN] Toggling favorito para proyecto ID: {}", project_id);
+pub async fn toggle_pin_project(db: State<'_, Database>, project_id: i64) -> Result<bool, String> {
+    debug!(
+        "⭐ [PIN] Toggling favorito para proyecto ID: {}",
+        project_id
+    );
     db.toggle_pin_project(project_id)
         .map_err(|e| format!("Error toggling pin: {}", e))
 }
@@ -676,7 +726,10 @@ pub async fn reorder_pinned_projects(
     db: State<'_, Database>,
     project_ids: Vec<i64>,
 ) -> Result<(), String> {
-    debug!("↕️ [PIN] Reordenando proyectos favoritos: {:?}", project_ids);
+    debug!(
+        "↕️ [PIN] Reordenando proyectos favoritos: {:?}",
+        project_ids
+    );
     db.reorder_pinned_projects(project_ids)
         .map_err(|e| format!("Error reordering pinned projects: {}", e))
 }
@@ -687,7 +740,10 @@ pub async fn update_project_order(
     project_id: i64,
     new_order: i64,
 ) -> Result<(), String> {
-    debug!("↕️ [ORDER] Actualizando orden del proyecto ID: {} a {}", project_id, new_order);
+    debug!(
+        "↕️ [ORDER] Actualizando orden del proyecto ID: {} a {}",
+        project_id, new_order
+    );
     db.update_project_order(project_id, new_order)
         .map_err(|e| format!("Error updating project order: {}", e))
 }
@@ -714,9 +770,7 @@ pub async fn get_git_branch(db: State<'_, Database>, path: String) -> Result<Str
         .map_err(|e| format!("Failed to execute git command: {}", e))?;
 
     if output.status.success() {
-        let branch = String::from_utf8_lossy(&output.stdout)
-            .trim()
-            .to_string();
+        let branch = String::from_utf8_lossy(&output.stdout).trim().to_string();
         Ok(branch)
     } else {
         Err("La carpeta del proyecto no es un repositorio git.".to_string())
@@ -788,7 +842,10 @@ pub async fn get_recent_commits(
             .collect();
         Ok(commits)
     } else {
-        Err("La carpeta del proyecto no es un repositorio git, o todavía no tiene commits.".to_string())
+        Err(
+            "La carpeta del proyecto no es un repositorio git, o todavía no tiene commits."
+                .to_string(),
+        )
     }
 }
 
@@ -912,7 +969,10 @@ pub async fn git_add(
         Ok("Archivos staged exitosamente".to_string())
     } else {
         let error = String::from_utf8_lossy(&output.stderr);
-        Err(format!("No se pudieron preparar los archivos para el commit: {}", error))
+        Err(format!(
+            "No se pudieron preparar los archivos para el commit: {}",
+            error
+        ))
     }
 }
 
@@ -1059,9 +1119,7 @@ pub async fn get_git_ahead_behind(
 // ==================== COMANDOS PARA CONFIGURACIÓN ====================
 
 #[tauri::command]
-pub async fn get_config(
-    config_manager: State<'_, ConfigManager>,
-) -> Result<AppConfig, String> {
+pub async fn get_config(config_manager: State<'_, ConfigManager>) -> Result<AppConfig, String> {
     debug!("⚙️ [CONFIG] Obteniendo configuración");
     config_manager.get_config()
 }
@@ -1076,9 +1134,7 @@ pub async fn update_config(
 }
 
 #[tauri::command]
-pub async fn reset_config(
-    config_manager: State<'_, ConfigManager>,
-) -> Result<AppConfig, String> {
+pub async fn reset_config(config_manager: State<'_, ConfigManager>) -> Result<AppConfig, String> {
     debug!("🔄 [CONFIG] Reseteando configuración a valores por defecto");
     config_manager.reset_config()
 }
@@ -1227,8 +1283,7 @@ pub async fn select_files(
 
     match result {
         Some(paths) => {
-            let path_strings: Vec<String> =
-                paths.iter().map(|p| p.to_string()).collect();
+            let path_strings: Vec<String> = paths.iter().map(|p| p.to_string()).collect();
             debug!("✅ [DIALOG] {} archivos seleccionados", path_strings.len());
             Ok(path_strings)
         }
@@ -1321,8 +1376,14 @@ pub async fn get_root_projects(db: State<'_, Database>) -> Result<Vec<Project>, 
 
 /// Obtener subproyectos de un grupo
 #[tauri::command]
-pub async fn get_subprojects(db: State<'_, Database>, parent_id: i64) -> Result<Vec<Project>, String> {
-    debug!("📁 [GROUPS] Obteniendo subproyectos del grupo ID: {}", parent_id);
+pub async fn get_subprojects(
+    db: State<'_, Database>,
+    parent_id: i64,
+) -> Result<Vec<Project>, String> {
+    debug!(
+        "📁 [GROUPS] Obteniendo subproyectos del grupo ID: {}",
+        parent_id
+    );
     db.get_subprojects(parent_id)
         .map_err(|e| format!("Error getting subprojects: {}", e))
 }
@@ -1352,7 +1413,10 @@ pub async fn assign_project_to_group(
     child_id: i64,
     parent_id: Option<i64>,
 ) -> Result<(), String> {
-    debug!("📁 [GROUPS] Asignando proyecto {} al grupo {:?}", child_id, parent_id);
+    debug!(
+        "📁 [GROUPS] Asignando proyecto {} al grupo {:?}",
+        child_id, parent_id
+    );
     // El método DB ya devuelve un mensaje en español accionable (self/ciclo/inexistente);
     // se propaga directo para no enmascararlo con un prefijo genérico.
     db.assign_project_to_group(child_id, parent_id)
@@ -1367,7 +1431,8 @@ pub async fn export_project_to_pdf(
     debug!("📄 [PDF] Exportando proyecto ID: {}", project_id);
 
     // Obtener proyecto de la base de datos
-    let project = db.get_project(project_id)
+    let project = db
+        .get_project(project_id)
         .map_err(|e| format!("Error getting project: {}", e))?;
 
     // Exportar en la carpeta del proyecto (local_path)
@@ -1375,7 +1440,10 @@ pub async fn export_project_to_pdf(
 
     // Verificar que el directorio existe
     if !export_dir.exists() {
-        return Err(format!("El directorio del proyecto no existe: {}", project.local_path));
+        return Err(format!(
+            "El directorio del proyecto no existe: {}",
+            project.local_path
+        ));
     }
 
     // Nombre del archivo con timestamp
@@ -1400,25 +1468,31 @@ pub async fn export_project_to_pdf(
 // ==================== TIME TRACKING COMMANDS ====================
 
 use crate::tracking::aggregator::TimeStats;
-use crate::tracking::config::{GestorConfig, init_gestor_config, has_tracking_config, find_gestor_config};
+use crate::tracking::config::{
+    find_gestor_config, has_tracking_config, init_gestor_config, GestorConfig,
+};
 
 /// Inicializar tracking en un proyecto (crear carpeta .gestor/)
 #[tauri::command]
-pub async fn init_tracking(
-    db: State<'_, Database>,
-    project_id: i64,
-) -> Result<String, String> {
-    debug!("🕒 [TRACKING] Inicializando tracking para proyecto ID: {}", project_id);
+pub async fn init_tracking(db: State<'_, Database>, project_id: i64) -> Result<String, String> {
+    debug!(
+        "🕒 [TRACKING] Inicializando tracking para proyecto ID: {}",
+        project_id
+    );
 
     // Obtener información del proyecto
-    let project = db.get_project(project_id)
+    let project = db
+        .get_project(project_id)
         .map_err(|e| format!("Error getting project: {}", e))?;
 
     let project_path = std::path::Path::new(&project.local_path);
 
     // Verificar que el directorio existe
     if !project_path.exists() {
-        return Err(format!("El directorio del proyecto no existe: {}", project.local_path));
+        return Err(format!(
+            "El directorio del proyecto no existe: {}",
+            project.local_path
+        ));
     }
 
     // Inicializar la carpeta .gestor/
@@ -1475,10 +1549,7 @@ pub async fn find_tracking_project(path: String) -> Result<Option<GestorConfig>,
 
 /// Obtener estadísticas de tiempo para un proyecto
 #[tauri::command]
-pub async fn get_time_stats(
-    db: State<'_, Database>,
-    project_id: i64,
-) -> Result<TimeStats, String> {
+pub async fn get_time_stats(db: State<'_, Database>, project_id: i64) -> Result<TimeStats, String> {
     db.get_time_stats(project_id)
         .map_err(|e| format!("Error getting time stats: {}", e))
 }
@@ -1504,11 +1575,15 @@ pub async fn start_work_session(
     active_session: State<'_, ActiveSession>,
     project_id: i64,
 ) -> Result<WorkSessionResponse, String> {
-    debug!("🚀 [WORK] Iniciando sesión de trabajo para proyecto ID: {}", project_id);
+    debug!(
+        "🚀 [WORK] Iniciando sesión de trabajo para proyecto ID: {}",
+        project_id
+    );
 
     // Obtener información del proyecto. No depende del lock de sesión: puede resolverse
     // antes de tomarlo.
-    let project = db.get_project(project_id)
+    let project = db
+        .get_project(project_id)
         .map_err(|e| format!("Error getting project: {}", e))?;
 
     let project_path = std::path::Path::new(&project.local_path);
@@ -1517,16 +1592,27 @@ pub async fn start_work_session(
     // sesión activa), así que tampoco necesita el lock de sesión.
     let mut tracking_initialized = false;
     if project_path.exists() && !has_tracking_config(project_path) {
-        debug!("📁 [WORK] Inicializando tracking automáticamente para: {}", project.name);
+        debug!(
+            "📁 [WORK] Inicializando tracking automáticamente para: {}",
+            project.name
+        );
         let _config = init_gestor_config(project_path, project_id, project.name.clone())
             .map_err(|e| format!("Error initializing tracking: {}", e))?;
         tracking_initialized = true;
     }
 
-    let (session_id, previous_stopped) =
-        start_new_session_sync(&db, &active_session, project_id, &project.name, &project.local_path)?;
+    let (session_id, previous_stopped) = start_new_session_sync(
+        &db,
+        &active_session,
+        project_id,
+        &project.name,
+        &project.local_path,
+    )?;
 
-    info!("✅ [WORK] Sesión {} iniciada para: {}", session_id, project.name);
+    info!(
+        "✅ [WORK] Sesión {} iniciada para: {}",
+        session_id, project.name
+    );
 
     Ok(WorkSessionResponse {
         session_id,
@@ -1556,24 +1642,34 @@ fn start_new_session_sync(
     project_name: &str,
     project_path: &str,
 ) -> Result<(i64, bool), String> {
-    let mut session_state = active_session.0.lock()
+    let mut session_state = active_session
+        .0
+        .lock()
         .map_err(|_| "Error locking session state")?;
 
     let mut previous_stopped = false;
 
-    if let (Some(prev_session_id), Some(started_at)) = (session_state.session_id, session_state.started_at) {
+    if let (Some(prev_session_id), Some(started_at)) =
+        (session_state.session_id, session_state.started_at)
+    {
         // Calcular duración de la sesión anterior
         let duration = started_at.elapsed().as_secs() as i64;
 
         // Solo guardar si duró más de 10 segundos (evitar sesiones accidentales)
         if duration > 10 {
-            debug!("⏹️ [WORK] Parando sesión anterior {} ({}s)", prev_session_id, duration);
+            debug!(
+                "⏹️ [WORK] Parando sesión anterior {} ({}s)",
+                prev_session_id, duration
+            );
             db.end_tracking_session(prev_session_id, duration)
                 .map_err(|e| format!("Error stopping previous session: {}", e))?;
             previous_stopped = true;
         } else {
             // Eliminar sesión muy corta
-            debug!("🗑️ [WORK] Descartando sesión muy corta {} ({}s)", prev_session_id, duration);
+            debug!(
+                "🗑️ [WORK] Descartando sesión muy corta {} ({}s)",
+                prev_session_id, duration
+            );
             // Marcar como 0 segundos para que no cuente
             let _ = db.end_tracking_session(prev_session_id, 0);
         }
@@ -1587,7 +1683,8 @@ fn start_new_session_sync(
     session_state.started_at = None;
 
     // Crear nueva sesión de tracking (todavía bajo el mismo lock)
-    let session_id = db.create_tracking_session(project_id, "work_button")
+    let session_id = db
+        .create_tracking_session(project_id, "work_button")
         .map_err(|e| format!("Error creating tracking session: {}", e))?;
 
     // Publicar el nuevo estado global (todavía bajo el mismo lock)
@@ -1609,13 +1706,20 @@ pub fn stop_active_session_sync(
     db: &Database,
     active_session: &ActiveSession,
 ) -> Result<Option<i64>, String> {
-    let mut session_state = active_session.0.lock()
+    let mut session_state = active_session
+        .0
+        .lock()
         .map_err(|_| "Error locking session state")?;
 
-    if let (Some(session_id), Some(started_at)) = (session_state.session_id, session_state.started_at) {
+    if let (Some(session_id), Some(started_at)) =
+        (session_state.session_id, session_state.started_at)
+    {
         let duration = started_at.elapsed().as_secs() as i64;
 
-        info!("⏹️ [WORK] Parando sesión {} con {} segundos", session_id, duration);
+        info!(
+            "⏹️ [WORK] Parando sesión {} con {} segundos",
+            session_id, duration
+        );
 
         db.end_tracking_session(session_id, duration)
             .map_err(|e| format!("Error stopping session: {}", e))?;
@@ -1652,13 +1756,18 @@ pub async fn stop_work_session(
 fn work_session_status_sync(
     active_session: &ActiveSession,
 ) -> Result<TrackingStatusResponse, String> {
-    let session_state = active_session.0.lock()
+    let session_state = active_session
+        .0
+        .lock()
         .map_err(|_| "Error locking session state")?;
 
     // `project_path` sale del path REAL capturado al arrancar la sesión, no del nombre
     // del proyecto (ver `ActiveSessionState::project_path`).
-    if let (Some(project_id), Some(started_at), Some(ref project_path)) =
-        (session_state.project_id, session_state.started_at, &session_state.project_path) {
+    if let (Some(project_id), Some(started_at), Some(ref project_path)) = (
+        session_state.project_id,
+        session_state.started_at,
+        &session_state.project_path,
+    ) {
         Ok(TrackingStatusResponse {
             is_tracking: true,
             project_id: Some(project_id),
@@ -1721,8 +1830,14 @@ mod backup_filename_sanitization_tests {
 
     #[test]
     fn normal_names_are_left_intact_modulo_trim() {
-        assert_eq!(sanitize_backup_filename_component("Mi Proyecto"), "Mi Proyecto");
-        assert_eq!(sanitize_backup_filename_component("  Mi Proyecto  "), "Mi Proyecto");
+        assert_eq!(
+            sanitize_backup_filename_component("Mi Proyecto"),
+            "Mi Proyecto"
+        );
+        assert_eq!(
+            sanitize_backup_filename_component("  Mi Proyecto  "),
+            "Mi Proyecto"
+        );
     }
 
     /// Decisión explícita al unificar los tres saneados: el criterio del PDF convertía
@@ -1740,7 +1855,11 @@ mod backup_filename_sanitization_tests {
     /// así que `dir.join(resultado)` nunca puede salirse de `dir`.
     #[test]
     fn traversal_payload_collapses_to_single_path_component() {
-        for malicious in ["../../etc/passwd", "..\\..\\Windows\\System32", "/etc/shadow"] {
+        for malicious in [
+            "../../etc/passwd",
+            "..\\..\\Windows\\System32",
+            "/etc/shadow",
+        ] {
             let safe = sanitize_backup_filename_component(malicious);
             let as_path = Path::new(&safe);
             assert_eq!(
@@ -1902,16 +2021,29 @@ mod work_session_tests {
         let active_session = ActiveSession::default();
         let project_id = seed_project(&db, "Proyecto de prueba");
 
-        let (session_id_1, previous_stopped_1) =
-            start_new_session_sync(&db, &active_session, project_id, "Proyecto de prueba", "/tmp/does-not-matter")
-                .expect("primer start_work_session no debería fallar");
+        let (session_id_1, previous_stopped_1) = start_new_session_sync(
+            &db,
+            &active_session,
+            project_id,
+            "Proyecto de prueba",
+            "/tmp/does-not-matter",
+        )
+        .expect("primer start_work_session no debería fallar");
         assert!(!previous_stopped_1, "no había sesión previa que parar");
 
-        let (session_id_2, _previous_stopped_2) =
-            start_new_session_sync(&db, &active_session, project_id, "Proyecto de prueba", "/tmp/does-not-matter")
-                .expect("segundo start_work_session no debería fallar");
+        let (session_id_2, _previous_stopped_2) = start_new_session_sync(
+            &db,
+            &active_session,
+            project_id,
+            "Proyecto de prueba",
+            "/tmp/does-not-matter",
+        )
+        .expect("segundo start_work_session no debería fallar");
 
-        assert_ne!(session_id_1, session_id_2, "cada llamada debe crear su propia fila");
+        assert_ne!(
+            session_id_1, session_id_2,
+            "cada llamada debe crear su propia fila"
+        );
 
         let sessions = db
             .get_tracking_sessions(project_id, 10)
@@ -1921,8 +2053,14 @@ mod work_session_tests {
         // La sesión 1 (la vieja) tiene que haber quedado cerrada (ended_at set),
         // sin importar que haya durado <10s (se descarta con duration=0, pero
         // `ended_at` SIEMPRE se setea). La sesión 2 (la activa) queda abierta.
-        let session_1 = sessions.iter().find(|s| s.id == Some(session_id_1)).unwrap();
-        let session_2 = sessions.iter().find(|s| s.id == Some(session_id_2)).unwrap();
+        let session_1 = sessions
+            .iter()
+            .find(|s| s.id == Some(session_id_1))
+            .unwrap();
+        let session_2 = sessions
+            .iter()
+            .find(|s| s.id == Some(session_id_2))
+            .unwrap();
 
         assert!(
             session_1.ended_at.is_some(),
@@ -1958,15 +2096,24 @@ mod work_session_tests {
                 let barrier = Arc::clone(&barrier);
                 std::thread::spawn(move || {
                     barrier.wait();
-                    start_new_session_sync(&db, &active_session, project_id, "Proyecto concurrente", "/tmp/does-not-matter")
-                        .expect("start_work_session no debería fallar bajo concurrencia")
+                    start_new_session_sync(
+                        &db,
+                        &active_session,
+                        project_id,
+                        "Proyecto concurrente",
+                        "/tmp/does-not-matter",
+                    )
+                    .expect("start_work_session no debería fallar bajo concurrencia")
                 })
             })
             .collect();
 
         let results: Vec<(i64, bool)> = handles.into_iter().map(|h| h.join().unwrap()).collect();
         let session_ids: Vec<i64> = results.iter().map(|(id, _)| *id).collect();
-        assert_ne!(session_ids[0], session_ids[1], "cada hilo debe crear su propia fila");
+        assert_ne!(
+            session_ids[0], session_ids[1],
+            "cada hilo debe crear su propia fila"
+        );
 
         let sessions = db
             .get_tracking_sessions(project_id, 10)
@@ -1995,9 +2142,14 @@ mod work_session_tests {
         let active_session = ActiveSession::default();
         let project_id = seed_project(&db, "Proyecto a cerrar");
 
-        let (session_id, _) =
-            start_new_session_sync(&db, &active_session, project_id, "Proyecto a cerrar", "/tmp/does-not-matter")
-                .expect("start_work_session no debería fallar");
+        let (session_id, _) = start_new_session_sync(
+            &db,
+            &active_session,
+            project_id,
+            "Proyecto a cerrar",
+            "/tmp/does-not-matter",
+        )
+        .expect("start_work_session no debería fallar");
 
         let stopped = stop_active_session_sync(&db, &active_session)
             .expect("stop_active_session_sync no debería fallar");

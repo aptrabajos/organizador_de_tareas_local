@@ -196,7 +196,6 @@ pub struct DashboardData {
     pub recent_journal_entries: Vec<DashboardJournalEntry>,
 }
 
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProjectTodo {
     pub id: i64,

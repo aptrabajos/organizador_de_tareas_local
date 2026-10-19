@@ -60,11 +60,7 @@ impl LinuxPlatform {
         }
 
         // Intentar tilix
-        if Command::new("tilix")
-            .args(["-w", path])
-            .spawn()
-            .is_ok()
-        {
+        if Command::new("tilix").args(["-w", path]).spawn().is_ok() {
             return Ok(());
         }
 
@@ -118,11 +114,10 @@ impl PlatformOperations for LinuxPlatform {
                     .as_ref()
                     .ok_or("Ruta de terminal personalizado no configurada")?;
 
-                let vars: HashMap<String, String> =
-                    [("path".to_string(), path.to_string())]
-                        .iter()
-                        .cloned()
-                        .collect();
+                let vars: HashMap<String, String> = [("path".to_string(), path.to_string())]
+                    .iter()
+                    .cloned()
+                    .collect();
 
                 let args: Vec<String> = config
                     .platform
@@ -147,11 +142,10 @@ impl PlatformOperations for LinuxPlatform {
                     .as_ref()
                     .ok_or("Script de terminal no configurado")?;
 
-                let vars: HashMap<String, String> =
-                    [("path".to_string(), path.to_string())]
-                        .iter()
-                        .cloned()
-                        .collect();
+                let vars: HashMap<String, String> = [("path".to_string(), path.to_string())]
+                    .iter()
+                    .cloned()
+                    .collect();
 
                 self.execute_script(script, vars)
             }
@@ -191,11 +185,10 @@ impl PlatformOperations for LinuxPlatform {
                     .as_ref()
                     .ok_or("Script de navegador no configurado")?;
 
-                let vars: HashMap<String, String> =
-                    [("url".to_string(), url.to_string())]
-                        .iter()
-                        .cloned()
-                        .collect();
+                let vars: HashMap<String, String> = [("url".to_string(), url.to_string())]
+                    .iter()
+                    .cloned()
+                    .collect();
 
                 self.execute_script(script, vars)
             }
@@ -244,11 +237,10 @@ impl PlatformOperations for LinuxPlatform {
                     .as_ref()
                     .ok_or("Script de editor no configurado")?;
 
-                let vars: HashMap<String, String> =
-                    [("path".to_string(), path.to_string())]
-                        .iter()
-                        .cloned()
-                        .collect();
+                let vars: HashMap<String, String> = [("path".to_string(), path.to_string())]
+                    .iter()
+                    .cloned()
+                    .collect();
 
                 self.execute_script(script, vars)
             }
@@ -256,28 +248,22 @@ impl PlatformOperations for LinuxPlatform {
     }
 
     fn get_config_dir(&self) -> Result<PathBuf, String> {
-        let config_dir = dirs::config_dir()
-            .ok_or("No se pudo obtener directorio de configuración")?;
+        let config_dir =
+            dirs::config_dir().ok_or("No se pudo obtener directorio de configuración")?;
         Ok(config_dir.join("gestor-proyectos"))
     }
 
     fn get_data_dir(&self) -> Result<PathBuf, String> {
-        let data_dir = dirs::data_dir()
-            .ok_or("No se pudo obtener directorio de datos")?;
+        let data_dir = dirs::data_dir().ok_or("No se pudo obtener directorio de datos")?;
         Ok(data_dir.join("gestor-proyectos"))
     }
 
     fn get_default_backup_path(&self) -> Result<PathBuf, String> {
-        let home = dirs::home_dir()
-            .ok_or("No se pudo obtener directorio home")?;
+        let home = dirs::home_dir().ok_or("No se pudo obtener directorio home")?;
         Ok(home.join("Backups").join("gestor-proyectos"))
     }
 
-    fn execute_script(
-        &self,
-        script: &str,
-        vars: HashMap<String, String>,
-    ) -> Result<(), String> {
+    fn execute_script(&self, script: &str, vars: HashMap<String, String>) -> Result<(), String> {
         // Reemplazar variables escapando cada valor como literal de shell
         // POSIX. El script en sí lo escribe el usuario (modo "Custom Script")
         // y se ejecuta intencionalmente con `bash -c`, pero los VALORES
