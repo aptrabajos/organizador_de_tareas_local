@@ -1,7 +1,7 @@
 # Diseño: `gestor-trackerd`, el demonio de medición de tiempo
 
 > **Estado:** aprobado (v3.2). F0 está hecha (commits 1–9, rama `feat/tracker-f0`
-> en `83c48d4`); `83c48d4` (refresco de la tarjeta) queda **fuera** de la
+> en `893299b`); `893299b` (refresco de la tarjeta) queda **fuera** de la
 > numeración. De F1 en adelante no hay nada implementado: el commit 10 (migraciones
 > versionadas) **no** está en el código (`rg user_version src-tauri/src` no
 > encuentra nada). Las decisiones DX1–DX5 de 9.2 están confirmadas desde el
@@ -9,7 +9,7 @@
 > 2026-10-20 (§1.1 y 9.3). DX3/DX4 siguen pidiendo un "sí" caso por caso antes de
 > reescribir filas (commit 72). DX5 (CI) se agrega cuando se autorice el push a GitHub.
 > **Fecha:** 2026-10-20 · **Base:** `main@c8b55ae` (B14 ya mergeado) para las
-> secciones 2–9 heredadas de la v3.1; `feat/tracker-f0@83c48d4` para las líneas de
+> secciones 2–9 heredadas de la v3.1; `feat/tracker-f0@893299b` para las líneas de
 > código que cita R8 (3.10, 5.6), que corren distinto.
 > **Alcance:** solo Linux (systemd). Instalación soportada: `install.sh` /
 > `scripts/release.sh --install`. **Ajustes manuales del tiempo: sí**, solo de
@@ -182,7 +182,7 @@ Los números de la base real se midieron en modo solo lectura sobre
   (`db/tracking.rs:32`): no hay forma de cerrar una sesión en otro instante.
 - Regla de los 10 s: una sesión de 10 s o menos se guarda con
   `duration_seconds = 0`, pero **solo** al cambiar de proyecto (detalle y líneas
-  en 3.2, "Regla única de duración mínima"). Resuelto en F0 (commit 8, `a3f5e76`).
+  en 3.2, "Regla única de duración mínima"). Resuelto en F0 (commit 8, `b9343a1`).
 - "Trabajar" crea `.gestor/` en el proyecto si no existe
   (`commands/mod.rs:1519-1524`), y la tarjeta solo muestra estadísticas si existe (P15).
 
@@ -218,8 +218,8 @@ solo proyecto (id 3: 30.348 s contra 38.448 s).
 | P19 | La base es legible por cualquier usuario: `projects.db` en `0644` y su carpeta en `0755` (medido) | `~/.local/share/gestor-proyectos/` | El demonio corre siempre; los `-wal`/`-shm` y los backups heredan esos permisos |
 
 Resueltos en F0 (rama `feat/tracker-f0`; la tabla describe `main@c8b55ae`): P2 (commit
-3, `c0d0a6f`), P7 (6, `9017485`), P8 (9, `0d2fb1f`), P9 (7, `895955f`), P11 (4,
-`fa35369`) y P16 (5, `c9f5e74`).
+3, `8942ce7`), P7 (6, `5ff2e79`), P8 (9, `6e6f3ab`), P9 (7, `f50e439`), P11 (4,
+`dd2f89a`) y P16 (5, `ba6d7a1`).
 
 ### 2.3 Lo que juega a favor
 
@@ -419,12 +419,12 @@ cierran en su `started_at` con 0 s. Hoy ya suman 0, así que el total no cambia.
 `create_tracking_session` y `end_tracking_session` quedan como envoltorios con
 "ahora" para no tocar los llamadores de golpe.
 
-**Regla única de duración mínima (M8), hecha en F0** (commit 8, `a3f5e76`). Antes
+**Regla única de duración mínima (M8), hecha en F0** (commit 8, `b9343a1`). Antes
 de F0 la regla de los 10 s se aplicaba solo al cambiar de proyecto (`main@c8b55ae`,
 `commands/mod.rs:1569-1579`); Parar y cerrar la ventana guardaban cualquier duración,
 y el cierre con 0 s descartaba su error (`let _`). Desde el commit 8 hay una sola
 función, `duracion_a_guardar(source, segundos)` (`commands/mod.rs:1704` en
-`83c48d4`), que usan **todos** los cierres; R8 le suma el caso `terminal` (commit 15):
+`893299b`), que usan **todos** los cierres; R8 le suma el caso `terminal` (commit 15):
 
 - `work_button` y fuentes viejas: 10 s o menos se guardan como 0. La fila se conserva, con su `ended_at`, pero no cuenta como sesión (3.3). El error del cierre se propaga.
 - `file_watch`: sin regla de 10 s; la cubre el margen de abajo.
@@ -461,7 +461,7 @@ en el esquema para no romper bases viejas ni backups, pero el código deja de
 leerla y de escribirla en dos commits (D2):
 
 - **Lectura por unión:** `get_time_stats` y `get_project_stats.total_time_hours` (`db/activity.rs:63-69`) pasan a `tiempo_trabajado` (3.3). Nada se borra todavía.
-- **Sacar el contador:** el segundo `UPDATE` de `end_tracking_session` (`db/tracking.rs:37-43`; `~49-54` en `83c48d4`); `add_project_time` (`db/activity.rs:28-39`), su comando (`commands/mod.rs:501-508`; `:533-542` en `83c48d4`), su registro (`main.rs:113`; `:119` en `83c48d4`) y su función de API sin llamadores (`src/services/api.ts:161-166`); el campo en `PROJECT_COLUMNS` y en el mapeo (`db/common.rs:18,43`), en el modelo (`models/project.rs:30`) y en el tipo (`src/types/project.ts:33`); los tests que lo afirman (`db/tracking.rs:170-172,185,191-195`, `db/activity.rs:164-172`) y el fixture (`models/project.rs:250`); y `ARQUITECTURA.md:442`.
+- **Sacar el contador:** el segundo `UPDATE` de `end_tracking_session` (`db/tracking.rs:37-43`; `~49-54` en `893299b`); `add_project_time` (`db/activity.rs:28-39`), su comando (`commands/mod.rs:501-508`; `:533-542` en `893299b`), su registro (`main.rs:113`; `:119` en `893299b`) y su función de API sin llamadores (`src/services/api.ts:161-166`); el campo en `PROJECT_COLUMNS` y en el mapeo (`db/common.rs:18,43`), en el modelo (`models/project.rs:30`) y en el tipo (`src/types/project.ts:33`); los tests que lo afirman (`db/tracking.rs:170-172,185,191-195`, `db/activity.rs:164-172`) y el fixture (`models/project.rs:250`); y `ARQUITECTURA.md:442`.
 ### 3.3 Cálculo del tiempo: unión de tramos
 
 **Formato único de fechas** (`time.rs`): todo se guarda como
@@ -531,7 +531,7 @@ consulta por proyecto.
 `session_id` y `started_at.elapsed()`, y lo **sueltan** antes de tocar la base. El
 orden de locks es siempre `ActiveSession → Database`, nunca al revés:
 `start_new_session_sync` ya sostiene el de la sesión mientras escribe en la base
-(`start_new_session_sync`, `commands/mod.rs:1638-1684` en `83c48d4`). El demonio llama con `activa = None`.
+(`start_new_session_sync`, `commands/mod.rs:1638-1684` en `893299b`). El demonio llama con `activa = None`.
 
 **Hora local:** "hoy" va de la medianoche local a la medianoche local, como rango
 `[desde, hasta)` en UTC antes de consultar. Una sesión que cruza la medianoche
@@ -906,8 +906,8 @@ con `--data-dir` o `GESTOR_DB`, como la app.
 | `busy_timeout = 5000` | Se mantiene como **requisito** en las dos conexiones (`db/schema.rs:21`). Sin él, cualquier escritura del otro proceso es un `SQLITE_BUSY` inmediato |
 | `synchronous = NORMAL` | En las dos conexiones. Es seguro con WAL |
 | **Las 6 transacciones** pasan a `transaction_with_behavior(Immediate)` (P13) | El riesgo real son dos: `restore_project` y `purge_project` **leen antes de escribir**, y con WAL una transacción diferida así falla con `SQLITE_BUSY_SNAPSHOT` si el otro proceso escribe en el medio; `busy_timeout` no la salva. Las otras cuatro empiezan escribiendo y solo esperarían. Igual pasan todas, por una regla simple: **toda transacción que escribe es `IMMEDIATE`**, así nadie agrega después una lectura al principio de una diferida (D9). Dos llegan antes que el resto: `end_tracking_session` en el commit 15 y `delete_project` en el 18, porque desde ahí compiten con otras conexiones; el commit 28 convierte las **cuatro** que quedan (`trash.rs:68/145/211`, `status.rs:75`, líneas de `feat/tracker-f0`, 3.10.7). `empty_trash` mete adentro el `SELECT` de ids que hoy hace afuera (`db/trash.rs:205-211`), y `restore_project` y `purge_project` meten adentro la guarda `SELECT deleted_at` que hoy validan antes de abrir la transacción (`db/trash.rs:56-66` y `:133-143`): si no, otro proceso puede restaurar o purgar entre la guarda y la escritura |
-| `end_tracking_session` idempotente (P2). **Hecho en F0** (commit 3, `c0d0a6f`) | `WHERE id = ? AND ended_at IS NULL`. Si ese `UPDATE` no afecta ninguna fila, **no** se ejecuta el segundo, el que suma al contador (`db/tracking.rs:38-43`): se hace rollback y se devuelve `Ok(false)` (B3). Rige hasta que el contador desaparece (3.2) |
-| `get_project` y `update_project` sin `try_lock` (P16). **Hecho en F0** (commit 5, `c9f5e74`) | Pasan a `self.conn()`, que espera y se recupera del envenenamiento como el resto (D7). La "cicatriz de deadlock" del comentario (`db/projects.rs:111-112`) no tiene sustento hoy: `get_project` pasa su guard a `get_project_links_internal` (`:142`), `update_project` lo suelta antes de llamar a `get_project` (`:244-249`) y `get_project_with_children` llama a `get_project` sin tener el lock (`db/groups.rs:81`). La espera queda acotada por lo que tarda la transacción del otro lado, que en el demonio son milisegundos; ningún método sostiene el Mutex más allá de su propia consulta |
+| `end_tracking_session` idempotente (P2). **Hecho en F0** (commit 3, `8942ce7`) | `WHERE id = ? AND ended_at IS NULL`. Si ese `UPDATE` no afecta ninguna fila, **no** se ejecuta el segundo, el que suma al contador (`db/tracking.rs:38-43`): se hace rollback y se devuelve `Ok(false)` (B3). Rige hasta que el contador desaparece (3.2) |
+| `get_project` y `update_project` sin `try_lock` (P16). **Hecho en F0** (commit 5, `ba6d7a1`) | Pasan a `self.conn()`, que espera y se recupera del envenenamiento como el resto (D7). La "cicatriz de deadlock" del comentario (`db/projects.rs:111-112`) no tiene sustento hoy: `get_project` pasa su guard a `get_project_links_internal` (`:142`), `update_project` lo suelta antes de llamar a `get_project` (`:244-249`) y `get_project_with_children` llama a `get_project` sin tener el lock (`db/groups.rs:81`). La espera queda acotada por lo que tarda la transacción del otro lado, que en el demonio son milisegundos; ningún método sostiene el Mutex más allá de su propia consulta |
 | Checkpoint | El demonio corre `wal_checkpoint(TRUNCATE)` cada hora |
 | Backups (`VACUUM INTO`) | Siguen igual. La copia se pasa a `journal_mode=DELETE` **antes** de verificarla, para que no aparezcan `-wal`/`-shm` en la carpeta de backups |
 | **Permisos** (P19, D11) | `paths::data_dir()` crea la carpeta con `0700` y corrige una existente. `Database::new` deja `projects.db` en `0600` **antes** de activar WAL: SQLite crea `-wal` y `-shm` con los permisos del archivo de la base. Cada backup nuevo queda en `0600`. El unit lleva `UMask=0077` (3.7) |
@@ -1101,7 +1101,7 @@ crea la sesión, `stop` la cierra. Paso manual: `systemd-analyze security --user
 gestor-trackerd` y anotar el puntaje en el PR.
 ### 3.8 Ciclo de vida desde la app (R6)
 
-**Hecho en F0** (commit 4, `fa35369`). En `main@c8b55ae`, `main.rs` no tenía
+**Hecho en F0** (commit 4, `dd2f89a`). En `main@c8b55ae`, `main.rs` no tenía
 `.setup()`: abría la base, leía la config y hacía el auto-backup en `main()` antes
 del plugin de instancia única (`main.rs:29-53` contra `:60`, P11). Desde el commit 4
 corre **después** de los plugins (D15), con este orden, que sale de cómo arranca Tauri 2 (verificado en `crates/tauri/src/app.rs`,
@@ -1237,7 +1237,7 @@ CLI `gestor` y, solo con `--rc`, sus bloques de los rc (3.10.16).
 **El tiempo deja de depender de `.gestor/` (B2).** Hoy `TimeTracker.tsx`
 (`loadTrackingData`, `:272-289`) llama a `checkTrackingConfig` y **solo** pide
 `getTimeStats` si existe `<proyecto>/.gestor/config.json` (`:277-283`, que usa
-`has_tracking_config` de `tracking/config.rs:122`; `:125` en `83c48d4`). Si no, las dos vistas muestran
+`has_tracking_config` de `tracking/config.rs:122`; `:125` en `893299b`). Si no, las dos vistas muestran
 el botón "Track" / "El tracking de tiempo no está activado" (`:41-65` en `CompactView`, `:130-150` en `FullView`).
 El demonio no crea `.gestor/` (y la ignora, 3.5), así que todo lo que mide sería
 **invisible**. Cambio: `TimeTracker` carga `getTimeStats` **siempre** y desaparece
@@ -1315,7 +1315,7 @@ acá. Las decisiones del usuario están en §1.1 y sus excepciones en §1.2.
 **Vocabulario.** "Sesión" en la UI quiere decir **token** (una fila de
 `trabajar_sesiones`); "tramo" quiere decir **fila** de `time_tracking_sessions`. "UA"
 es la **última actividad** válida de la sesión. Las líneas de código citadas en este
-capítulo son de `feat/tracker-f0@83c48d4`.
+capítulo son de `feat/tracker-f0@893299b`.
 
 | Subsección | Tema |
 |---|---|
@@ -2425,7 +2425,7 @@ Vale también con el demonio caído.
 **Lectura.** La tarjeta lee el estado de `get_live_tracking` (64): sesiones vivas con
 `token`, `estado`, `dueno`, `origen`, `creada_at`, `last_seen_at`, tramo abierto y
 cantidad de terminales. Relee cada 5 s con la ventana visible, al ganar el foco y
-después de cada acción. Los tests de `83c48d4` (`ProjectList.work.test.tsx`) se
+después de cada acción. Los tests de `893299b` (`ProjectList.work.test.tsx`) se
 conservan.
 
 **Indicador de la tarjeta, por estado:**
@@ -2847,15 +2847,15 @@ completa está en 4.10.
 
 ### F0 — Puerta de calidad y arreglos heredados
 
-Hecha en la rama `feat/tracker-f0`: 1 `476a936` · 2 `f2d48c7` · 3 `c0d0a6f` · 4
-`fa35369` · 5 `c9f5e74` · 6 `9017485` · 7 `895955f` · 8 `a3f5e76` · 9 `0d2fb1f`.
-`83c48d4` (la tarjeta refresca el total después de Parar) queda fuera de la
+Hecha en la rama `feat/tracker-f0`: 1 `36896d1` · 2 `8fb3000` · 3 `8942ce7` · 4
+`dd2f89a` · 5 `ba6d7a1` · 6 `5ff2e79` · 7 `f50e439` · 8 `b9343a1` · 9 `6e6f3ab`.
+`893299b` (la tarjeta refresca el total después de Parar) queda fuera de la
 numeración. Las líneas de código de esta tabla son las de `main@c8b55ae`, antes de
 cada commit.
 
 | # | Commit | Test | Hallazgos | Depende de |
 |---|---|---|---|---|
-| 1 | `cargo fmt` de todo el crate, sin otro cambio. Antes del commit, `cargo fmt --check` reportaba **127** bloques de diferencia (medido sobre `main@c8b55ae`); desde `476a936` sale con 0 | `cargo test` sin cambios; `git diff --stat` solo de formato | B6a | — |
+| 1 | `cargo fmt` de todo el crate, sin otro cambio. Antes del commit, `cargo fmt --check` reportaba **127** bloques de diferencia (medido sobre `main@c8b55ae`); desde `36896d1` sale con 0 | `cargo test` sin cambios; `git diff --stat` solo de formato | B6a | — |
 | 2 | `scripts/check.sh` (5.5). Si `cargo clippy --all-targets -- -D warnings` no pasa sobre `main`, los avisos se corrigen en este mismo commit, sin cambios de comportamiento | Correr el script en verde; romper el formato de un archivo a propósito → el script falla | B6a | 1 |
 | 3 | `end_tracking_session` idempotente: `WHERE id = ? AND ended_at IS NULL`; si afecta 0 filas, rollback y **no** corre el `UPDATE` del contador (`db/tracking.rs:38-43`); devuelve `Ok(false)` | Cerrar dos veces suma **una** vez (contador y `duration_seconds` intactos tras el 2º); se mantiene `test_end_tracking_session_with_unknown_id_credits_no_project` | P2, B3 | — |
 | 4 | Base, config, nivel de log y auto-backup pasan a correr **después** del plugin de instancia única (`main.rs:29-53` contra `:60`), con el orden de 3.8: `Builder::build()` → `Database::new` + `app.manage(db)`, `config`, `ActiveSession` **síncronos** → `app.run()`; el auto-backup y todo trabajo lento van en un hilo lanzado desde `.setup()`. Un error de `Database::new` sale como `Err` con mensaje | Paso manual 1 (5.3): lanzar la app dos veces seguidas → una ventana y **un** backup nuevo; un `invoke` inmediato desde la ventana (por ejemplo `get_all_projects` en el primer render) no falla por estado no registrado | P11, D15 | — |
@@ -2876,7 +2876,7 @@ cada commit.
 | 14 | Sesiones con instante explícito: `abrir_sesion`, `latir`, `cerrar_sesion` con `Result<bool>`; `create_/end_tracking_session` quedan como envoltorios | Abrir escribe `last_activity_at = started_at`; cerrar dos veces → `false`; `latir` sobre cerrada o id inexistente → `false` | D14, M7 | 12 |
 | 15 | **R8-1.** `checkpoint: esquema paso 4 para sesiones de Trabajar atadas a la terminal`. `trabajar_sesiones` (con `CHECK` de estado y motivo, `adoptada_at`, `ultimo_clic_at`, sin `ultima_actividad_at`), `trabajar_anclas` completa (3.10.1: `token` nullable, `pid`, `starttime`, `tty_nr`, `multiplexor`, `desde`, `hasta`, `motivo_salida` con `sesion_terminada`), `trabajar_evidencia` (con `ausente_desde_s`/`ausente_hasta_s`), `archivos_evidencia` (U1), `terminal_token` y `motivo_cierre` (con el `CHECK` de tramo de sesión con motivo y `tope_sin_tracker` en las listas, U6) en `time_tracking_sessions`, `source = 'terminal'`, `presencia*` y `trabajar_idle_minutes` en `tracker_status`, los tres índices parciales (el de tramo abierto, **único**); `ESQUEMA_ACTUAL = 4`. `db/trabajar.rs` con todos los métodos condicionales en `transaction_with_behavior(Immediate)`, `terminar_sesiones_de(ids, fin, motivo)` (con la regla única de `terminada_at` de 3.10.15 y el cierre de las anclas abiertas), `pasar_a_esperando_demonio(token)`, `cerrar_por_terminal(token, escaneo)` condicional (3.10.2, sin carrera), `cerrar_reclamos_muertos(...)` y `registrar_evidencia(...)` / `registrar_evidencia_archivos(...)` (UPSERT con OR de bits y MIN/MAX de los segundos). `cerrar_sesion(id, fin, dur, motivo)`. `duracion_a_guardar('terminal', s) = s`. `demonio_vivo(conn, ahora)` (con `comm`). `end_tracking_session` a `IMMEDIATE`. Helper `flock` compartido de `restore.lock` | De 3 a 4 y del esquema viejo real a 4; dos sesiones vivas en un proyecto → error; terminar dos veces → `false`; `abrir_tramo` sobre un token cerrado → `None`; Parar y "terminal cerrada" a la vez desde dos conexiones → un solo `true`; sesión cerrada sin motivo → error de `CHECK`; tramo con token cerrado sin motivo (`UPDATE` e `INSERT`) → error de `CHECK`, y las filas viejas sin token cerradas sin motivo se aceptan; dos tramos abiertos de un token → error de índice; UPSERT de evidencia con OR de bits y los segundos sin presencia (cuatro combinaciones de nulos; bit 32 sin segundos → error de `CHECK`); `archivos_evidencia` con un bit distinto de 8 o 32 → error de `CHECK`; tramo de 0 s → borrado; borrar el proyecto → cascada; `terminada_at` nunca menor que `MAX(ended_at)` (sesión sin `last_seen_at` con tramos de archivos); `cerrar_por_terminal` con un `ultimo_clic_at` o un ancla posteriores al escaneo → no cierra; `demonio_vivo` (sin fila, `desactivado`, `pid NULL`, latido 44/46 s, pid inexistente, pid vivo con otro `comm`); `end_tracking_session` con dos conexiones | R8, DT1, DT5, DT12, DT14, U1, U6 | 10, 13, 14 |
 | 16 | **R8-2.** `checkpoint: la terminal de Trabajar nace con la marca de la sesión y sin zombis`. `open_terminal(path, config, marca: Option<&MarcaSesion>)` en el trait y las dos plataformas; `argv_terminal` con la tabla de flags; `comando_script()` privado (la marca nunca llega a navegador ni editor); helper `lanzar(cmd)` con hilo `wait()` para **todos** los spawns de `linux.rs`; `try_terminal_fallback` con `match spawn()`; el comando `open_terminal` pasa `None`; `limpiar_entorno_heredado()` (`remove_var("GESTOR_SESION")`) antes de `logging::init()`; `scripts/check.sh --windows` (`cargo check --locked --target x86_64-pc-windows-gnu`, fuera del check por defecto porque la caché de cargo no tiene las dependencias de Windows y bajarlas necesita red: paso manual `cargo fetch` del usuario o CI, 3.10.3) | Golden de `argv_terminal` (la marca es **un** elemento del argv); terminal falsa en un `tempdir` del `PATH` que vuelca argv y `environ` → la marca está en los dos, y ausente sin marca con el padre marcado; reaper: la terminal falsa escribe su pid y se sondea hasta que `/proc/<pid>` desaparece; `comando_script` de navegador/editor sin marca; `limpiar_entorno_heredado` probado lanzando el binario de test con `GESTOR_SESION`; salida de `check.sh --windows` pegada en el PR | R8 | — |
-| 17 | **R8-3.** `checkpoint: Trabajar y Parar leen la sesión de la base y conviven por proyecto`. `trabajar(project_id)` (reutiliza el token vivo, D-R8-4; dueño `app` hasta el commit 58 (R8-8); rechaza proyecto en la papelera y con `restore.lock` tomado); `parar(project_id, token, origen) -> ResultadoParar { Cerrada, YaCerrada{motivo, segundos}, Ninguna }`; `estado_trabajar()`; `ActiveSession(Mutex<Option<MedicionApp>>)`; Trabajar en otro proyecto cierra el tramo de la app y pasa el token a `esperando_demonio`; `al_cerrar_ventana` en `CloseRequested`; `tracker_soportado()` (Linux, sin `GESTOR_NO_TRACKERD` y con `BIN_DIR/gestor-trackerd` presente) y `adopcion_imposible()` **solo** con `!tracker_soportado()` (la cláusula `daemon_enabled` entra en el 35, 3.10.7): en F1–F5 da verdadero y todo termina como hoy; `ultimo_clic_at` al crear o reutilizar; la sesión `dueno = app` vive en `viva_activa`; `TOPE_SIN_TRACKER = 43200` (U6): Parar, Trabajar en otro proyecto y cerrar la ventana recortan a 12 h (el latido que corta en el tope llega con el 19), y Trabajar con `dueno = app` devuelve `aviso_sin_tracker` para el toast solo si `adopcion_imposible()` es falso; `estado_trabajar()` devuelve además `adopcion_imposible` y si el demonio corrió alguna vez (fila en `tracker_status`), y la cabecera aplica `aviso_cabecera` de 3.10.14 (U6: alarma, línea de Trabajar o nada). Salen `start_work_session`, `stop_work_session`, `get_work_session_status`; el campo `previous_session_stopped` pasa a `sesion_anterior`. Frontend: `api.trabajar`, `parar`, `estadoTrabajar`; `trabajar` abre la terminal en el backend (con la marca), así que `src/utils/workSession.ts` (`trabajarEnProyecto`) deja de recibir el callback `abrirTerminal`, y sus dos llamadores lo sueltan: `Dashboard.tsx:52-67` y `ProjectList.tsx:230`; la tarjeta relee al ganar el foco y después de cada acción | Rust: A y B con la app → A `esperando_demonio`, una sola `MedicionApp`, A en `viva_activa` mientras se mide; A dos veces → mismo token y `ultimo_clic_at` nuevo; Parar → `Cerrada`, otra vez → `Ninguna`, con token cerrado → `YaCerrada{motivo}`; cerrar la ventana con un `gestor-trackerd` falso en el `BIN_DIR` temporal → tramo `cierre_app`, token en espera; sin ese binario (F1–F5) → `cerrada/cierre_app`, y Trabajar en otro proyecto → `cerrada/cambio_de_proyecto`; Windows simulado → `cerrada/cierre_app`; spawn que falla con token nuevo → token borrado; Parar con un `Instant` de 13 h (reloj inyectado) → 43200 s; Trabajar con `dueno = app` → `aviso_sin_tracker` con el binario presente, y sin aviso con adopción imposible; tabla de `aviso_cabecera` (los cuatro casos de 3.10.14, dos sondeos contra uno); los tests de `work_session_tests` reescritos o ajustados (§5.6). Vitest: los tres de `ProjectList.work.test.tsx` de `83c48d4` (193, 211 y 226) conservan su intención; los usos de `previous_session_stopped` (`api.test.ts:863-875`, `test-setup.ts:142`, `Dashboard.test.tsx:243`, `ProjectList.work.test.tsx:234`) pasan a `sesion_anterior`; `workSession.ts` sin `abrirTerminal` (hoy no tiene test propio: se cubre por `Dashboard.test.tsx` y `ProjectList.work.test.tsx`); toast de `YaCerrada`; toast "El tracker no está corriendo…" con `aviso_sin_tracker`; cabecera: alarma con fila en `tracker_status` y dos sondeos sin demonio, nada sin fila o con adopción imposible, línea "Trabajar mide sin vigilancia" con una sesión de la app (3.10.14); relectura al ganar el foco | D-R8-1, D-R8-2, D-R8-4, DT2, DT14, U4, U6 | 7, 8, 9, 15, 16 |
+| 17 | **R8-3.** `checkpoint: Trabajar y Parar leen la sesión de la base y conviven por proyecto`. `trabajar(project_id)` (reutiliza el token vivo, D-R8-4; dueño `app` hasta el commit 58 (R8-8); rechaza proyecto en la papelera y con `restore.lock` tomado); `parar(project_id, token, origen) -> ResultadoParar { Cerrada, YaCerrada{motivo, segundos}, Ninguna }`; `estado_trabajar()`; `ActiveSession(Mutex<Option<MedicionApp>>)`; Trabajar en otro proyecto cierra el tramo de la app y pasa el token a `esperando_demonio`; `al_cerrar_ventana` en `CloseRequested`; `tracker_soportado()` (Linux, sin `GESTOR_NO_TRACKERD` y con `BIN_DIR/gestor-trackerd` presente) y `adopcion_imposible()` **solo** con `!tracker_soportado()` (la cláusula `daemon_enabled` entra en el 35, 3.10.7): en F1–F5 da verdadero y todo termina como hoy; `ultimo_clic_at` al crear o reutilizar; la sesión `dueno = app` vive en `viva_activa`; `TOPE_SIN_TRACKER = 43200` (U6): Parar, Trabajar en otro proyecto y cerrar la ventana recortan a 12 h (el latido que corta en el tope llega con el 19), y Trabajar con `dueno = app` devuelve `aviso_sin_tracker` para el toast solo si `adopcion_imposible()` es falso; `estado_trabajar()` devuelve además `adopcion_imposible` y si el demonio corrió alguna vez (fila en `tracker_status`), y la cabecera aplica `aviso_cabecera` de 3.10.14 (U6: alarma, línea de Trabajar o nada). Salen `start_work_session`, `stop_work_session`, `get_work_session_status`; el campo `previous_session_stopped` pasa a `sesion_anterior`. Frontend: `api.trabajar`, `parar`, `estadoTrabajar`; `trabajar` abre la terminal en el backend (con la marca), así que `src/utils/workSession.ts` (`trabajarEnProyecto`) deja de recibir el callback `abrirTerminal`, y sus dos llamadores lo sueltan: `Dashboard.tsx:52-67` y `ProjectList.tsx:230`; la tarjeta relee al ganar el foco y después de cada acción | Rust: A y B con la app → A `esperando_demonio`, una sola `MedicionApp`, A en `viva_activa` mientras se mide; A dos veces → mismo token y `ultimo_clic_at` nuevo; Parar → `Cerrada`, otra vez → `Ninguna`, con token cerrado → `YaCerrada{motivo}`; cerrar la ventana con un `gestor-trackerd` falso en el `BIN_DIR` temporal → tramo `cierre_app`, token en espera; sin ese binario (F1–F5) → `cerrada/cierre_app`, y Trabajar en otro proyecto → `cerrada/cambio_de_proyecto`; Windows simulado → `cerrada/cierre_app`; spawn que falla con token nuevo → token borrado; Parar con un `Instant` de 13 h (reloj inyectado) → 43200 s; Trabajar con `dueno = app` → `aviso_sin_tracker` con el binario presente, y sin aviso con adopción imposible; tabla de `aviso_cabecera` (los cuatro casos de 3.10.14, dos sondeos contra uno); los tests de `work_session_tests` reescritos o ajustados (§5.6). Vitest: los tres de `ProjectList.work.test.tsx` de `893299b` (193, 211 y 226) conservan su intención; los usos de `previous_session_stopped` (`api.test.ts:863-875`, `test-setup.ts:142`, `Dashboard.test.tsx:243`, `ProjectList.work.test.tsx:234`) pasan a `sesion_anterior`; `workSession.ts` sin `abrirTerminal` (hoy no tiene test propio: se cubre por `Dashboard.test.tsx` y `ProjectList.work.test.tsx`); toast de `YaCerrada`; toast "El tracker no está corriendo…" con `aviso_sin_tracker`; cabecera: alarma con fila en `tracker_status` y dos sondeos sin demonio, nada sin fila o con adopción imposible, línea "Trabajar mide sin vigilancia" con una sesión de la app (3.10.14); relectura al ganar el foco | D-R8-1, D-R8-2, D-R8-4, DT2, DT14, U4, U6 | 7, 8, 9, 15, 16 |
 | 18 | **R8-3b.** `checkpoint: mandar a la papelera corta las sesiones vivas del proyecto y sus descendientes`. `delete_project` cierra en la misma transacción `IMMEDIATE` (con el `Instant` si la mide la app) y toast | Papelera de un padre con sesiones en padre e hijo → las dos `proyecto_a_papelera`; un fallo del `UPDATE` no deja sesiones cortadas; `trabajar` sobre un proyecto en la papelera → error en español | D-R8-1 (excepción) | 15, 17 |
 | 19 | Latido de "Trabajar" cada 60 s (`last_activity_at` **y** `duration_seconds` del `Instant`) + recuperación de huérfanas `work_button` en `.setup()` (> 2 min, reglas de 3.2) **R8:** El latido de 60 s es de la única `MedicionApp` y aplica el **tope de 12 h** (U6, 3.10.13): al llegar cierra el tramo en `started_at + 12 h` con `tope_sin_tracker` y pasa el token a `esperando_demonio` (o lo termina con `tope_sin_tracker` si la adopción es imposible). Huérfanas: solo `source = 'work_button'`; el tramo cierra con motivo `huerfana` (o `tope_sin_tracker` si pasó las 12 h, con la duración recortada a 43200) y el token pasa a `esperando_demonio` (o termina con ese motivo si la adopción es imposible, 3.10.7). Una fila `terminal` nunca se toca. | Huérfana con latido y suspensión → cierra con la duración, no con la diferencia; sin latido → 0 s; sesión de otra instancia con latido reciente → intacta; las 81 huérfanas reales no cambian el total. **R8:** latido con reloj inyectado a 12 h + 1 s → tramo de 43200 s con `tope_sin_tracker` y token en espera; ídem con Windows simulado → `cerrada/tope_sin_tracker`; huérfana de 13 h → 43200 s; huérfana con token → `esperando_demonio`; Windows simulado → `cerrada/huerfana`; huérfana **sin** token → solo el tramo, con `huerfana`. El ensayo sobre una copia de la base real va en el 24, que trae la API de backup (3.10.1) | P4, M7 | 4, 8, 14, 15, 17 |
 | 20 | `tiempo_trabajado(project_id, rango, activa)`: tramos de 3.3, unión y recorte; variante de una consulta para todos los proyectos **R8:** `activa` **sigue** siendo `Option<SesionActiva>`. Filas explícitas de `terminal` en la tabla de tramos (3.10.8) y `simultaneidad()`. | Disjuntos, superpuestos, anidados, que se tocan; abiertos de cada tipo; cruce de medianoche; regla de 10 s; `activa` con suspensión cuenta los segundos del `Instant`; `file_watch` abierto hasta `last_activity_at`; `ended_at` muy posterior no amplía el tramo; `activa` con id cerrado se ignora. **R8:** terminal 9–18 con suspensión 12–14 y `file_watch` 16–18 → 7 h; pausa con `file_watch` adentro y los 60 s de DX1; A 10–12 y B 11–13 → 1 h simultánea en cada uno (el paraguas se prueba en el 42) | R4, M5, M6 | 15, 19 |
@@ -3003,7 +3003,7 @@ corrida en la CI (3.10.3).
 |---|---|---|---|---|
 | 71 | `scripts/medir-trackerd.sh`: RSS, `%CPU`, `memory.current` del cgroup y `watched_dirs` (6) **R8:** `medir-trackerd.sh` mide la CPU también con **3 sesiones vivas** y el hilo de presencia (2 llamadas D-Bus cada 5 s). Umbral < 1 % | Correrlo con el demonio instalado; salida con los cuatro valores | T8, O3 | 59 |
 | 72 | `scripts/datos-historicos.sh`: aplica lo decidido en DX3 y DX4 sobre la base real. Por defecto solo muestra lo que haría (las filas y proyectos afectados, con la lista del commit 24); con `--aplicar` exige un "sí" escrito del usuario, hace antes un backup `VACUUM INTO` verificado con `integrity_check`, y aplica en una transacción `IMMEDIATE`. Con DX3 (a), "marcar" no toca la base: solo genera la lista para el CHANGELOG | Contra una copia: sin `--aplicar` la base queda igual byte a byte; con `--aplicar` y una respuesta distinta de "sí" → nada cambia; con "sí" → backup presente y verificado antes del primer cambio | D3, DX3, DX4 | 24 |
-| 73 | `ARQUITECTURA.md`, `CLAUDE.md` (sección Time tracking: los dos caminos, el demonio, el piso de downgrade), CHANGELOG con cada diferencia del diff con datos reales (D3), la lista de sesiones > 12 h marcadas (DX3) y el "piso de downgrade". Después, `scripts/release.sh minor` **R8:** `ARQUITECTURA.md`, `CLAUDE.md` (Time tracking: sesión atada a la terminal, motivos, ajustes, CLI; conteo de comandos: hoy `CLAUDE.md` dice 79 y `generate_handler!` registra 80 (medido en `83c48d4`); salen `start_work_session`, `stop_work_session` y `get_work_session_status`, entran `trabajar`, `parar`, `estado_trabajar`, `desglose_tiempo` y los de ajustes, y el commit escribe el número que dé `generate_handler!` en ese momento), `docs/cli.md` (medición, `parar`, `estado`, `--sin-medir`, `ajustar`, `ajustes`) | — | D3, D10 | todos |
+| 73 | `ARQUITECTURA.md`, `CLAUDE.md` (sección Time tracking: los dos caminos, el demonio, el piso de downgrade), CHANGELOG con cada diferencia del diff con datos reales (D3), la lista de sesiones > 12 h marcadas (DX3) y el "piso de downgrade". Después, `scripts/release.sh minor` **R8:** `ARQUITECTURA.md`, `CLAUDE.md` (Time tracking: sesión atada a la terminal, motivos, ajustes, CLI; conteo de comandos: hoy `CLAUDE.md` dice 79 y `generate_handler!` registra 80 (medido en `893299b`); salen `start_work_session`, `stop_work_session` y `get_work_session_status`, entran `trabajar`, `parar`, `estado_trabajar`, `desglose_tiempo` y los de ajustes, y el commit escribe el número que dé `generate_handler!` en ese momento), `docs/cli.md` (medición, `parar`, `estado`, `--sin-medir`, `ajustar`, `ajustes`) | — | D3, D10 | todos |
 
 **Validación de F8:** matriz por terminal (5.3.1) y recorrido de R8 (pasos 19–42 de
 5.3.2) sobre la instalación real, además de la Definición de "listo" (§6).
@@ -3135,7 +3135,7 @@ una sola vez en la tabla (~0,5), y la fila "Integrar la v3.2 al documento y renu
 | Frontend | Contadores, indicador, ajustes, avisos, errores | `pnpm test` (Vitest) | Cada commit |
 | Manual guiado | 5.3 (pasos 1–18), 5.3.1 (matriz por terminal) y 5.3.2 (pasos 19–42) | Persona + checklist | Según la columna "Fase" de 5.3 (pasos 1–18); 5.3.1 y 5.3.2, al cerrar F8 |
 
-En `main@c8b55ae` había **171** `#[test]` en el crate, y en `feat/tracker-f0@83c48d4` hay **174** (medido). Los tests de integración no pueden
+En `main@c8b55ae` había **171** `#[test]` en el crate, y en `feat/tracker-f0@893299b` hay **174** (medido). Los tests de integración no pueden
 usar `db/test_support.rs` (es `#[cfg(test)]`): usan la API pública de la lib, que
 alcanza (`Database::new`, `create_project`, `abrir_sesion`, `latir`,
 `cerrar_sesion`, `tiempo_trabajado`, `db::restore::tomar_lock` y `restaurar_desde`).
@@ -3180,7 +3180,7 @@ la zona, no el reloj del sistema.
 | Subcomandos | `sesion` (rutas, guardas, códigos) y `ajuste` | 61 (R8-C2), 63 (R8-C4) |
 | CLI instalada | `instalar-cli.sh` con `HOME=$tmp PREFIX=$tmp`, rc solo con `--rc` | 60 (R8-C1) |
 | Desglose (Rust) | Tramos `solo_archivos` derivados de las dos tablas de evidencia, recorte contra lo cobrado, sin efecto en `tiempo_total` | 69 (R8-9) |
-| Vitest | Tarjeta, contador, toasts (incluido el aviso sin tracker), desglose (`solo_archivos`, `sin_vigilancia`), ajustes ("Cargar como ajuste" desde `solo_archivos`); `ProjectList.work.test.tsx` de `83c48d4` | 17, 65, 69, 70 |
+| Vitest | Tarjeta, contador, toasts (incluido el aviso sin tracker), desglose (`solo_archivos`, `sin_vigilancia`), ajustes ("Cargar como ajuste" desde `solo_archivos`); `ProjectList.work.test.tsx` de `893299b` | 17, 65, 69, 70 |
 
 ### 5.2 Punta a punta automatizado
 
@@ -3480,7 +3480,7 @@ fi
   `test result: ok. N passed` y falla si `N < E2E_ESPERADOS`. Cada commit que agrega
   E2E sube la constante.
 
-- `cargo fmt --check` pasa desde el commit 1, que formatea el crate entero (antes de F0 había 127 bloques sin formatear; desde `476a936`, ninguno).
+- `cargo fmt --check` pasa desde el commit 1, que formatea el crate entero (antes de F0 había 127 bloques sin formatear; desde `36896d1`, ninguno).
 - `--test-threads=1` en los E2E: cada uno lanza su demonio con tiempos cortos, y en paralelo competirían por CPU y volverían inestables los plazos.
 - E16 y E22 se excluyen del script: necesitan el bus de usuario de systemd y se corren a mano (5.1).
 - `pnpm run lint` sin `--fix`: la puerta no modifica archivos.
@@ -3495,7 +3495,7 @@ Requiere autorización aparte, por ser remoto. Es también el lugar natural de
 ### 5.6 Tests existentes que se rompen con R8
 
 - **Rust, `commands/mod.rs`, módulo `work_session_tests` (1933–2389, 15 tests):** los **14** que tocan `start_new_session_sync`, `stop_active_session_sync` o `work_session_status_sync` se reescriben contra `trabajar`, `parar`, `al_cerrar_ventana` y `estado_trabajar`; el **15.º**, 2257 (`duracion_a_guardar…`), es una función pura que no toca ninguna de las tres: solo suma el caso `terminal`. Cambian de **semántica** 2049 y 2115 (mismo proyecto dos veces = mismo token) y 2170/2342 (cerrar la ventana deja el token en espera). 2287, 2308 y 2356 conservan la semántica del tramo y afirman además el token en `esperando_demonio`. `main.rs:78-98` cambia a `al_cerrar_ventana`.
-- **Frontend:** `api.test.ts:857-905`, `test-setup.ts:137-156`, `ProjectList.work.test.tsx` (61, 92, 113, 150, 159, 171, 193, 211, 226, 247, 263; **193, 211 y 226 son los tres de `83c48d4`: se conserva la intención** —la recarga después de Parar, y en 226 la recarga cuando Trabajar cierra la sesión anterior, que es justo el caso del cambio de proyecto) y `Dashboard.test.tsx:225-270`. El renombre `previous_session_stopped` → `sesion_anterior` toca `api.test.ts:863-875`, `test-setup.ts:142`, `Dashboard.test.tsx:243` y `ProjectList.work.test.tsx:234`. `src/utils/workSession.ts` (sin test propio) pierde el callback `abrirTerminal`, y con él sus llamadores `Dashboard.tsx:52-67` y `ProjectList.tsx:230`. `projectStore.test.ts` no se rompe (`open_terminal` sigue, con `None`).
+- **Frontend:** `api.test.ts:857-905`, `test-setup.ts:137-156`, `ProjectList.work.test.tsx` (61, 92, 113, 150, 159, 171, 193, 211, 226, 247, 263; **193, 211 y 226 son los tres de `893299b`: se conserva la intención** —la recarga después de Parar, y en 226 la recarga cuando Trabajar cierra la sesión anterior, que es justo el caso del cambio de proyecto) y `Dashboard.test.tsx:225-270`. El renombre `previous_session_stopped` → `sesion_anterior` toca `api.test.ts:863-875`, `test-setup.ts:142`, `Dashboard.test.tsx:243` y `ProjectList.work.test.tsx:234`. `src/utils/workSession.ts` (sin test propio) pierde el callback `abrirTerminal`, y con él sus llamadores `Dashboard.tsx:52-67` y `ProjectList.tsx:230`. `projectStore.test.ts` no se rompe (`open_terminal` sigue, con `None`).
 
 ---
 ## 6. Definición de "listo"
@@ -3507,7 +3507,7 @@ Cada punto se verifica con un comando o un paso concreto; ninguno queda a criter
 - [ ] **E2E estables:** `scripts/check.sh --e2e` pasa completo: E1–E15, E17–E21 y E23–E37 (36 tests, `E2E_ESPERADOS=36`, verificado por la cuenta de 5.5), **tres corridas seguidas** sin un solo fallo. Un test inestable se arregla, no se reintenta.
 - [ ] **Rc intactos:** los `sha256` de `~/.zshrc` y `~/.bashrc` reales son iguales antes y después de `check.sh --e2e`.
 - [ ] **E16 y E22** (`cargo test --test e2e_trackerd -- --ignored e16`, ídem `e22`) pasan en esta máquina con el systemd del usuario. E16 extendido (`cwd`, presencia, `/dev/pts`) con la salida pegada en el PR de F6.
-- [ ] **Vitest** en verde, con los tests de `83c48d4` en `ProjectList.work.test.tsx` conservando su intención.
+- [ ] **Vitest** en verde, con los tests de `893299b` en `ProjectList.work.test.tsx` conservando su intención.
 - [ ] **Recorrido manual** 5.3 completo (pasos 1–42) y matriz por terminal 5.3.1, sobre la instalación real hecha con `install.sh`, anotados.
 - [ ] **Kill switch probado** (paso manual 12): después de desactivar desde Ajustes, `systemctl --user is-enabled gestor-trackerd` devuelve `disabled`, `is-active` devuelve `inactive` y la consulta de sesiones `file_watch` abiertas devuelve **0**, igual que `SELECT COUNT(*) FROM trabajar_sesiones WHERE dueno = 'demonio' AND estado <> 'cerrada'`; si había una sesión del demonio viva, `SELECT COUNT(*) FROM trabajar_sesiones WHERE motivo_cierre = 'tracker_apagado'` da ≥ 1. Al reabrir la app sigue apagado.
 - [ ] **Diff con datos reales** (5.4) corrido sobre una copia fresca de la base real, con **cada** diferencia explicada en el CHANGELOG. Las decisiones de la sección 9 sobre sesiones > 12 h, huérfanas y carpetas inexistentes están tomadas y aplicadas (o explícitamente "dejar").
@@ -4074,7 +4074,7 @@ texto copia lo que usa de cada escenario.
 - logind por D-Bus (`LockedHint`, sesión `Display`): https://www.freedesktop.org/software/systemd/man/latest/org.freedesktop.login1.html
 - `zbus` 5 (cliente D-Bus, ya en el `Cargo.lock`): https://docs.rs/zbus/5
 
-**Repo** (relevado sobre `main@c8b55ae`; lo de R8, sobre `feat/tracker-f0@83c48d4`, y además `docs/cli.md:7-8`, `~/.local/bin/gestor` y `~/.zshrc:112-133` y `~/.bashrc:141-162` (bloques entre marcas, 2026-10-20), que no están en el repo): `scripts/release.sh:2` (`set -euo pipefail`), `:302-304` (`cargo build --release` + `cp`); `install.sh:6` (`set -e`), `:14-17` (exige el binario ya compilado), `:27` (`cp`), `:46` (`Exec=` fijo); `uninstall.sh:37-41` (conserva la base); `start-app.sh:21` (`pkill -f "gestor-proyectos"`); `src-tauri/Cargo.toml:19` (rusqlite solo con `bundled`), `:31-32` (`[dev-dependencies]` con `tempfile`); `src-tauri/tauri.conf.json:7` (`beforeBuildCommand`), `:57-59` (`bundle`); no existe `.github/`.
+**Repo** (relevado sobre `main@c8b55ae`; lo de R8, sobre `feat/tracker-f0@893299b`, y además `docs/cli.md:7-8`, `~/.local/bin/gestor` y `~/.zshrc:112-133` y `~/.bashrc:141-162` (bloques entre marcas, 2026-10-20), que no están en el repo): `scripts/release.sh:2` (`set -euo pipefail`), `:302-304` (`cargo build --release` + `cp`); `install.sh:6` (`set -e`), `:14-17` (exige el binario ya compilado), `:27` (`cp`), `:46` (`Exec=` fijo); `uninstall.sh:37-41` (conserva la base); `start-app.sh:21` (`pkill -f "gestor-proyectos"`); `src-tauri/Cargo.toml:19` (rusqlite solo con `bundled`), `:31-32` (`[dev-dependencies]` con `tempfile`); `src-tauri/tauri.conf.json:7` (`beforeBuildCommand`), `:57-59` (`bundle`); no existe `.github/`.
 
 ---
 ## 11. Historial de revisión
