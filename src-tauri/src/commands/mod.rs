@@ -238,7 +238,8 @@ pub async fn open_terminal(
     debug!("🚀 [TERMINAL] Abriendo terminal en: {}", path);
     let config = config_manager.get_config()?;
     let platform = get_platform();
-    platform.open_terminal(&path, &config)
+    // Abrir una terminal sin Trabajar no mide: la marca solo la pasa `trabajar`.
+    platform.open_terminal(&path, &config, None)
 }
 
 #[tauri::command]

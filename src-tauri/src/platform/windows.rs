@@ -1,4 +1,4 @@
-use super::PlatformOperations;
+use super::{MarcaSesion, PlatformOperations};
 use crate::config::{AppConfig, ProgramMode};
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -92,7 +92,14 @@ fn escape_powershell(value: &str) -> String {
 }
 
 impl PlatformOperations for WindowsPlatform {
-    fn open_terminal(&self, path: &str, config: &AppConfig) -> Result<(), String> {
+    fn open_terminal(
+        &self,
+        path: &str,
+        config: &AppConfig,
+        // Windows recibe la marca y la ignora: el tracker por terminal es solo de
+        // Linux (3.10.3 del diseño del tracker).
+        _marca: Option<&MarcaSesion>,
+    ) -> Result<(), String> {
         match &config.platform.terminal.mode {
             ProgramMode::Auto => {
                 // Intentar con terminales comunes en orden de preferencia

@@ -19,7 +19,11 @@ use log::{error, info, warn};
 use tauri::Manager;
 
 fn main() {
-    // El logger va PRIMERO: todo lo que sigue (resolver la DB, leer la config,
+    // Antes que nada, incluso antes del logger: todavía no hay hilos, así que tocar
+    // el entorno del proceso es seguro.
+    limpiar_entorno_heredado();
+
+    // El logger va primero entre lo demás: todo lo que sigue (resolver la DB, leer la config,
     // el auto-backup) ya loguea, y sin logger instalado esos records se tiran.
     // Arranca en Info; el nivel real de `advanced.log_level` se aplica apenas la
     // config esté leída.
@@ -31,6 +35,16 @@ fn main() {
         error!("❌ [ARRANQUE] {}", e);
         std::process::exit(1);
     }
+}
+
+/// Corta la herencia accidental de la marca de Trabajar (3.10.3 del diseño del
+/// tracker). Si la app se lanza desde una terminal marcada (por ejemplo,
+/// `pnpm run tauri:dev` desde una konsole de Trabajar), heredaría `GESTOR_SESION` y
+/// se la pasaría a todo lo que abra. Se quita al arrancar, cuando todavía no hay
+/// hilos; en edition 2021 `remove_var` no necesita `unsafe`. El `env_remove` de
+/// cada spawn de `platform/linux.rs` queda como segunda barrera.
+fn limpiar_entorno_heredado() {
+    std::env::remove_var(platform::VAR_MARCA_SESION);
 }
 
 /// Arranca la app en el orden que impone Tauri 2 (P11/D15, 3.8 del diseño del
@@ -245,4 +259,42 @@ fn spawn_auto_backup(handle: tauri::AppHandle) {
             );
         }
     });
+}
+
+#[cfg(all(test, target_os = "linux"))]
+mod tests {
+    use super::*;
+    use platform::{correr_test_en_subproceso, VAR_MARCA_SESION};
+    use std::process::Command;
+
+    const TOKEN_PADRE: &str = "fedcba9876543210fedcba9876543210";
+
+    /// Corre en el binario de test relanzado con `GESTOR_SESION` en el entorno, como
+    /// la app lanzada desde una terminal de Trabajar.
+    #[test]
+    #[ignore = "lo lanza limpiar_entorno_heredado_quita_la_marca en un subproceso"]
+    fn subproceso_limpiar_entorno_heredado() {
+        assert_eq!(
+            std::env::var(VAR_MARCA_SESION).as_deref(),
+            Ok(TOKEN_PADRE),
+            "el subproceso tenía que nacer marcado"
+        );
+
+        limpiar_entorno_heredado();
+
+        assert!(std::env::var_os(VAR_MARCA_SESION).is_none());
+        // Y un hijo lanzado sin ninguna otra barrera (sin `env_remove`) ya no la
+        // hereda.
+        let salida = Command::new("/usr/bin/env").output().expect("correr env");
+        let env = String::from_utf8_lossy(&salida.stdout);
+        assert!(
+            env.lines().all(|l| !l.starts_with("GESTOR_SESION=")),
+            "el hijo heredó la marca"
+        );
+    }
+
+    #[test]
+    fn limpiar_entorno_heredado_quita_la_marca() {
+        correr_test_en_subproceso("tests::subproceso_limpiar_entorno_heredado", TOKEN_PADRE);
+    }
 }
