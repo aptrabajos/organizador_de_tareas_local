@@ -9,6 +9,7 @@ mod logging;
 mod models;
 mod pdf_export;
 mod platform;
+mod time;
 mod tracking;
 
 use commands::ActiveSession;
