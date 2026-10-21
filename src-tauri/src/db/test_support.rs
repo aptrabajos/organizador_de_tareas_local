@@ -1,7 +1,7 @@
 //! Helpers compartidos por los `mod tests` de la capa SQLite.
 
-use rusqlite::params;
-use std::path::PathBuf;
+use rusqlite::{params, Connection};
+use std::path::{Path, PathBuf};
 
 use crate::models::project::*;
 
@@ -9,6 +9,88 @@ use super::Database;
 
 pub(super) fn test_db() -> Database {
     Database::new(PathBuf::from(":memory:")).expect("Failed to create in-memory database")
+}
+
+/// Siembra en `db_path` un esquema viejo real (pre-v0.4.0, `user_version = 0`) con un
+/// proyecto y un enlace, y cierra la conexión antes de volver.
+///
+/// No tiene ninguna de las columnas que las `ALTER` agregan después (incluida
+/// `ai_documentation_url`), ni `updated_at` en `project_links`, ni las tablas que
+/// vinieron más tarde: es el camino de upgrade más largo que puede atravesar un
+/// usuario real.
+pub(super) fn sembrar_esquema_viejo(db_path: &Path) {
+    let old_conn = Connection::open(db_path).expect("no se pudo crear el schema viejo");
+    old_conn
+        .execute(
+            "CREATE TABLE projects (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                description TEXT NOT NULL,
+                local_path TEXT NOT NULL,
+                documentation_url TEXT,
+                drive_link TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )",
+            [],
+        )
+        .unwrap();
+    old_conn
+        .execute(
+            "CREATE TABLE project_links (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL,
+                link_type TEXT NOT NULL,
+                title TEXT NOT NULL,
+                url TEXT NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )",
+            [],
+        )
+        .unwrap();
+
+    old_conn
+        .execute(
+            "INSERT INTO projects (name, description, local_path, documentation_url, drive_link)
+             VALUES ('Proyecto Viejo', 'Sembrado en schema pre-v0.4.0', '/tmp/viejo', NULL, NULL)",
+            [],
+        )
+        .unwrap();
+    let project_id = old_conn.last_insert_rowid();
+    old_conn
+        .execute(
+            "INSERT INTO project_links (project_id, link_type, title, url)
+             VALUES (?1, 'repo', 'Link Viejo', 'https://old.example.com')",
+            params![project_id],
+        )
+        .unwrap();
+} // old_conn se dropea acá, liberando el archivo antes de que lo reabra el llamador
+
+/// `PRAGMA user_version` de una conexión.
+pub(super) fn user_version(conn: &Connection) -> i64 {
+    conn.query_row("PRAGMA user_version", [], |row| row.get(0))
+        .unwrap()
+}
+
+/// Nombres de columna de `tabla`, en orden.
+pub(super) fn columnas(conn: &Connection, tabla: &str) -> Vec<String> {
+    conn.prepare(&format!("PRAGMA table_info({})", tabla))
+        .unwrap()
+        .query_map([], |row| row.get::<_, String>(1))
+        .unwrap()
+        .collect::<rusqlite::Result<Vec<_>>>()
+        .unwrap()
+}
+
+/// Nombres de todos los objetos del esquema (tablas, índices, triggers), ordenados:
+/// sirve para afirmar que una migración fallida no dejó nada a medias.
+pub(super) fn objetos_del_esquema(conn: &Connection) -> Vec<String> {
+    conn.prepare("SELECT type || ' ' || name FROM sqlite_master ORDER BY type, name")
+        .unwrap()
+        .query_map([], |row| row.get::<_, String>(0))
+        .unwrap()
+        .collect::<rusqlite::Result<Vec<_>>>()
+        .unwrap()
 }
 
 pub(super) fn seed_project_at(db: &Database, name: &str, local_path: &str) -> i64 {
