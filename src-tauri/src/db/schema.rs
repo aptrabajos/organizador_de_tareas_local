@@ -9,10 +9,10 @@ use super::Database;
 ///
 /// Cada paso de [`PASOS`] lleva la base de la versión `n - 1` a la `n`. Para agregar
 /// uno: escribir `paso_n`, sumarlo al final de `PASOS` y subir esta constante.
-pub(crate) const ESQUEMA_ACTUAL: i64 = 1;
+pub(crate) const ESQUEMA_ACTUAL: i64 = 2;
 
 /// Los pasos en orden: `PASOS[0]` es el paso 1, y así.
-const PASOS: [fn(&Transaction) -> Result<()>; ESQUEMA_ACTUAL as usize] = [paso_1];
+const PASOS: [fn(&Transaction) -> Result<()>; ESQUEMA_ACTUAL as usize] = [paso_1, paso_2];
 
 /// Mensaje para el usuario cuando la base la escribió una versión más nueva de la app.
 const MENSAJE_ESQUEMA_NUEVO: &str = "La base de datos es de una versión más nueva de Gestor de Proyectos. Actualizá la app antes de abrirla.";
@@ -366,6 +366,26 @@ fn paso_1(conn: &Transaction) -> Result<()> {
     Ok(())
 }
 
+/// Paso 2 (P4): el latido de las sesiones y el índice para encontrar las abiertas.
+///
+/// `last_activity_at` se escribe al abrir (igual a `started_at`) y en cada latido:
+/// es la hora real con la que se recupera una sesión huérfana. El índice
+/// `(project_id, ended_at)` sirve a las consultas de "sesiones abiertas de un
+/// proyecto" (`ended_at IS NULL`).
+fn paso_2(conn: &Transaction) -> Result<()> {
+    agregar_columna(
+        conn,
+        "ALTER TABLE time_tracking_sessions ADD COLUMN last_activity_at DATETIME",
+    )?;
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_sessions_project_ended
+         ON time_tracking_sessions(project_id, ended_at)",
+        [],
+    )?;
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use rusqlite::Connection;
@@ -539,12 +559,69 @@ mod tests {
         // 5. P14 (a): la base vieja (`user_version = 0`) termina en la versión actual.
         assert_eq!(user_version(&conn), ESQUEMA_ACTUAL);
 
+        // 6. Paso 2 (P4): el latido y el índice de sesiones abiertas.
+        assert!(columnas(&conn, "time_tracking_sessions").contains(&"last_activity_at".to_string()));
+        assert!(
+            objetos_del_esquema(&conn).contains(&"index idx_sessions_project_ended".to_string())
+        );
+
         drop(conn);
         drop(db);
         // `dir` (TempDir) borra el directorio temporal solo al salir de scope.
     }
 
     // --- P14/B1: migraciones versionadas ---
+
+    /// Deja en `db_path` una base migrada hasta `version` (no hasta la actual), como
+    /// la dejó una versión anterior de la app.
+    fn base_en_version(db_path: &std::path::Path, version: i64) -> Connection {
+        let mut conn = Connection::open(db_path).unwrap();
+        preparar_conexion(&conn).unwrap();
+        let tx = conn.transaction().unwrap();
+        for paso in &PASOS[..version as usize] {
+            paso(&tx).unwrap();
+        }
+        tx.pragma_update(None, "user_version", version).unwrap();
+        tx.commit().unwrap();
+        conn
+    }
+
+    /// Paso 2: una base en la versión 1 gana `last_activity_at` (NULL en las filas
+    /// viejas: nunca latieron) y el índice `(project_id, ended_at)`, sin perder datos.
+    #[test]
+    fn migrar_de_la_version_1_a_la_2_agrega_el_latido_y_el_indice() {
+        let dir = TempDir::new().unwrap();
+        let db_path = dir.path().join("v1.db");
+        {
+            let conn = base_en_version(&db_path, 1);
+            assert!(!columnas(&conn, "time_tracking_sessions")
+                .contains(&"last_activity_at".to_string()));
+            conn.execute_batch(
+                "INSERT INTO projects (id, name, description, local_path) VALUES (1, 'P', 'd', '/tmp/p');
+                 INSERT INTO time_tracking_sessions (project_id, started_at, ended_at, duration_seconds, source)
+                 VALUES (1, '2026-10-01 10:00:00', '2026-10-01 11:00:00', 3600, 'work_button');",
+            )
+            .unwrap();
+        }
+
+        let db = Database::new(db_path).unwrap();
+        let conn = db.conn();
+        assert_eq!(user_version(&conn), 2);
+        assert!(columnas(&conn, "time_tracking_sessions").contains(&"last_activity_at".to_string()));
+        assert!(
+            objetos_del_esquema(&conn).contains(&"index idx_sessions_project_ended".to_string())
+        );
+
+        let (duracion, latido): (i64, Option<String>) = conn
+            .query_row(
+                "SELECT duration_seconds, last_activity_at FROM time_tracking_sessions",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(duracion, 3600);
+        assert_eq!(latido, None);
+    }
 
     /// (b) Una base al día no se toca: ni un paso, ni el `user_version`, ni un commit.
     /// `data_version` lo ve otra conexión, y cambia con cualquier commit que escriba
