@@ -2,16 +2,7 @@ use chrono::{DateTime, Utc};
 use rusqlite::{params, Connection, Result};
 
 use super::Database;
-
-/// Un instante como se guarda en las sesiones: UTC con el formato de
-/// `CURRENT_TIMESTAMP` (`%Y-%m-%d %H:%M:%S`). Los filtros por rango comparan texto,
-/// así que mezclar formatos los rompería sin aviso.
-///
-/// Es local a este módulo hasta que exista el formateador único de `time.rs`
-/// (commit 11 del diseño del tracker), que lo reemplaza.
-fn instante_sql(instante: DateTime<Utc>) -> String {
-    instante.format("%Y-%m-%d %H:%M:%S").to_string()
-}
+use crate::time;
 
 /// El `UPDATE` de [`Database::cerrar_sesion`], sobre la conexión o transacción que
 /// le pasen: `end_tracking_session` lo necesita dentro de la suya.
@@ -25,7 +16,7 @@ fn cerrar_sesion_en(
         "UPDATE time_tracking_sessions
          SET ended_at = ?1, duration_seconds = ?2
          WHERE id = ?3 AND ended_at IS NULL",
-        params![instante_sql(ended_at), duration_seconds, session_id],
+        params![time::formatear(ended_at), duration_seconds, session_id],
     )?;
     Ok(cerradas > 0)
 }
@@ -48,7 +39,7 @@ impl Database {
         started_at: DateTime<Utc>,
     ) -> Result<i64> {
         let conn = self.conn();
-        let instante = instante_sql(started_at);
+        let instante = time::formatear(started_at);
 
         conn.execute(
             "INSERT INTO time_tracking_sessions (project_id, started_at, last_activity_at, source)
@@ -78,7 +69,11 @@ impl Database {
             "UPDATE time_tracking_sessions
              SET last_activity_at = ?1, duration_seconds = COALESCE(?2, duration_seconds)
              WHERE id = ?3 AND ended_at IS NULL",
-            params![instante_sql(last_activity_at), duration_seconds, session_id],
+            params![
+                time::formatear(last_activity_at),
+                duration_seconds,
+                session_id
+            ],
         )?;
 
         Ok(latidas > 0)
