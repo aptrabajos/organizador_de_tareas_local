@@ -1,21 +1,108 @@
-use rusqlite::{params, Result};
+use chrono::{DateTime, Utc};
+use rusqlite::{params, Connection, Result};
 
 use super::Database;
+
+/// Un instante como se guarda en las sesiones: UTC con el formato de
+/// `CURRENT_TIMESTAMP` (`%Y-%m-%d %H:%M:%S`). Los filtros por rango comparan texto,
+/// así que mezclar formatos los rompería sin aviso.
+///
+/// Es local a este módulo hasta que exista el formateador único de `time.rs`
+/// (commit 11 del diseño del tracker), que lo reemplaza.
+fn instante_sql(instante: DateTime<Utc>) -> String {
+    instante.format("%Y-%m-%d %H:%M:%S").to_string()
+}
+
+/// El `UPDATE` de [`Database::cerrar_sesion`], sobre la conexión o transacción que
+/// le pasen: `end_tracking_session` lo necesita dentro de la suya.
+fn cerrar_sesion_en(
+    conn: &Connection,
+    session_id: i64,
+    ended_at: DateTime<Utc>,
+    duration_seconds: i64,
+) -> Result<bool> {
+    let cerradas = conn.execute(
+        "UPDATE time_tracking_sessions
+         SET ended_at = ?1, duration_seconds = ?2
+         WHERE id = ?3 AND ended_at IS NULL",
+        params![instante_sql(ended_at), duration_seconds, session_id],
+    )?;
+    Ok(cerradas > 0)
+}
 
 impl Database {
     // ==================== TIME TRACKING METHODS ====================
 
-    /// Crear una nueva sesión de tracking
-    pub fn create_tracking_session(&self, project_id: i64, source: &str) -> Result<i64> {
+    // --- Sesiones con instante explícito (D14) ---
+    //
+    // Quien abre, late o cierra una sesión dice CUÁNDO: nadie más escribe
+    // `CURRENT_TIMESTAMP` en las sesiones. El demonio cierra en el último cambio real,
+    // no en "ahora", y los tests fijan el reloj.
+
+    /// Abre una sesión en `started_at`. Escribe también `last_activity_at` con el
+    /// mismo instante, para que una sesión huérfana nunca quede sin latido (M7).
+    pub fn abrir_sesion(
+        &self,
+        project_id: i64,
+        source: &str,
+        started_at: DateTime<Utc>,
+    ) -> Result<i64> {
         let conn = self.conn();
+        let instante = instante_sql(started_at);
 
         conn.execute(
-            "INSERT INTO time_tracking_sessions (project_id, started_at, source)
-             VALUES (?1, CURRENT_TIMESTAMP, ?2)",
-            params![project_id, source],
+            "INSERT INTO time_tracking_sessions (project_id, started_at, last_activity_at, source)
+             VALUES (?1, ?2, ?2, ?3)",
+            params![project_id, instante, source],
         )?;
 
         Ok(conn.last_insert_rowid())
+    }
+
+    /// Latido de una sesión abierta: mueve `last_activity_at` y, si viene, deja en
+    /// `duration_seconds` lo medido hasta ahora (el latido de Trabajar, que mide con
+    /// `Instant`). Con `None` la duración no se toca (el latido de `file_watch`).
+    ///
+    /// Devuelve `false` si no tocó ninguna fila: la sesión ya estaba cerrada o no
+    /// existe (por ejemplo, el proyecto se purgó). Quien late la suelta.
+    #[allow(dead_code)] // Sin llamadores hasta el latido de Trabajar (commit 19) y el demonio
+    pub fn latir(
+        &self,
+        session_id: i64,
+        last_activity_at: DateTime<Utc>,
+        duration_seconds: Option<i64>,
+    ) -> Result<bool> {
+        let conn = self.conn();
+
+        let latidas = conn.execute(
+            "UPDATE time_tracking_sessions
+             SET last_activity_at = ?1, duration_seconds = COALESCE(?2, duration_seconds)
+             WHERE id = ?3 AND ended_at IS NULL",
+            params![instante_sql(last_activity_at), duration_seconds, session_id],
+        )?;
+
+        Ok(latidas > 0)
+    }
+
+    /// Cierra una sesión abierta: `ended_at` y `duration_seconds` juntos, en un solo
+    /// `UPDATE` (M7). Devuelve `false` si ya estaba cerrada o no existe.
+    ///
+    /// No toca `projects.total_time_seconds`: el contador está deprecado y solo lo
+    /// sigue sumando `end_tracking_session` hasta que desaparezca.
+    #[allow(dead_code)] // Sin llamadores hasta la recuperación de huérfanas (commit 19) y el demonio
+    pub fn cerrar_sesion(
+        &self,
+        session_id: i64,
+        ended_at: DateTime<Utc>,
+        duration_seconds: i64,
+    ) -> Result<bool> {
+        cerrar_sesion_en(&self.conn(), session_id, ended_at, duration_seconds)
+    }
+
+    /// Crear una nueva sesión de tracking que empieza ahora. Envoltorio de
+    /// [`Database::abrir_sesion`] para los llamadores que todavía no pasan el instante.
+    pub fn create_tracking_session(&self, project_id: i64, source: &str) -> Result<i64> {
+        self.abrir_sesion(project_id, source, Utc::now())
     }
 
     /// Terminar una sesión de tracking: cerrarla y acreditar su duración al proyecto.
@@ -29,18 +116,13 @@ impl Database {
     /// contador NO corre: filtrar sólo el primero no alcanzaba, porque el segundo
     /// sumaba igual y cerrar dos veces acreditaba dos veces. Devuelve `true` si cerró
     /// la sesión y `false` si no había nada que cerrar.
+    ///
+    /// Envoltorio de [`Database::cerrar_sesion`] con "ahora", más el contador.
     pub fn end_tracking_session(&self, session_id: i64, duration_seconds: i64) -> Result<bool> {
         let conn = self.conn();
         let tx = conn.unchecked_transaction()?;
 
-        let cerradas = tx.execute(
-            "UPDATE time_tracking_sessions
-             SET ended_at = CURRENT_TIMESTAMP, duration_seconds = ?1
-             WHERE id = ?2 AND ended_at IS NULL",
-            params![duration_seconds, session_id],
-        )?;
-
-        if cerradas == 0 {
+        if !cerrar_sesion_en(&tx, session_id, Utc::now(), duration_seconds)? {
             // Nada que cerrar: soltar `tx` sin commit es un rollback.
             return Ok(false);
         }
@@ -164,7 +246,11 @@ impl Database {
 
 #[cfg(test)]
 mod tests {
+    use chrono::{DateTime, Utc};
+    use rusqlite::params;
+
     use super::super::test_support::*;
+    use crate::db::Database;
 
     // --- Time Tracking DB ---
 
@@ -246,5 +332,153 @@ mod tests {
         assert_eq!(stats.session_count, 2);
         assert_eq!(stats.avg_session_seconds, 450);
         assert_eq!(stats.longest_session_seconds, 600);
+    }
+
+    // --- D14/M7: sesiones con instante explícito ---
+
+    fn instante(texto: &str) -> DateTime<Utc> {
+        chrono::NaiveDateTime::parse_from_str(texto, "%Y-%m-%d %H:%M:%S")
+            .unwrap()
+            .and_utc()
+    }
+
+    /// (started_at, last_activity_at, ended_at, duration_seconds) de una sesión.
+    fn fila_sesion(
+        db: &Database,
+        session_id: i64,
+    ) -> (String, Option<String>, Option<String>, Option<i64>) {
+        db.conn()
+            .query_row(
+                "SELECT started_at, last_activity_at, ended_at, duration_seconds
+                 FROM time_tracking_sessions WHERE id = ?1",
+                params![session_id],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+            )
+            .unwrap()
+    }
+
+    #[test]
+    fn abrir_sesion_escribe_el_latido_igual_al_inicio() {
+        let db = test_db();
+        let p = db.create_project(test_project_dto()).unwrap();
+
+        let id = db
+            .abrir_sesion(p.id, "file_watch", instante("2026-10-20 09:00:00"))
+            .unwrap();
+
+        let (started_at, last_activity_at, ended_at, duracion) = fila_sesion(&db, id);
+        assert_eq!(started_at, "2026-10-20 09:00:00");
+        assert_eq!(last_activity_at.as_deref(), Some("2026-10-20 09:00:00"));
+        assert_eq!(ended_at, None);
+        assert_eq!(duracion, None);
+    }
+
+    /// El envoltorio con "ahora" también escribe el latido, en el formato de
+    /// `CURRENT_TIMESTAMP`.
+    #[test]
+    fn create_tracking_session_escribe_el_latido_igual_al_inicio() {
+        let db = test_db();
+        let p = db.create_project(test_project_dto()).unwrap();
+
+        let id = db.create_tracking_session(p.id, "work_button").unwrap();
+
+        let (started_at, last_activity_at, _, _) = fila_sesion(&db, id);
+        assert_eq!(last_activity_at.as_deref(), Some(started_at.as_str()));
+        let ahora: String = db
+            .conn()
+            .query_row("SELECT CURRENT_TIMESTAMP", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(
+            started_at.len(),
+            ahora.len(),
+            "mismo formato que CURRENT_TIMESTAMP"
+        );
+    }
+
+    #[test]
+    fn latir_mueve_el_latido_y_solo_toca_la_duracion_si_viene() {
+        let db = test_db();
+        let p = db.create_project(test_project_dto()).unwrap();
+        let id = db
+            .abrir_sesion(p.id, "work_button", instante("2026-10-20 09:00:00"))
+            .unwrap();
+
+        assert!(db
+            .latir(id, instante("2026-10-20 09:01:00"), Some(60))
+            .unwrap());
+        let (_, latido, _, duracion) = fila_sesion(&db, id);
+        assert_eq!(latido.as_deref(), Some("2026-10-20 09:01:00"));
+        assert_eq!(duracion, Some(60));
+
+        assert!(db.latir(id, instante("2026-10-20 09:02:00"), None).unwrap());
+        let (_, latido, ended_at, duracion) = fila_sesion(&db, id);
+        assert_eq!(latido.as_deref(), Some("2026-10-20 09:02:00"));
+        assert_eq!(duracion, Some(60), "sin duración, el latido no la toca");
+        assert_eq!(ended_at, None, "latir no cierra");
+    }
+
+    /// Una sesión cerrada o inexistente (proyecto purgado) no late: `false`, y la
+    /// fila cerrada no cambia.
+    #[test]
+    fn latir_sobre_una_sesion_cerrada_o_inexistente_devuelve_false() {
+        let db = test_db();
+        let p = db.create_project(test_project_dto()).unwrap();
+        let id = db
+            .abrir_sesion(p.id, "file_watch", instante("2026-10-20 09:00:00"))
+            .unwrap();
+        assert!(db
+            .cerrar_sesion(id, instante("2026-10-20 09:30:00"), 1800)
+            .unwrap());
+        let cerrada = fila_sesion(&db, id);
+
+        assert!(!db
+            .latir(id, instante("2026-10-20 10:00:00"), Some(3600))
+            .unwrap());
+        assert_eq!(fila_sesion(&db, id), cerrada);
+
+        assert!(!db
+            .latir(999_999, instante("2026-10-20 10:00:00"), None)
+            .unwrap());
+    }
+
+    #[test]
+    fn cerrar_sesion_dos_veces_devuelve_false_y_no_toca_la_fila() {
+        let db = test_db();
+        let p = db.create_project(test_project_dto()).unwrap();
+        let id = db
+            .abrir_sesion(p.id, "file_watch", instante("2026-10-20 09:00:00"))
+            .unwrap();
+
+        assert!(db
+            .cerrar_sesion(id, instante("2026-10-20 09:30:00"), 1800)
+            .unwrap());
+        let (_, _, ended_at, duracion) = fila_sesion(&db, id);
+        assert_eq!(ended_at.as_deref(), Some("2026-10-20 09:30:00"));
+        assert_eq!(duracion, Some(1800));
+
+        assert!(!db
+            .cerrar_sesion(id, instante("2026-10-20 11:00:00"), 7200)
+            .unwrap());
+        let (_, _, ended_at, duracion) = fila_sesion(&db, id);
+        assert_eq!(ended_at.as_deref(), Some("2026-10-20 09:30:00"));
+        assert_eq!(duracion, Some(1800));
+
+        assert!(!db
+            .cerrar_sesion(999_999, instante("2026-10-20 11:00:00"), 7200)
+            .unwrap());
+    }
+
+    /// `cerrar_sesion` no suma al contador deprecado; eso lo sigue haciendo solo el
+    /// envoltorio `end_tracking_session`.
+    #[test]
+    fn cerrar_sesion_no_suma_al_contador_del_proyecto() {
+        let db = test_db();
+        let p = db.create_project(test_project_dto()).unwrap();
+        let id = db
+            .abrir_sesion(p.id, "file_watch", instante("2026-10-20 09:00:00"))
+            .unwrap();
+        db.cerrar_sesion(id, instante("2026-10-20 09:30:00"), 1800)
+            .unwrap();
+        assert_eq!(db.get_project(p.id).unwrap().total_time_seconds, Some(0));
     }
 }
