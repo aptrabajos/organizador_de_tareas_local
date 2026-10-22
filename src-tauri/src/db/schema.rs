@@ -9,10 +9,10 @@ use super::Database;
 ///
 /// Cada paso de [`PASOS`] lleva la base de la versión `n - 1` a la `n`. Para agregar
 /// uno: escribir `paso_n`, sumarlo al final de `PASOS` y subir esta constante.
-pub(crate) const ESQUEMA_ACTUAL: i64 = 2;
+pub(crate) const ESQUEMA_ACTUAL: i64 = 3;
 
 /// Los pasos en orden: `PASOS[0]` es el paso 1, y así.
-const PASOS: [fn(&Transaction) -> Result<()>; ESQUEMA_ACTUAL as usize] = [paso_1, paso_2];
+const PASOS: [fn(&Transaction) -> Result<()>; ESQUEMA_ACTUAL as usize] = [paso_1, paso_2, paso_3];
 
 /// Mensaje para el usuario cuando la base la escribió una versión más nueva de la app.
 const MENSAJE_ESQUEMA_NUEVO: &str = "La base de datos es de una versión más nueva de Gestor de Proyectos. Actualizá la app antes de abrirla.";
@@ -386,6 +386,38 @@ fn paso_2(conn: &Transaction) -> Result<()> {
     Ok(())
 }
 
+/// Paso 3 (B6b): `tracker_status`, una sola fila (`id = 1`) que escribe el demonio y
+/// lee la app. Sin fila significa que el demonio nunca corrió.
+///
+/// Columnas (3.2 del diseño del tracker): identidad del proceso (`pid` en `NULL` al
+/// salir limpio), el esquema que conoce, el estado, el latido (cada 15 s), los
+/// valores efectivos de la config, los contadores de vigilancia, el fin del
+/// recorrido inicial y el último error.
+fn paso_3(conn: &Transaction) -> Result<()> {
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS tracker_status (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            pid INTEGER,
+            version TEXT,
+            started_at DATETIME,
+            schema_version INTEGER,
+            estado TEXT NOT NULL CHECK (estado IN ('activo', 'desactivado', 'esperando_migracion', 'esquema_nuevo')),
+            last_heartbeat DATETIME,
+            idle_minutes INTEGER,
+            min_credit_seconds INTEGER,
+            watched_projects INTEGER,
+            watched_dirs INTEGER,
+            scan_completed_at DATETIME,
+            unwatched_projects TEXT,
+            last_error TEXT,
+            last_error_at DATETIME
+        )",
+        [],
+    )?;
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use rusqlite::Connection;
@@ -565,6 +597,9 @@ mod tests {
             objetos_del_esquema(&conn).contains(&"index idx_sessions_project_ended".to_string())
         );
 
+        // 7. Paso 3 (B6b): la tabla del estado del demonio, vacía.
+        assert!(objetos_del_esquema(&conn).contains(&"table tracker_status".to_string()));
+
         drop(conn);
         drop(db);
         // `dir` (TempDir) borra el directorio temporal solo al salir de scope.
@@ -606,7 +641,7 @@ mod tests {
 
         let db = Database::new(db_path).unwrap();
         let conn = db.conn();
-        assert_eq!(user_version(&conn), 2);
+        assert_eq!(user_version(&conn), ESQUEMA_ACTUAL);
         assert!(columnas(&conn, "time_tracking_sessions").contains(&"last_activity_at".to_string()));
         assert!(
             objetos_del_esquema(&conn).contains(&"index idx_sessions_project_ended".to_string())
@@ -621,6 +656,23 @@ mod tests {
             .unwrap();
         assert_eq!(duracion, 3600);
         assert_eq!(latido, None);
+    }
+
+    /// Paso 3: una base en la versión 2 gana `tracker_status`, sin fila (el demonio
+    /// nunca corrió contra ella).
+    #[test]
+    fn migrar_de_la_version_2_a_la_3_agrega_tracker_status() {
+        let dir = TempDir::new().unwrap();
+        let db_path = dir.path().join("v2.db");
+        {
+            let conn = base_en_version(&db_path, 2);
+            assert!(!objetos_del_esquema(&conn).contains(&"table tracker_status".to_string()));
+        }
+
+        let db = Database::new(db_path).unwrap();
+        assert_eq!(user_version(&db.conn()), ESQUEMA_ACTUAL);
+        assert!(objetos_del_esquema(&db.conn()).contains(&"table tracker_status".to_string()));
+        assert_eq!(db.leer_tracker_status().unwrap(), None);
     }
 
     /// (b) Una base al día no se toca: ni un paso, ni el `user_version`, ni un commit.

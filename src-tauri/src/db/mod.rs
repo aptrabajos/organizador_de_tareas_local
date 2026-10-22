@@ -14,6 +14,7 @@ mod projects;
 mod schema;
 mod status;
 mod todos;
+mod tracker_status;
 mod tracking;
 mod trash;
 
