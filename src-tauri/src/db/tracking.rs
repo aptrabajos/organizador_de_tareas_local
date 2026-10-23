@@ -1,22 +1,46 @@
 use chrono::{DateTime, Utc};
-use rusqlite::{params, Connection, Result};
+use rusqlite::{params, Connection, Result, TransactionBehavior};
 
+use super::trabajar::{MotivoTramo, FUENTE_TERMINAL};
 use super::Database;
 use crate::time;
 
-/// El `UPDATE` de [`Database::cerrar_sesion`], sobre la conexión o transacción que
-/// le pasen: `end_tracking_session` lo necesita dentro de la suya.
-fn cerrar_sesion_en(
+/// El cierre de [`Database::cerrar_sesion`], sobre la conexión o transacción que le
+/// pasen: `end_tracking_session` y los cierres de `db/trabajar.rs` lo necesitan
+/// dentro de la suya.
+///
+/// Un tramo `terminal` de 0 s se **borra** en vez de cerrarse (DT5): no usa la regla
+/// de los 10 s y no aporta nada. `motivo` es `None` solo para el envoltorio con
+/// "ahora", que cierra filas sin token como antes del paso 4; el `CHECK` de la columna
+/// rechaza un tramo de sesión cerrado sin motivo.
+pub(super) fn cerrar_sesion_en(
     conn: &Connection,
     session_id: i64,
     ended_at: DateTime<Utc>,
     duration_seconds: i64,
+    motivo: Option<MotivoTramo>,
 ) -> Result<bool> {
+    if duration_seconds == 0 {
+        let borradas = conn.execute(
+            "DELETE FROM time_tracking_sessions
+             WHERE id = ?1 AND ended_at IS NULL AND source = ?2",
+            params![session_id, FUENTE_TERMINAL],
+        )?;
+        if borradas > 0 {
+            return Ok(true);
+        }
+    }
+
     let cerradas = conn.execute(
         "UPDATE time_tracking_sessions
-         SET ended_at = ?1, duration_seconds = ?2
-         WHERE id = ?3 AND ended_at IS NULL",
-        params![time::formatear(ended_at), duration_seconds, session_id],
+         SET ended_at = ?1, duration_seconds = ?2, motivo_cierre = ?3
+         WHERE id = ?4 AND ended_at IS NULL",
+        params![
+            time::formatear(ended_at),
+            duration_seconds,
+            motivo.map(MotivoTramo::como_texto),
+            session_id
+        ],
     )?;
     Ok(cerradas > 0)
 }
@@ -79,8 +103,10 @@ impl Database {
         Ok(latidas > 0)
     }
 
-    /// Cierra una sesión abierta: `ended_at` y `duration_seconds` juntos, en un solo
-    /// `UPDATE` (M7). Devuelve `false` si ya estaba cerrada o no existe.
+    /// Cierra una sesión abierta: `ended_at`, `duration_seconds` y el motivo juntos, en
+    /// un solo `UPDATE` (M7). Desde el paso 4 todo cierre lleva motivo (3.10.15): la
+    /// firma lo exige. Devuelve `false` si ya estaba cerrada o no existe. Un tramo
+    /// `terminal` de 0 s se borra (DT5) y cuenta como cerrado.
     ///
     /// No toca `projects.total_time_seconds`: el contador está deprecado y solo lo
     /// sigue sumando `end_tracking_session` hasta que desaparezca.
@@ -90,8 +116,15 @@ impl Database {
         session_id: i64,
         ended_at: DateTime<Utc>,
         duration_seconds: i64,
+        motivo: MotivoTramo,
     ) -> Result<bool> {
-        cerrar_sesion_en(&self.conn(), session_id, ended_at, duration_seconds)
+        cerrar_sesion_en(
+            &self.conn(),
+            session_id,
+            ended_at,
+            duration_seconds,
+            Some(motivo),
+        )
     }
 
     /// Crear una nueva sesión de tracking que empieza ahora. Envoltorio de
@@ -112,12 +145,20 @@ impl Database {
     /// sumaba igual y cerrar dos veces acreditaba dos veces. Devuelve `true` si cerró
     /// la sesión y `false` si no había nada que cerrar.
     ///
-    /// Envoltorio de [`Database::cerrar_sesion`] con "ahora", más el contador.
+    /// Envoltorio de [`Database::cerrar_sesion`] con "ahora", más el contador. Cierra
+    /// sin motivo: sus llamadores (Trabajar de antes de R8) cierran filas sin token, y
+    /// los reemplaza el commit 17.
+    ///
+    /// La transacción es `IMMEDIATE` (R8-1): toma el lock de escritura antes de leer.
+    /// En una diferida que lee antes de escribir, la conexión puede quedar con el lock
+    /// de lectura esperando el de escritura de otra, y SQLite le devuelve
+    /// `SQLITE_BUSY` sin esperar el `busy_timeout`. Desde el commit 17 la llaman
+    /// cierres que compiten con otra conexión (el demonio, la CLI).
     pub fn end_tracking_session(&self, session_id: i64, duration_seconds: i64) -> Result<bool> {
-        let conn = self.conn();
-        let tx = conn.unchecked_transaction()?;
+        let mut conn = self.conn();
+        let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
 
-        if !cerrar_sesion_en(&tx, session_id, Utc::now(), duration_seconds)? {
+        if !cerrar_sesion_en(&tx, session_id, Utc::now(), duration_seconds, None)? {
             // Nada que cerrar: soltar `tx` sin commit es un rollback.
             return Ok(false);
         }
@@ -245,6 +286,7 @@ mod tests {
     use rusqlite::params;
 
     use super::super::test_support::*;
+    use super::super::trabajar::MotivoTramo;
     use crate::db::Database;
 
     // --- Time Tracking DB ---
@@ -422,7 +464,12 @@ mod tests {
             .abrir_sesion(p.id, "file_watch", instante("2026-10-20 09:00:00"))
             .unwrap();
         assert!(db
-            .cerrar_sesion(id, instante("2026-10-20 09:30:00"), 1800)
+            .cerrar_sesion(
+                id,
+                instante("2026-10-20 09:30:00"),
+                1800,
+                MotivoTramo::Inactividad
+            )
             .unwrap());
         let cerrada = fila_sesion(&db, id);
 
@@ -445,22 +492,109 @@ mod tests {
             .unwrap();
 
         assert!(db
-            .cerrar_sesion(id, instante("2026-10-20 09:30:00"), 1800)
+            .cerrar_sesion(
+                id,
+                instante("2026-10-20 09:30:00"),
+                1800,
+                MotivoTramo::Inactividad
+            )
             .unwrap());
         let (_, _, ended_at, duracion) = fila_sesion(&db, id);
         assert_eq!(ended_at.as_deref(), Some("2026-10-20 09:30:00"));
         assert_eq!(duracion, Some(1800));
 
         assert!(!db
-            .cerrar_sesion(id, instante("2026-10-20 11:00:00"), 7200)
+            .cerrar_sesion(
+                id,
+                instante("2026-10-20 11:00:00"),
+                7200,
+                MotivoTramo::Inactividad
+            )
             .unwrap());
         let (_, _, ended_at, duracion) = fila_sesion(&db, id);
         assert_eq!(ended_at.as_deref(), Some("2026-10-20 09:30:00"));
         assert_eq!(duracion, Some(1800));
 
         assert!(!db
-            .cerrar_sesion(999_999, instante("2026-10-20 11:00:00"), 7200)
+            .cerrar_sesion(
+                999_999,
+                instante("2026-10-20 11:00:00"),
+                7200,
+                MotivoTramo::Inactividad
+            )
             .unwrap());
+    }
+
+    /// R8-1: `end_tracking_session` en `IMMEDIATE`. Dos conexiones cierran la misma
+    /// sesión a la vez (Parar contra el cierre de otra conexión): una sola cierra,
+    /// ninguna recibe `SQLITE_BUSY` y el contador suma una vez. Fija el contrato
+    /// para cuando el cierre lea antes de escribir (commit 17): con una transacción
+    /// diferida, ese patrón puede devolver `SQLITE_BUSY` sin esperar el
+    /// `busy_timeout`.
+    #[test]
+    fn end_tracking_session_con_dos_conexiones_cierra_una_vez_y_sin_busy() {
+        use std::sync::{Arc, Barrier};
+
+        let dir = tempfile::TempDir::new().unwrap();
+        let ruta = dir.path().join("projects.db");
+        let una = Arc::new(Database::new(ruta.clone()).unwrap());
+        let otra = Arc::new(Database::new(ruta).unwrap());
+        let p = una.create_project(test_project_dto()).unwrap();
+
+        for vuelta in 0..30 {
+            let id = una.create_tracking_session(p.id, "work_button").unwrap();
+            let largada = Arc::new(Barrier::new(2));
+            let hilos: Vec<_> = [Arc::clone(&una), Arc::clone(&otra)]
+                .into_iter()
+                .map(|db| {
+                    let largada = Arc::clone(&largada);
+                    std::thread::spawn(move || {
+                        largada.wait();
+                        db.end_tracking_session(id, 100)
+                    })
+                })
+                .collect();
+            let cerraron: Vec<bool> = hilos
+                .into_iter()
+                .map(|h| h.join().unwrap().expect("sin SQLITE_BUSY"))
+                .collect();
+            assert_eq!(
+                cerraron.iter().filter(|c| **c).count(),
+                1,
+                "vuelta {vuelta}: {cerraron:?}"
+            );
+        }
+
+        assert_eq!(
+            una.get_project(p.id).unwrap().total_time_seconds,
+            Some(3000)
+        );
+    }
+
+    /// `cerrar_sesion` guarda el motivo del tramo (3.10.15).
+    #[test]
+    fn cerrar_sesion_guarda_el_motivo() {
+        let db = test_db();
+        let p = db.create_project(test_project_dto()).unwrap();
+        let id = db
+            .abrir_sesion(p.id, "file_watch", instante("2026-10-20 09:00:00"))
+            .unwrap();
+        db.cerrar_sesion(
+            id,
+            instante("2026-10-20 09:30:00"),
+            1800,
+            MotivoTramo::SinVigilancia,
+        )
+        .unwrap();
+        let motivo: Option<String> = db
+            .conn()
+            .query_row(
+                "SELECT motivo_cierre FROM time_tracking_sessions WHERE id = ?1",
+                params![id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(motivo.as_deref(), Some("sin_vigilancia"));
     }
 
     /// `cerrar_sesion` no suma al contador deprecado; eso lo sigue haciendo solo el
@@ -472,8 +606,13 @@ mod tests {
         let id = db
             .abrir_sesion(p.id, "file_watch", instante("2026-10-20 09:00:00"))
             .unwrap();
-        db.cerrar_sesion(id, instante("2026-10-20 09:30:00"), 1800)
-            .unwrap();
+        db.cerrar_sesion(
+            id,
+            instante("2026-10-20 09:30:00"),
+            1800,
+            MotivoTramo::Inactividad,
+        )
+        .unwrap();
         assert_eq!(db.get_project(p.id).unwrap().total_time_seconds, Some(0));
     }
 }

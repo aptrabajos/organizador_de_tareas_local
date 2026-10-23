@@ -28,6 +28,12 @@ pub struct TrackerStatus {
     pub unwatched_projects: Option<String>,
     pub last_error: Option<String>,
     pub last_error_at: Option<String>,
+    /// Paso 4: la pausa efectiva de Trabajar, en minutos.
+    pub trabajar_idle_minutes: Option<i64>,
+    /// Paso 4: `kde`, `gnome`, `prueba` o `no_disponible`.
+    pub presencia: Option<String>,
+    pub presencia_motivo: Option<String>,
+    pub presencia_at: Option<String>,
 }
 
 impl Database {
@@ -39,7 +45,8 @@ impl Database {
         conn.query_row(
             "SELECT pid, version, started_at, schema_version, estado, last_heartbeat,
                     idle_minutes, min_credit_seconds, watched_projects, watched_dirs,
-                    scan_completed_at, unwatched_projects, last_error, last_error_at
+                    scan_completed_at, unwatched_projects, last_error, last_error_at,
+                    trabajar_idle_minutes, presencia, presencia_motivo, presencia_at
              FROM tracker_status
              WHERE id = 1",
             [],
@@ -59,6 +66,10 @@ impl Database {
                     unwatched_projects: row.get(11)?,
                     last_error: row.get(12)?,
                     last_error_at: row.get(13)?,
+                    trabajar_idle_minutes: row.get(14)?,
+                    presencia: row.get(15)?,
+                    presencia_motivo: row.get(16)?,
+                    presencia_at: row.get(17)?,
                 })
             },
         )
@@ -97,6 +108,10 @@ mod tests {
                 "unwatched_projects",
                 "last_error",
                 "last_error_at",
+                "trabajar_idle_minutes",
+                "presencia",
+                "presencia_motivo",
+                "presencia_at",
             ]
         );
     }
@@ -133,6 +148,7 @@ mod tests {
         assert_eq!(estado.watched_dirs, Some(340));
         assert_eq!(estado.scan_completed_at, None, "todavía recorre");
         assert_eq!(estado.last_error, None);
+        assert_eq!(estado.presencia, None, "el paso 4 no inventa la presencia");
     }
 
     /// Una sola fila (`id = 1`) y solo los estados que define el diseño.
@@ -158,5 +174,24 @@ mod tests {
                 []
             )
             .is_ok());
+    }
+
+    /// Paso 4: la presencia solo toma los valores que publica el demonio (3.10.4).
+    #[test]
+    fn tracker_status_rechaza_una_presencia_desconocida() {
+        let db = test_db();
+        let conn = db.conn();
+        conn.execute(
+            "INSERT INTO tracker_status (id, estado) VALUES (1, 'activo')",
+            [],
+        )
+        .unwrap();
+        assert!(conn
+            .execute("UPDATE tracker_status SET presencia = 'xfce'", [])
+            .is_err());
+        for valor in ["kde", "gnome", "prueba", "no_disponible"] {
+            conn.execute("UPDATE tracker_status SET presencia = ?1", [valor])
+                .unwrap();
+        }
     }
 }

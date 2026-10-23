@@ -9,6 +9,7 @@ mod logging;
 mod models;
 mod pdf_export;
 mod platform;
+mod restore_lock;
 mod time;
 mod tracking;
 

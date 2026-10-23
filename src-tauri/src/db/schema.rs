@@ -9,10 +9,11 @@ use super::Database;
 ///
 /// Cada paso de [`PASOS`] lleva la base de la versión `n - 1` a la `n`. Para agregar
 /// uno: escribir `paso_n`, sumarlo al final de `PASOS` y subir esta constante.
-pub(crate) const ESQUEMA_ACTUAL: i64 = 3;
+pub(crate) const ESQUEMA_ACTUAL: i64 = 4;
 
 /// Los pasos en orden: `PASOS[0]` es el paso 1, y así.
-const PASOS: [fn(&Transaction) -> Result<()>; ESQUEMA_ACTUAL as usize] = [paso_1, paso_2, paso_3];
+const PASOS: [fn(&Transaction) -> Result<()>; ESQUEMA_ACTUAL as usize] =
+    [paso_1, paso_2, paso_3, paso_4];
 
 /// Mensaje para el usuario cuando la base la escribió una versión más nueva de la app.
 const MENSAJE_ESQUEMA_NUEVO: &str = "La base de datos es de una versión más nueva de Gestor de Proyectos. Actualizá la app antes de abrirla.";
@@ -418,6 +419,157 @@ fn paso_3(conn: &Transaction) -> Result<()> {
     Ok(())
 }
 
+/// Paso 4 (R8-1): las sesiones de Trabajar atadas a la terminal (3.10.1 del diseño del
+/// tracker).
+///
+/// - `trabajar_sesiones`: una fila por token, con su dueño actual, su estado y, al
+///   cerrarse, `terminada_at` y el motivo. Los dos `CHECK` de fila impiden una sesión
+///   cerrada sin motivo o una viva con motivo. No hay `ultima_actividad_at`: la única
+///   fuente es el tramo (`last_activity_at`, o el `ended_at` del último).
+/// - `trabajar_anclas`: las shells que reclama la CLI (anclas) y los vetos de pty
+///   (`token` en `NULL`).
+/// - `trabajar_evidencia` y `archivos_evidencia`: un registro por minuto con
+///   actividad, con los bits de lo contado y lo ignorado (DT12, U1).
+/// - `terminal_token` y `motivo_cierre` en `time_tracking_sessions`. El `CHECK` de
+///   `motivo_cierre` exige motivo a todo tramo cerrado **de una sesión**; las filas
+///   viejas, sin token, quedan aceptadas aunque estén cerradas sin motivo. Va como
+///   `CHECK` y no como trigger porque tiene que cubrir también el `INSERT`.
+/// - Las columnas de presencia y la pausa de Trabajar en `tracker_status`.
+/// - Tres índices únicos parciales: una sesión viva por proyecto, un tramo abierto
+///   por token y un reclamo vigente por shell.
+///
+/// `source = 'terminal'` (los tramos que mide el demonio) no cambia el esquema:
+/// `source` nunca tuvo `CHECK`.
+fn paso_4(conn: &Transaction) -> Result<()> {
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS trabajar_sesiones (
+            token TEXT PRIMARY KEY CHECK (length(token) = 32 AND token NOT GLOB '*[^0-9a-f]*'),
+            project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+            dueno TEXT NOT NULL CHECK (dueno IN ('demonio', 'app')),
+            origen TEXT NOT NULL CHECK (origen IN ('boton', 'cli')),
+            estado TEXT NOT NULL CHECK (estado IN ('esperando_terminal', 'esperando_demonio',
+                'viva_activa', 'viva_pausada', 'terminal_no_detectada', 'cerrada')),
+            creada_at DATETIME NOT NULL,
+            ultimo_clic_at DATETIME NOT NULL,
+            adoptada_at DATETIME,
+            last_seen_at DATETIME,
+            terminada_at DATETIME,
+            motivo_cierre TEXT CHECK (motivo_cierre IS NULL OR motivo_cierre IN (
+                'terminal_cerrada', 'parar_app', 'parar_cli', 'tracker_apagado',
+                'tracker_caido', 'proyecto_a_papelera', 'restauracion',
+                'cambio_de_proyecto', 'cierre_app', 'huerfana', 'tope_sin_tracker')),
+            CHECK ((estado = 'cerrada') = (terminada_at IS NOT NULL)),
+            CHECK ((estado = 'cerrada') = (motivo_cierre IS NOT NULL))
+        )",
+        [],
+    )?;
+
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS trabajar_anclas (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            token TEXT REFERENCES trabajar_sesiones(token) ON DELETE CASCADE,
+            pid INTEGER NOT NULL,
+            starttime INTEGER NOT NULL,
+            tty_nr INTEGER NOT NULL CHECK (tty_nr <> 0),
+            multiplexor TEXT CHECK (multiplexor IS NULL OR multiplexor IN ('tmux', 'screen')),
+            desde DATETIME NOT NULL,
+            hasta DATETIME,
+            motivo_salida TEXT CHECK (motivo_salida IS NULL OR motivo_salida IN (
+                'shell_cerrada', 'cambio_de_proyecto', 'parar', 'sin_medir', 'sesion_terminada')),
+            CHECK ((hasta IS NULL) = (motivo_salida IS NULL))
+        )",
+        [],
+    )?;
+
+    // Las dos tablas de evidencia comparten las columnas de los segundos sin
+    // presencia: con el bit 32 van los dos, sin él ninguno, y el primero nunca es
+    // posterior al último.
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS trabajar_evidencia (
+            token TEXT NOT NULL REFERENCES trabajar_sesiones(token) ON DELETE CASCADE,
+            minuto TEXT NOT NULL,
+            fuentes INTEGER NOT NULL,
+            archivo_rel TEXT,
+            ausente_desde_s INTEGER CHECK (ausente_desde_s BETWEEN 0 AND 59),
+            ausente_hasta_s INTEGER CHECK (ausente_hasta_s BETWEEN 0 AND 59),
+            CHECK ((ausente_desde_s IS NULL) = ((fuentes & 32) = 0)),
+            CHECK ((ausente_hasta_s IS NULL) = ((fuentes & 32) = 0)),
+            CHECK (ausente_desde_s <= ausente_hasta_s),
+            PRIMARY KEY (token, minuto)
+        ) WITHOUT ROWID",
+        [],
+    )?;
+
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS archivos_evidencia (
+            project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+            minuto TEXT NOT NULL,
+            fuentes INTEGER NOT NULL CHECK (fuentes <> 0 AND (fuentes & ~40) = 0),
+            archivo_rel TEXT,
+            ausente_desde_s INTEGER CHECK (ausente_desde_s BETWEEN 0 AND 59),
+            ausente_hasta_s INTEGER CHECK (ausente_hasta_s BETWEEN 0 AND 59),
+            CHECK ((ausente_desde_s IS NULL) = ((fuentes & 32) = 0)),
+            CHECK ((ausente_hasta_s IS NULL) = ((fuentes & 32) = 0)),
+            CHECK (ausente_desde_s <= ausente_hasta_s),
+            PRIMARY KEY (project_id, minuto)
+        ) WITHOUT ROWID",
+        [],
+    )?;
+
+    agregar_columna(
+        conn,
+        "ALTER TABLE time_tracking_sessions
+         ADD COLUMN terminal_token TEXT REFERENCES trabajar_sesiones(token)",
+    )?;
+    agregar_columna(
+        conn,
+        "ALTER TABLE time_tracking_sessions
+         ADD COLUMN motivo_cierre TEXT
+         CHECK (motivo_cierre IS NULL OR motivo_cierre IN (
+             'terminal_cerrada', 'parar_app', 'parar_cli', 'tracker_apagado',
+             'tracker_caido', 'proyecto_a_papelera', 'restauracion',
+             'cambio_de_proyecto', 'cierre_app', 'huerfana', 'tope_sin_tracker',
+             'inactividad', 'suspension', 'reloj', 'tracker_detenido', 'sin_vigilancia'))
+         CHECK (ended_at IS NULL OR terminal_token IS NULL OR motivo_cierre IS NOT NULL)",
+    )?;
+
+    agregar_columna(
+        conn,
+        "ALTER TABLE tracker_status ADD COLUMN trabajar_idle_minutes INTEGER",
+    )?;
+    agregar_columna(
+        conn,
+        "ALTER TABLE tracker_status ADD COLUMN presencia TEXT
+         CHECK (presencia IS NULL OR presencia IN ('kde', 'gnome', 'prueba', 'no_disponible'))",
+    )?;
+    agregar_columna(
+        conn,
+        "ALTER TABLE tracker_status ADD COLUMN presencia_motivo TEXT",
+    )?;
+    agregar_columna(
+        conn,
+        "ALTER TABLE tracker_status ADD COLUMN presencia_at DATETIME",
+    )?;
+
+    conn.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_trabajar_sesiones_viva
+         ON trabajar_sesiones(project_id) WHERE estado <> 'cerrada'",
+        [],
+    )?;
+    conn.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_sessions_tramo_abierto
+         ON time_tracking_sessions(terminal_token) WHERE ended_at IS NULL",
+        [],
+    )?;
+    conn.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_trabajar_anclas_vigente
+         ON trabajar_anclas(pid, starttime) WHERE hasta IS NULL",
+        [],
+    )?;
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use rusqlite::Connection;
@@ -600,6 +752,9 @@ mod tests {
         // 7. Paso 3 (B6b): la tabla del estado del demonio, vacía.
         assert!(objetos_del_esquema(&conn).contains(&"table tracker_status".to_string()));
 
+        // 8. Paso 4 (R8-1): las sesiones de Trabajar, sobre el esquema viejo real.
+        afirmar_paso_4(&conn);
+
         drop(conn);
         drop(db);
         // `dir` (TempDir) borra el directorio temporal solo al salir de scope.
@@ -673,6 +828,161 @@ mod tests {
         assert_eq!(user_version(&db.conn()), ESQUEMA_ACTUAL);
         assert!(objetos_del_esquema(&db.conn()).contains(&"table tracker_status".to_string()));
         assert_eq!(db.leer_tracker_status().unwrap(), None);
+    }
+
+    /// Lo que deja el paso 4: las cuatro tablas, las columnas nuevas y los tres índices
+    /// únicos parciales.
+    fn afirmar_paso_4(conn: &Connection) {
+        let objetos = objetos_del_esquema(conn);
+        for esperado in [
+            "table trabajar_sesiones",
+            "table trabajar_anclas",
+            "table trabajar_evidencia",
+            "table archivos_evidencia",
+            "index idx_trabajar_sesiones_viva",
+            "index idx_sessions_tramo_abierto",
+            "index idx_trabajar_anclas_vigente",
+        ] {
+            assert!(
+                objetos.contains(&esperado.to_string()),
+                "falta {esperado}: {objetos:?}"
+            );
+        }
+        for indice in [
+            "idx_trabajar_sesiones_viva",
+            "idx_sessions_tramo_abierto",
+            "idx_trabajar_anclas_vigente",
+        ] {
+            let (unico, parcial): (bool, bool) = conn
+                .query_row(
+                    "SELECT \"unique\", partial FROM pragma_index_list(
+                         (SELECT tbl_name FROM sqlite_master WHERE name = ?1))
+                     WHERE name = ?1",
+                    [indice],
+                    |row| Ok((row.get(0)?, row.get(1)?)),
+                )
+                .unwrap();
+            assert!(unico && parcial, "{indice} tiene que ser único y parcial");
+        }
+
+        assert_eq!(
+            columnas(conn, "trabajar_sesiones"),
+            vec![
+                "token",
+                "project_id",
+                "dueno",
+                "origen",
+                "estado",
+                "creada_at",
+                "ultimo_clic_at",
+                "adoptada_at",
+                "last_seen_at",
+                "terminada_at",
+                "motivo_cierre",
+            ],
+            "sin ultima_actividad_at: la única fuente es el tramo"
+        );
+        assert_eq!(
+            columnas(conn, "trabajar_anclas"),
+            vec![
+                "id",
+                "token",
+                "pid",
+                "starttime",
+                "tty_nr",
+                "multiplexor",
+                "desde",
+                "hasta",
+                "motivo_salida",
+            ]
+        );
+        for tabla in ["trabajar_evidencia", "archivos_evidencia"] {
+            let columnas = columnas(conn, tabla);
+            assert_eq!(
+                columnas[1..],
+                [
+                    "minuto",
+                    "fuentes",
+                    "archivo_rel",
+                    "ausente_desde_s",
+                    "ausente_hasta_s"
+                ],
+                "{tabla}"
+            );
+        }
+        let sesiones = columnas(conn, "time_tracking_sessions");
+        assert!(sesiones.contains(&"terminal_token".to_string()));
+        assert!(sesiones.contains(&"motivo_cierre".to_string()));
+        let estado = columnas(conn, "tracker_status");
+        for columna in [
+            "trabajar_idle_minutes",
+            "presencia",
+            "presencia_motivo",
+            "presencia_at",
+        ] {
+            assert!(estado.contains(&columna.to_string()), "falta {columna}");
+        }
+    }
+
+    /// Paso 4: una base en la versión 3, con tramos viejos cerrados sin motivo, una
+    /// huérfana abierta y el estado del demonio, gana las sesiones de Trabajar sin
+    /// perder nada. El `CHECK` de tramo con motivo acepta las filas viejas porque no
+    /// tienen token.
+    #[test]
+    fn migrar_de_la_version_3_a_la_4_agrega_las_sesiones_de_trabajar() {
+        let dir = TempDir::new().unwrap();
+        let db_path = dir.path().join("v3.db");
+        {
+            let conn = base_en_version(&db_path, 3);
+            assert!(!objetos_del_esquema(&conn).contains(&"table trabajar_sesiones".to_string()));
+            conn.execute_batch(
+                "INSERT INTO projects (id, name, description, local_path) VALUES (1, 'P', 'd', '/tmp/p');
+                 INSERT INTO time_tracking_sessions (project_id, started_at, ended_at, duration_seconds, source)
+                 VALUES (1, '2026-10-01 10:00:00', '2026-10-01 11:00:00', 3600, 'work_button'),
+                        (1, '2026-10-02 10:00:00', '2026-10-02 10:00:05', 5, 'shell_hook');
+                 INSERT INTO time_tracking_sessions (project_id, started_at, source)
+                 VALUES (1, '2026-10-03 10:00:00', 'work_button');
+                 INSERT INTO tracker_status (id, pid, estado, last_heartbeat)
+                 VALUES (1, 4242, 'activo', '2026-10-03 10:00:00');",
+            )
+            .unwrap();
+        }
+
+        let db = Database::new(db_path).unwrap();
+        let conn = db.conn();
+        assert_eq!(user_version(&conn), 4);
+        assert_eq!(ESQUEMA_ACTUAL, 4);
+        afirmar_paso_4(&conn);
+
+        let filas: Vec<(Option<i64>, Option<String>, Option<String>)> = conn
+            .prepare(
+                "SELECT duration_seconds, terminal_token, motivo_cierre
+                 FROM time_tracking_sessions ORDER BY id",
+            )
+            .unwrap()
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
+            .unwrap()
+            .collect::<rusqlite::Result<_>>()
+            .unwrap();
+        assert_eq!(
+            filas,
+            vec![
+                (Some(3600), None, None),
+                (Some(5), None, None),
+                (None, None, None)
+            ]
+        );
+
+        let (pid, presencia): (i64, Option<String>) = conn
+            .query_row("SELECT pid, presencia FROM tracker_status", [], |row| {
+                Ok((row.get(0)?, row.get(1)?))
+            })
+            .unwrap();
+        assert_eq!((pid, presencia), (4242, None));
+        drop(conn);
+
+        // Y la huérfana vieja, sin token, se puede seguir cerrando sin motivo.
+        assert!(db.end_tracking_session(3, 0).unwrap());
     }
 
     /// (b) Una base al día no se toca: ni un paso, ni el `user_version`, ni un commit.

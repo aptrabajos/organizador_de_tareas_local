@@ -14,6 +14,7 @@ mod projects;
 mod schema;
 mod status;
 mod todos;
+mod trabajar;
 mod tracker_status;
 mod tracking;
 mod trash;
@@ -24,6 +25,10 @@ mod test_support;
 /// Único re-export necesario: el comando `list_trash` de `commands/mod.rs`
 /// nombra este tipo por ruta (`crate::db::TrashItem`).
 pub use trash::TrashItem;
+
+/// `source` de los tramos que mide el demonio: lo nombra la regla de duración mínima
+/// de `commands/mod.rs`.
+pub(crate) use trabajar::FUENTE_TERMINAL;
 
 pub struct Database {
     conn: Mutex<Connection>,

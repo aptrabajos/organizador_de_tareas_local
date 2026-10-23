@@ -1692,6 +1692,8 @@ const FUENTE_TRABAJAR: &str = "work_button";
 /// regla de duración mínima: la cubre el margen por guardado (diseño, 3.4).
 const FUENTE_ARCHIVOS: &str = "file_watch";
 
+use crate::db::FUENTE_TERMINAL;
+
 /// Una sesión de "Trabajar" (o de una fuente vieja) que dura esto o menos no cuenta.
 const DURACION_MINIMA_SEGUNDOS: i64 = 10;
 
@@ -1702,8 +1704,11 @@ const DURACION_MINIMA_SEGUNDOS: i64 = 10;
 /// la regla de los 10 s vivía solo en el cambio de proyecto, así que la misma sesión
 /// corta valía 0 o 5 s según cómo se cerrara. La fila se conserva igual, con su
 /// `ended_at` real; con 0 s no suma tiempo.
+/// Los tramos `terminal` (los que mide el demonio para una sesión de Trabajar) tampoco
+/// la tienen (DT5): un tramo de 0 s se borra al cerrarlo (`cerrar_sesion`).
 pub(crate) fn duracion_a_guardar(source: &str, segundos: i64) -> i64 {
-    if source == FUENTE_ARCHIVOS || segundos > DURACION_MINIMA_SEGUNDOS {
+    if source == FUENTE_ARCHIVOS || source == FUENTE_TERMINAL || segundos > DURACION_MINIMA_SEGUNDOS
+    {
         segundos
     } else {
         0
@@ -2265,6 +2270,9 @@ mod work_session_tests {
         assert_eq!(duracion_a_guardar("shell_hook", 3600), 3600);
         // `file_watch` no tiene regla de 10 s (la cubre el margen por guardado).
         assert_eq!(duracion_a_guardar("file_watch", 5), 5);
+        // `terminal` tampoco (DT5): el tramo de 0 s se borra al cerrarlo.
+        assert_eq!(duracion_a_guardar("terminal", 5), 5);
+        assert_eq!(duracion_a_guardar("terminal", 0), 0);
     }
 
     #[test]
