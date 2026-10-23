@@ -192,13 +192,6 @@ export interface TimeStats {
   week_seconds: number;
 }
 
-export interface TrackingStatusResponse {
-  is_tracking: boolean;
-  project_id?: number;
-  project_path?: string;
-  elapsed_seconds: number;
-}
-
 export interface GestorConfig {
   project_id: number;
   project_name: string;

@@ -22,12 +22,11 @@ pub const VAR_MARCA_SESION: &str = "GESTOR_SESION";
 ///
 /// Es un newtype que solo se construye desde un token que cumple `^[0-9a-f]{32}$`,
 /// así que el valor que llega al argv o al entorno nunca puede ser texto arbitrario.
-/// Por ahora es mínimo: el token lo genera `trabajar` (commit 17, R8-3), que es el
-/// único que pasa una marca; hoy solo la construyen los tests.
+/// El token lo genera `trabajar` (`commands/trabajar.rs`), que es el único que pasa
+/// una marca.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MarcaSesion(String);
 
-#[allow(dead_code)] // La construye `trabajar` (commit 17, R8-3); hoy solo los tests
 impl MarcaSesion {
     /// Construye la marca si el token tiene exactamente 32 dígitos hexadecimales en
     /// minúscula. Cualquier otra cosa devuelve `None`.

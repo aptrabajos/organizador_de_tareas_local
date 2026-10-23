@@ -30,6 +30,12 @@ pub use trash::TrashItem;
 /// de `commands/mod.rs`.
 pub(crate) use trabajar::FUENTE_TERMINAL;
 
+/// Lo que usan Trabajar, Parar y la tarjeta (`commands/trabajar.rs`, commit 17).
+pub(crate) use trabajar::{
+    Dueno, InicioTrabajar, MedicionTrabajar, MedidoPorLaApp, MotivoSesion, PedidoTrabajar,
+    ResultadoParar, SesionViva,
+};
+
 pub struct Database {
     conn: Mutex<Connection>,
 }
@@ -71,6 +77,19 @@ impl Database {
         self.conn()
             .execute_batch(sql)
             .expect("no se pudo ejecutar el SQL del test");
+    }
+
+    /// Lee una fila con la conexión cruda, para las aserciones de los tests de otros
+    /// módulos (el estado de una sesión cerrada, el motivo de un tramo).
+    pub(crate) fn fila_para_tests<T>(
+        &self,
+        sql: &str,
+        params: impl rusqlite::Params,
+        fila: impl FnOnce(&rusqlite::Row) -> rusqlite::Result<T>,
+    ) -> T {
+        self.conn()
+            .query_row(sql, params, fila)
+            .expect("no se pudo leer la fila del test")
     }
 }
 

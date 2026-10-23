@@ -134,24 +134,28 @@ vi.mock('@tauri-apps/api/core', () => ({
     if (cmd === 'track_project_open') {
       return Promise.resolve();
     }
-    if (cmd === 'start_work_session') {
+    if (cmd === 'trabajar') {
       return Promise.resolve({
-        session_id: 1,
+        token: '0123456789abcdef0123456789abcdef',
         project_id: 1,
         project_name: 'Test Project',
-        previous_session_stopped: false,
+        dueno: 'app',
+        sesion_anterior: false,
         tracking_initialized: false,
+        aviso_sin_tracker: false,
       });
     }
-    if (cmd === 'stop_work_session') {
-      return Promise.resolve(null);
+    if (cmd === 'parar') {
+      return Promise.resolve({ resultado: 'ninguna' });
     }
-    if (cmd === 'get_work_session_status') {
+    if (cmd === 'estado_trabajar') {
       return Promise.resolve({
-        is_tracking: false,
-        project_id: null,
-        project_path: null,
-        elapsed_seconds: 0,
+        sesiones: [],
+        demonio_vivo: false,
+        adopcion_imposible: true,
+        tracker_corrio: false,
+        sondeos_sin_demonio: 1,
+        aviso: { alarma: false, linea_trabajar: false },
       });
     }
     if (cmd === 'get_root_projects') {
@@ -274,21 +278,22 @@ vi.mock('@tauri-apps/plugin-global-shortcut', () => ({
 }));
 
 // Mock de solid-toast
+// `toast(...)` también se llama directo (avisos neutros), así que el mock es una
+// función con los métodos colgados, como la de verdad.
+const { toastFalso } = vi.hoisted(() => ({
+  toastFalso: () =>
+    Object.assign(vi.fn(), {
+      success: vi.fn(),
+      error: vi.fn(),
+      loading: vi.fn(),
+      dismiss: vi.fn(),
+      custom: vi.fn(),
+    }),
+}));
+
 vi.mock('solid-toast', () => ({
-  default: {
-    success: vi.fn(),
-    error: vi.fn(),
-    loading: vi.fn(),
-    dismiss: vi.fn(),
-    custom: vi.fn(),
-  },
-  toast: {
-    success: vi.fn(),
-    error: vi.fn(),
-    loading: vi.fn(),
-    dismiss: vi.fn(),
-    custom: vi.fn(),
-  },
+  default: toastFalso(),
+  toast: toastFalso(),
 }));
 
 // Mock de marked

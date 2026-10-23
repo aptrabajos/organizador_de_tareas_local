@@ -45,6 +45,33 @@ pub(super) fn cerrar_sesion_en(
     Ok(cerradas > 0)
 }
 
+/// [`cerrar_sesion_en`] más el contador deprecado `projects.total_time_seconds`, en la
+/// transacción del llamador: si no cerró nada (ya estaba cerrada o no existe), el
+/// contador no se toca (P2/B3). Lo usan el envoltorio `end_tracking_session` y el
+/// cierre con el `Instant` de Trabajar (commit 17), para que el total del Dashboard
+/// siga sumando hasta que la lectura pase a la unión (commit 21) y el contador
+/// desaparezca (commit 25).
+pub(super) fn cerrar_y_acreditar_en(
+    conn: &Connection,
+    session_id: i64,
+    ended_at: DateTime<Utc>,
+    duration_seconds: i64,
+    motivo: Option<MotivoTramo>,
+) -> Result<bool> {
+    if !cerrar_sesion_en(conn, session_id, ended_at, duration_seconds, motivo)? {
+        return Ok(false);
+    }
+
+    // También actualizar el tiempo total del proyecto
+    conn.execute(
+        "UPDATE projects
+         SET total_time_seconds = COALESCE(total_time_seconds, 0) + ?1
+         WHERE id = (SELECT project_id FROM time_tracking_sessions WHERE id = ?2)",
+        params![duration_seconds, session_id],
+    )?;
+    Ok(true)
+}
+
 impl Database {
     // ==================== TIME TRACKING METHODS ====================
 
@@ -109,7 +136,8 @@ impl Database {
     /// `terminal` de 0 s se borra (DT5) y cuenta como cerrado.
     ///
     /// No toca `projects.total_time_seconds`: el contador está deprecado y solo lo
-    /// sigue sumando `end_tracking_session` hasta que desaparezca.
+    /// siguen sumando `end_tracking_session` y el cierre con el `Instant` de Trabajar
+    /// (`cerrar_y_acreditar_en`) hasta que desaparezca.
     #[allow(dead_code)] // Sin llamadores hasta la recuperación de huérfanas (commit 19) y el demonio
     pub fn cerrar_sesion(
         &self,
@@ -129,6 +157,7 @@ impl Database {
 
     /// Crear una nueva sesión de tracking que empieza ahora. Envoltorio de
     /// [`Database::abrir_sesion`] para los llamadores que todavía no pasan el instante.
+    #[allow(dead_code)] // Desde el commit 17 Trabajar abre sus tramos con el token; quedan los tests
     pub fn create_tracking_session(&self, project_id: i64, source: &str) -> Result<i64> {
         self.abrir_sesion(project_id, source, Utc::now())
     }
@@ -146,30 +175,24 @@ impl Database {
     /// la sesión y `false` si no había nada que cerrar.
     ///
     /// Envoltorio de [`Database::cerrar_sesion`] con "ahora", más el contador. Cierra
-    /// sin motivo: sus llamadores (Trabajar de antes de R8) cierran filas sin token, y
-    /// los reemplaza el commit 17.
+    /// sin motivo, así que solo sirve para filas sin token: desde el commit 17 Trabajar
+    /// cierra sus tramos con motivo y este envoltorio queda sin llamadores fuera de los
+    /// tests.
     ///
     /// La transacción es `IMMEDIATE` (R8-1): toma el lock de escritura antes de leer.
     /// En una diferida que lee antes de escribir, la conexión puede quedar con el lock
     /// de lectura esperando el de escritura de otra, y SQLite le devuelve
     /// `SQLITE_BUSY` sin esperar el `busy_timeout`. Desde el commit 17 la llaman
     /// cierres que compiten con otra conexión (el demonio, la CLI).
+    #[allow(dead_code)] // Sin llamadores desde el commit 17: Trabajar cierra con motivo
     pub fn end_tracking_session(&self, session_id: i64, duration_seconds: i64) -> Result<bool> {
         let mut conn = self.conn();
         let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
 
-        if !cerrar_sesion_en(&tx, session_id, Utc::now(), duration_seconds, None)? {
+        if !cerrar_y_acreditar_en(&tx, session_id, Utc::now(), duration_seconds, None)? {
             // Nada que cerrar: soltar `tx` sin commit es un rollback.
             return Ok(false);
         }
-
-        // También actualizar el tiempo total del proyecto
-        tx.execute(
-            "UPDATE projects
-             SET total_time_seconds = COALESCE(total_time_seconds, 0) + ?1
-             WHERE id = (SELECT project_id FROM time_tracking_sessions WHERE id = ?2)",
-            params![duration_seconds, session_id],
-        )?;
 
         tx.commit()?;
         Ok(true)

@@ -854,55 +854,77 @@ describe('API Service', () => {
       });
     });
 
-    describe('startWorkSession', () => {
-      it('should return WorkSessionResponse', async () => {
+    describe('trabajar', () => {
+      it('should return RespuestaTrabajar', async () => {
         const mockResponse = {
-          session_id: 42,
+          token: '0123456789abcdef0123456789abcdef',
           project_id: 1,
           project_name: 'Test Project',
-          previous_session_stopped: true,
+          dueno: 'app',
+          sesion_anterior: true,
           tracking_initialized: false,
+          aviso_sin_tracker: false,
         };
 
         vi.mocked(invoke).mockResolvedValue(mockResponse);
 
-        const result = await api.startWorkSession(1);
+        const result = await api.trabajar(1);
 
-        expect(invoke).toHaveBeenCalledWith('start_work_session', {
-          projectId: 1,
+        expect(invoke).toHaveBeenCalledWith('trabajar', { projectId: 1 });
+        expect(result.token).toBe('0123456789abcdef0123456789abcdef');
+        expect(result.sesion_anterior).toBe(true);
+      });
+    });
+
+    describe('parar', () => {
+      it('should pass the token of the card and return ResultadoParar', async () => {
+        vi.mocked(invoke).mockResolvedValue({
+          resultado: 'cerrada',
+          segundos: 1800,
         });
-        expect(result.session_id).toBe(42);
-        expect(result.previous_session_stopped).toBe(true);
+
+        const result = await api.parar(1, '0123456789abcdef0123456789abcdef');
+
+        expect(invoke).toHaveBeenCalledWith('parar', {
+          projectId: 1,
+          token: '0123456789abcdef0123456789abcdef',
+        });
+        expect(result).toEqual({ resultado: 'cerrada', segundos: 1800 });
+      });
+
+      it('should send a null token when the card has none', async () => {
+        vi.mocked(invoke).mockResolvedValue({ resultado: 'ninguna' });
+
+        const result = await api.parar(1);
+
+        expect(invoke).toHaveBeenCalledWith('parar', {
+          projectId: 1,
+          token: null,
+        });
+        expect(result.resultado).toBe('ninguna');
       });
     });
 
-    describe('stopWorkSession', () => {
-      it('should return elapsed seconds or null', async () => {
-        vi.mocked(invoke).mockResolvedValue(1800);
-
-        const result = await api.stopWorkSession();
-
-        expect(invoke).toHaveBeenCalledWith('stop_work_session');
-        expect(result).toBe(1800);
-      });
-    });
-
-    describe('getWorkSessionStatus', () => {
-      it('should return TrackingStatusResponse', async () => {
-        const mockStatus = {
-          is_tracking: true,
-          project_id: 1,
-          project_path: '/home/user/project',
-          elapsed_seconds: 600,
+    describe('estadoTrabajar', () => {
+      it('should pass the polls without daemon and return EstadoTrabajar', async () => {
+        const mockEstado = {
+          sesiones: [],
+          demonio_vivo: false,
+          adopcion_imposible: false,
+          tracker_corrio: true,
+          sondeos_sin_demonio: 2,
+          aviso: { alarma: true, linea_trabajar: false },
         };
 
-        vi.mocked(invoke).mockResolvedValue(mockStatus);
+        vi.mocked(invoke).mockResolvedValue(mockEstado);
 
-        const result = await api.getWorkSessionStatus();
+        const result = await api.estadoTrabajar(1);
 
-        expect(invoke).toHaveBeenCalledWith('get_work_session_status');
-        expect(result.is_tracking).toBe(true);
-        expect(result.elapsed_seconds).toBe(600);
+        expect(invoke).toHaveBeenCalledWith('estado_trabajar', {
+          sondeosSinDemonio: 1,
+        });
+        expect(result.aviso.alarma).toBe(true);
+        expect(result.sondeos_sin_demonio).toBe(2);
       });
     });
   });

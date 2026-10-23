@@ -40,7 +40,6 @@ const renderGroups = () =>
       viewMode="groups"
       onEdit={vi.fn()}
       onDelete={vi.fn()}
-      onOpenTerminal={vi.fn()}
     />
   ));
 

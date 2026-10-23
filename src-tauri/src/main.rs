@@ -85,27 +85,25 @@ fn run() -> Result<(), String> {
             spawn_auto_backup(app.handle().clone());
             Ok(())
         })
-        // Auditoría (CRÍTICO): antes no había ningún on_window_event/CloseRequested
-        // registrado, así que `stop_work_session` nunca se llamaba al cerrar la app:
-        // la sesión de tracking activa quedaba con ended_at/duration_seconds en NULL
-        // para siempre. Esto es best-effort y síncrono (bloquea brevemente el cierre,
-        // la app se está yendo de todos modos): usa la misma lógica que el comando
-        // manual `stop_work_session` vía `stop_active_session_sync`.
+        // Cerrar la ventana no termina ninguna sesión de Trabajar (D-R8-1, 3.10.11 del
+        // diseño del tracker): la que mide la app cierra su tramo con el `Instant` y
+        // queda esperando al tracker, o termina con `cierre_app` si nadie la puede
+        // adoptar. Es síncrono y corto (una transacción): la app se está yendo.
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {
                 let db = window.state::<Database>();
                 let active_session = window.state::<ActiveSession>();
-                match commands::stop_active_session_sync(&db, &active_session) {
+                match commands::al_cerrar_ventana(&db, &active_session) {
                     Ok(Some(duration)) => {
                         info!(
-                            "⏹️ [WORK] Sesión activa cerrada al salir de la app ({}s)",
+                            "⏹️ [WORK] La app soltó su sesión al cerrar la ventana ({}s)",
                             duration
                         );
                     }
                     Ok(None) => {}
                     Err(e) => {
                         warn!(
-                            "⚠️ [WORK] No se pudo cerrar la sesión activa al salir: {}",
+                            "⚠️ [WORK] No se pudo soltar la sesión de la app al salir: {}",
                             e
                         );
                     }
@@ -190,10 +188,10 @@ fn run() -> Result<(), String> {
             commands::check_tracking_config,
             commands::find_tracking_project,
             commands::get_time_stats,
-            // Work Session (v0.5.1) - Tracking automático
-            commands::start_work_session,
-            commands::stop_work_session,
-            commands::get_work_session_status,
+            // Trabajar y Parar con la sesión en la base (R8-3)
+            commands::trabajar::trabajar,
+            commands::trabajar::parar,
+            commands::trabajar::estado_trabajar,
             // Backup de la base de datos
             commands::backup_database,
             commands::list_backups,

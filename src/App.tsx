@@ -15,6 +15,7 @@ import ProjectFilters from './components/ProjectFilters';
 import type { ProjectFiltersProps } from './components/ProjectFilters';
 import TreeView from './components/TreeView';
 import Dashboard from './components/Dashboard';
+import AvisoTracker from './components/AvisoTracker';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { ConfigProvider, useConfig } from './contexts/ConfigContext';
 import { ShortcutsProvider, useShortcuts } from './contexts/ShortcutsContext';
@@ -170,14 +171,6 @@ const AppContent: Component = () => {
       }
     } catch {
       alert('Error al mover el proyecto a la papelera');
-    }
-  };
-
-  const handleOpenTerminal = async (project: Project) => {
-    try {
-      await store.openTerminal(project.local_path);
-    } catch {
-      alert('Error al abrir terminal');
     }
   };
 
@@ -445,6 +438,8 @@ const AppContent: Component = () => {
               <ProjectFilters {...filterProps()!} />
             </Show>
           </div>
+
+          <AvisoTracker />
         </div>
       </header>
 
@@ -526,7 +521,6 @@ const AppContent: Component = () => {
                       projects={store.projects()}
                       onEdit={handleEdit}
                       onDelete={handleDelete}
-                      onOpenTerminal={handleOpenTerminal}
                       onProjectsChanged={() => {
                         // Fuente única: reloadCurrentView() ya respeta la búsqueda
                         // activa (isSearchActive) además de grupos/subproyectos, a

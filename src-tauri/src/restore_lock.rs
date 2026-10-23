@@ -20,7 +20,6 @@ pub const MENSAJE_RESTAURACION_EN_CURSO: &str =
 
 /// Lock compartido sobre `restore.lock`. Se suelta al soltar el valor (cerrar el
 /// descriptor suelta el `flock`).
-#[allow(dead_code)] // Sin llamadores hasta Trabajar (commit 17)
 #[derive(Debug)]
 pub struct LockRestoreCompartido {
     _archivo: File,
@@ -30,7 +29,6 @@ pub struct LockRestoreCompartido {
 ///
 /// Si el restore lo tiene exclusivo, devuelve [`MENSAJE_RESTAURACION_EN_CURSO`] sin
 /// esperar. Un fallo al abrir o al tomar el lock es de sistema: va en inglés.
-#[allow(dead_code)] // Sin llamadores hasta Trabajar (commit 17) y la CLI (commit 61)
 pub fn tomar_compartido(data_dir: &Path) -> Result<LockRestoreCompartido, String> {
     let ruta = data_dir.join(NOMBRE);
     let archivo = OpenOptions::new()

@@ -6,7 +6,7 @@ use super::Database;
 ///
 /// Solo la escribe el demonio; la app la lee para mostrar el estado, nunca para
 /// calcular tiempo. Los nombres siguen a las columnas (3.2 del diseño del tracker).
-#[allow(dead_code)] // Sin llamadores hasta que Trabajar lea el estado del demonio (commit 17)
+#[allow(dead_code)] // `estado_trabajar` lee la fila y el estado; el resto, la UI de F7
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TrackerStatus {
     /// `NULL` cuando el demonio salió limpio.
@@ -39,7 +39,6 @@ pub struct TrackerStatus {
 impl Database {
     /// Lee el estado que publicó el demonio. `None` significa que el demonio nunca
     /// corrió contra esta base (la tabla existe desde el paso 3, pero sin fila).
-    #[allow(dead_code)] // Sin llamadores hasta que Trabajar lea el estado del demonio (commit 17)
     pub fn leer_tracker_status(&self) -> Result<Option<TrackerStatus>> {
         let conn = self.conn();
         conn.query_row(

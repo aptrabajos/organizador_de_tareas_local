@@ -27,6 +27,9 @@ printpdf = "0.7"
 # falta, y trae un árbol de dependencias bastante más grande.
 log = "0.4"
 env_logger = "0.11"
+# El token de cada sesión de Trabajar: 16 bytes del generador del sistema, en hex
+# (3.10.1 del diseño del tracker). Ya estaba en el árbol de dependencias.
+getrandom = "0.3"
 
 [dev-dependencies]
 chrono-tz = "0.10"

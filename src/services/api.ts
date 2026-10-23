@@ -210,9 +210,7 @@ export async function getRecentCommits(
 }
 
 // Funciones Git mejoradas
-export async function getGitFileCount(
-  path: string
-): Promise<GitFileCount> {
+export async function getGitFileCount(path: string): Promise<GitFileCount> {
   return await invoke('get_git_file_count', { path });
 }
 
@@ -459,7 +457,6 @@ export async function getDashboardData(): Promise<DashboardData> {
 import type {
   TimeTrackingSession,
   TimeStats,
-  TrackingStatusResponse,
   GestorConfig,
 } from '../types/project';
 
@@ -488,26 +485,78 @@ export async function getTimeStats(projectId: number): Promise<TimeStats> {
   return await invoke('get_time_stats', { projectId });
 }
 
-// ==================== WORK SESSION (v0.5.1) ====================
+// ==================== TRABAJAR Y PARAR (R8-3) ====================
+// La sesión de Trabajar vive en la base: `trabajar` la crea o la reutiliza y abre la
+// terminal con su marca, `parar` la termina y `estadoTrabajar` lee las vivas.
 
-export interface WorkSessionResponse {
-  session_id: number;
+export interface RespuestaTrabajar {
+  token: string;
   project_id: number;
   project_name: string;
-  previous_session_stopped: boolean;
+  /** Quién mide la sesión: la app (sin tracker) o el demonio. */
+  dueno: 'app' | 'demonio';
+  /** La app soltó la sesión de otro proyecto y le guardó tiempo. */
+  sesion_anterior: boolean;
   tracking_initialized: boolean;
+  /** Mide la app sin el tracker que se esperaba: hay que avisarlo. */
+  aviso_sin_tracker: boolean;
 }
 
-export async function startWorkSession(
-  projectId: number
-): Promise<WorkSessionResponse> {
-  return await invoke('start_work_session', { projectId });
+export type ResultadoParar =
+  | { resultado: 'cerrada'; segundos: number }
+  | { resultado: 'ya_cerrada'; motivo: string; segundos: number }
+  | { resultado: 'ninguna' };
+
+export interface TramoVivo {
+  started_at: string;
+  last_activity_at: string | null;
+  duration_seconds: number | null;
 }
 
-export async function stopWorkSession(): Promise<number | null> {
-  return await invoke('stop_work_session');
+export interface SesionViva {
+  token: string;
+  project_id: number;
+  estado: string;
+  dueno: 'app' | 'demonio';
+  origen: 'boton' | 'cli';
+  creada_at: string;
+  last_seen_at: string | null;
+  tramo_abierto: TramoVivo | null;
+  segundos: number;
+  /** Segundos del reloj de la app, si es la sesión que mide ella. */
+  elapsed_seconds: number | null;
 }
 
-export async function getWorkSessionStatus(): Promise<TrackingStatusResponse> {
-  return await invoke('get_work_session_status');
+export interface AvisoCabecera {
+  alarma: boolean;
+  linea_trabajar: boolean;
+}
+
+export interface EstadoTrabajar {
+  sesiones: SesionViva[];
+  demonio_vivo: boolean;
+  adopcion_imposible: boolean;
+  tracker_corrio: boolean;
+  /** Sondeos seguidos sin demonio: la cabecera lo devuelve en el siguiente. */
+  sondeos_sin_demonio: number;
+  aviso: AvisoCabecera;
+}
+
+export async function trabajar(projectId: number): Promise<RespuestaTrabajar> {
+  return await invoke('trabajar', { projectId });
+}
+
+export async function parar(
+  projectId: number,
+  token?: string
+): Promise<ResultadoParar> {
+  return await invoke('parar', { projectId, token: token ?? null });
+}
+
+export async function estadoTrabajar(
+  sondeosSinDemonio?: number
+): Promise<EstadoTrabajar> {
+  return await invoke('estado_trabajar', {
+    sondeosSinDemonio: sondeosSinDemonio ?? null,
+  });
 }

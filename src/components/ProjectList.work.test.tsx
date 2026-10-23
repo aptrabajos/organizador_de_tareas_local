@@ -6,7 +6,9 @@ import toast from 'solid-toast';
 import ProjectList from './ProjectList';
 import type { Project } from '../types/project';
 
-// "Trabajar" y "Parar" desde la tarjeta del proyecto (P7, P9).
+// "Trabajar" y "Parar" desde la tarjeta del proyecto (P7, P9), con la sesión en la
+// base (R8-3): `trabajar` abre la terminal, `parar` devuelve un `ResultadoParar` y la
+// tarjeta lee las sesiones vivas con `estado_trabajar`.
 
 const proyecto: Project = {
   id: 1,
@@ -34,6 +36,7 @@ const pisarComando = (comando: string, respuesta: () => Promise<unknown>) => {
 beforeEach(() => {
   base = vi.mocked(invoke).getMockImplementation() as InvokeImpl;
   vi.mocked(invoke).mockClear();
+  vi.mocked(toast).mockClear();
   vi.mocked(toast.error).mockClear();
   vi.mocked(toast.success).mockClear();
 });
@@ -44,7 +47,6 @@ afterEach(() => {
 
 const renderLista = (
   projects: Project[] = [proyecto],
-  onOpenTerminal = vi.fn(),
   onProjectsChanged = vi.fn()
 ) =>
   render(() => (
@@ -52,27 +54,44 @@ const renderLista = (
       projects={projects}
       onEdit={vi.fn()}
       onDelete={vi.fn()}
-      onOpenTerminal={onOpenTerminal}
       onProjectsChanged={onProjectsChanged}
     />
   ));
 
-describe('ProjectList: Trabajar', () => {
-  it('muestra un toast en español si startWorkSession falla y abre el terminal igual', async () => {
-    const user = userEvent.setup();
-    const onOpenTerminal = vi.fn();
-    pisarComando('start_work_session', () =>
-      Promise.reject('El directorio del proyecto no existe: /home/user/x')
-    );
+const TOKEN = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 
-    render(() => (
-      <ProjectList
-        projects={[proyecto]}
-        onEdit={vi.fn()}
-        onDelete={vi.fn()}
-        onOpenTerminal={onOpenTerminal}
-      />
-    ));
+/** Una sesión viva de la app en `projectId`, como la devuelve `estado_trabajar`. */
+const sesionViva = (projectId: number) => ({
+  token: TOKEN,
+  project_id: projectId,
+  estado: 'viva_activa',
+  dueno: 'app',
+  origen: 'boton',
+  creada_at: '2026-10-20 09:00:00',
+  last_seen_at: null,
+  tramo_abierto: null,
+  segundos: 0,
+  elapsed_seconds: 42,
+});
+
+const estado = (sesiones: unknown[]) => ({
+  sesiones,
+  demonio_vivo: false,
+  adopcion_imposible: true,
+  tracker_corrio: false,
+  sondeos_sin_demonio: 1,
+  aviso: { alarma: false, linea_trabajar: sesiones.length > 0 },
+});
+
+describe('ProjectList: Trabajar', () => {
+  it('muestra un toast en español si trabajar falla y no abre nada más', async () => {
+    const user = userEvent.setup();
+    pisarComando('trabajar', () =>
+      Promise.reject(
+        'Proyecto 1 está en la papelera: restauralo para trabajar en él.'
+      )
+    );
+    renderLista();
 
     await user.click(screen.getByRole('button', { name: /trabajar/i }));
 
@@ -80,57 +99,76 @@ describe('ProjectList: Trabajar', () => {
       expect(toast.error).toHaveBeenCalledTimes(1);
     });
     const mensaje = vi.mocked(toast.error).mock.calls[0][0] as string;
-    expect(mensaje).toContain('No se pudo empezar a medir el tiempo');
+    expect(mensaje).toContain('No se pudo empezar a trabajar en Proyecto 1');
     // El texto del backend llega tal cual (Tauri rechaza con un string plano).
-    expect(mensaje).toContain(
-      'El directorio del proyecto no existe: /home/user/x'
-    );
-    expect(onOpenTerminal).toHaveBeenCalledTimes(1);
-    expect(onOpenTerminal).toHaveBeenCalledWith(proyecto);
+    expect(mensaje).toContain('está en la papelera');
+    expect(invoke).not.toHaveBeenCalledWith('open_terminal', expect.anything());
   });
 
-  it('no muestra error si la sesión arranca bien', async () => {
+  it('no muestra error si la sesión arranca bien: la terminal la abre trabajar', async () => {
     const user = userEvent.setup();
-    const onOpenTerminal = vi.fn();
-
-    render(() => (
-      <ProjectList
-        projects={[proyecto]}
-        onEdit={vi.fn()}
-        onDelete={vi.fn()}
-        onOpenTerminal={onOpenTerminal}
-      />
-    ));
+    renderLista();
 
     await user.click(screen.getByRole('button', { name: /trabajar/i }));
 
     await waitFor(() => {
-      expect(onOpenTerminal).toHaveBeenCalledWith(proyecto);
+      expect(invoke).toHaveBeenCalledWith('trabajar', { projectId: 1 });
     });
     expect(toast.error).not.toHaveBeenCalled();
+    expect(invoke).not.toHaveBeenCalledWith('open_terminal', expect.anything());
   });
 
   it('si falla el registro de la apertura, la sesión arranca igual', async () => {
     const user = userEvent.setup();
     pisarComando('track_project_open', () => Promise.reject('boom'));
-
-    render(() => (
-      <ProjectList
-        projects={[proyecto]}
-        onEdit={vi.fn()}
-        onDelete={vi.fn()}
-        onOpenTerminal={vi.fn()}
-      />
-    ));
+    renderLista();
 
     await user.click(screen.getByRole('button', { name: /trabajar/i }));
 
     await waitFor(() => {
-      expect(invoke).toHaveBeenCalledWith('start_work_session', {
-        projectId: 1,
-      });
+      expect(invoke).toHaveBeenCalledWith('trabajar', { projectId: 1 });
     });
     expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  it('con aviso_sin_tracker, avisa que la sesión no se pausa y se corta a las 12 h', async () => {
+    const user = userEvent.setup();
+    pisarComando('trabajar', () =>
+      Promise.resolve({
+        token: TOKEN,
+        project_id: 1,
+        project_name: 'Proyecto 1',
+        dueno: 'app',
+        sesion_anterior: false,
+        tracking_initialized: false,
+        aviso_sin_tracker: true,
+      })
+    );
+    renderLista();
+
+    await user.click(screen.getByRole('button', { name: /trabajar/i }));
+
+    await waitFor(() => {
+      expect(toast).toHaveBeenCalledWith(
+        expect.stringContaining('El tracker no está corriendo'),
+        expect.anything()
+      );
+    });
+  });
+
+  it('sin aviso_sin_tracker (adopción imposible) no hay toast del tracker', async () => {
+    const user = userEvent.setup();
+    renderLista();
+
+    await user.click(screen.getByRole('button', { name: /trabajar/i }));
+
+    await waitFor(() => {
+      expect(invoke).toHaveBeenCalledWith('trabajar', { projectId: 1 });
+    });
+    expect(toast).not.toHaveBeenCalledWith(
+      expect.stringContaining('El tracker no está corriendo'),
+      expect.anything()
+    );
   });
 });
 
@@ -138,25 +176,22 @@ describe('ProjectList: Parar', () => {
   const otro: Project = { ...proyecto, id: 2, name: 'Proyecto 2' };
 
   const sesionActivaEn = (projectId: number) =>
-    pisarComando('get_work_session_status', () =>
-      Promise.resolve({
-        is_tracking: true,
-        project_id: projectId,
-        project_path: '/home/user/proyecto1',
-        elapsed_seconds: 42,
-      })
+    pisarComando('estado_trabajar', () =>
+      Promise.resolve(estado([sesionViva(projectId)]))
     );
 
-  it('sin sesión activa no hay botón Parar', async () => {
+  it('sin sesión viva no hay botón Parar', async () => {
     renderLista([proyecto, otro]);
 
     await waitFor(() => {
-      expect(invoke).toHaveBeenCalledWith('get_work_session_status');
+      expect(invoke).toHaveBeenCalledWith('estado_trabajar', {
+        sondeosSinDemonio: null,
+      });
     });
     expect(screen.queryByRole('button', { name: /parar/i })).toBeNull();
   });
 
-  it('con sesión activa, Parar aparece solo en la tarjeta de ese proyecto', async () => {
+  it('con sesión viva, Parar aparece solo en la tarjeta de ese proyecto', async () => {
     sesionActivaEn(2);
     renderLista([proyecto, otro]);
 
@@ -168,9 +203,26 @@ describe('ProjectList: Parar', () => {
     expect(parar.parentElement).not.toBe(trabajar[0].parentElement);
   });
 
-  it('Trabajar hace aparecer Parar, y Parar llama a stop_work_session y lo oculta', async () => {
+  it('Trabajar hace aparecer Parar, y Parar llama a parar con el token y lo oculta', async () => {
     const user = userEvent.setup();
-    pisarComando('stop_work_session', () => Promise.resolve(125));
+    let vivas: unknown[] = [];
+    pisarComando('estado_trabajar', () => Promise.resolve(estado(vivas)));
+    pisarComando('trabajar', () => {
+      vivas = [sesionViva(1)];
+      return Promise.resolve({
+        token: TOKEN,
+        project_id: 1,
+        project_name: 'Proyecto 1',
+        dueno: 'app',
+        sesion_anterior: false,
+        tracking_initialized: false,
+        aviso_sin_tracker: false,
+      });
+    });
+    pisarComando('parar', () => {
+      vivas = [];
+      return Promise.resolve({ resultado: 'cerrada', segundos: 125 });
+    });
     renderLista();
 
     await user.click(screen.getByRole('button', { name: /trabajar/i }));
@@ -179,7 +231,10 @@ describe('ProjectList: Parar', () => {
     await user.click(parar);
 
     await waitFor(() => {
-      expect(invoke).toHaveBeenCalledWith('stop_work_session');
+      expect(invoke).toHaveBeenCalledWith('parar', {
+        projectId: 1,
+        token: TOKEN,
+      });
     });
     await waitFor(() => {
       expect(screen.queryByRole('button', { name: /parar/i })).toBeNull();
@@ -194,8 +249,10 @@ describe('ProjectList: Parar', () => {
     const user = userEvent.setup();
     const onProjectsChanged = vi.fn();
     sesionActivaEn(1);
-    pisarComando('stop_work_session', () => Promise.resolve(417));
-    renderLista([proyecto], vi.fn(), onProjectsChanged);
+    pisarComando('parar', () =>
+      Promise.resolve({ resultado: 'cerrada', segundos: 417 })
+    );
+    renderLista([proyecto], onProjectsChanged);
 
     await user.click(await screen.findByRole('button', { name: /parar/i }));
 
@@ -212,8 +269,10 @@ describe('ProjectList: Parar', () => {
     const user = userEvent.setup();
     const onProjectsChanged = vi.fn();
     sesionActivaEn(1);
-    pisarComando('stop_work_session', () => Promise.resolve(0));
-    renderLista([proyecto], vi.fn(), onProjectsChanged);
+    pisarComando('parar', () =>
+      Promise.resolve({ resultado: 'cerrada', segundos: 0 })
+    );
+    renderLista([proyecto], onProjectsChanged);
 
     await user.click(await screen.findByRole('button', { name: /parar/i }));
 
@@ -226,16 +285,18 @@ describe('ProjectList: Parar', () => {
   it('Trabajar que cierra la sesión anterior recarga la lista', async () => {
     const user = userEvent.setup();
     const onProjectsChanged = vi.fn();
-    pisarComando('start_work_session', () =>
+    pisarComando('trabajar', () =>
       Promise.resolve({
-        session_id: 7,
+        token: TOKEN,
         project_id: 1,
         project_name: 'Proyecto 1',
-        previous_session_stopped: true,
+        dueno: 'app',
+        sesion_anterior: true,
         tracking_initialized: true,
+        aviso_sin_tracker: false,
       })
     );
-    renderLista([proyecto], vi.fn(), onProjectsChanged);
+    renderLista([proyecto], onProjectsChanged);
 
     await user.click(screen.getByRole('button', { name: /trabajar/i }));
 
@@ -247,7 +308,9 @@ describe('ProjectList: Parar', () => {
   it('una sesión de 0 s avisa que no suma tiempo', async () => {
     const user = userEvent.setup();
     sesionActivaEn(1);
-    pisarComando('stop_work_session', () => Promise.resolve(0));
+    pisarComando('parar', () =>
+      Promise.resolve({ resultado: 'cerrada', segundos: 0 })
+    );
     renderLista();
 
     await user.click(await screen.findByRole('button', { name: /parar/i }));
@@ -260,10 +323,68 @@ describe('ProjectList: Parar', () => {
     });
   });
 
+  it('Parar sobre una sesión que ya había terminado lo dice con su motivo', async () => {
+    const user = userEvent.setup();
+    sesionActivaEn(1);
+    pisarComando('parar', () =>
+      Promise.resolve({
+        resultado: 'ya_cerrada',
+        motivo: 'terminal_cerrada',
+        segundos: 4320,
+      })
+    );
+    renderLista();
+
+    await user.click(await screen.findByRole('button', { name: /parar/i }));
+
+    await waitFor(() => {
+      expect(toast).toHaveBeenCalledWith(
+        'La sesión de Proyecto 1 ya había terminado: cerraste la terminal (1h 12m).',
+        expect.anything()
+      );
+    });
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+
+  it('Parar sin sesión que parar no muestra ningún toast', async () => {
+    const user = userEvent.setup();
+    sesionActivaEn(1);
+    pisarComando('parar', () => Promise.resolve({ resultado: 'ninguna' }));
+    renderLista();
+
+    await user.click(await screen.findByRole('button', { name: /parar/i }));
+
+    await waitFor(() => {
+      expect(invoke).toHaveBeenCalledWith('parar', {
+        projectId: 1,
+        token: TOKEN,
+      });
+    });
+    expect(toast).not.toHaveBeenCalled();
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  it('al ganar el foco, la tarjeta relee las sesiones de la base', async () => {
+    renderLista();
+    await waitFor(() => {
+      expect(invoke).toHaveBeenCalledWith('estado_trabajar', {
+        sondeosSinDemonio: null,
+      });
+    });
+    expect(screen.queryByRole('button', { name: /parar/i })).toBeNull();
+
+    // La sesión arrancó en otro lado (el Dashboard, la CLI).
+    sesionActivaEn(1);
+    window.dispatchEvent(new Event('focus'));
+
+    expect(await screen.findByRole('button', { name: /parar/i })).toBeTruthy();
+  });
+
   it('si Parar falla, muestra el error y el botón sigue', async () => {
     const user = userEvent.setup();
     sesionActivaEn(1);
-    pisarComando('stop_work_session', () =>
+    pisarComando('parar', () =>
       Promise.reject('Error stopping session: disk I/O error')
     );
     renderLista();

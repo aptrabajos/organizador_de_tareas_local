@@ -1,9 +1,8 @@
 import { Component, createResource, For, Show } from 'solid-js';
-import { getDashboardData, openTerminal } from '../services/api';
+import { getDashboardData } from '../services/api';
 import type { DashboardData } from '../types/dashboard';
 import { getErrorMessage } from '../utils/errors';
 import type { Project } from '../types/project';
-import toast from 'solid-toast';
 import { logger } from '../utils/logger';
 import { trabajarEnProyecto } from '../utils/workSession';
 
@@ -49,22 +48,10 @@ const Dashboard: Component<DashboardProps> = (props) => {
     }
   };
 
-  const abrirTerminal = async (project: Project) => {
-    try {
-      await openTerminal(project.local_path);
-      toast.success(`Abriendo ${project.name}...`, { duration: 2000 });
-    } catch (error) {
-      logger.error('Error al abrir proyecto:', error);
-      toast.error(
-        `No se pudo abrir el terminal de ${project.name}: ${getErrorMessage(error)}`
-      );
-    }
-  };
-
-  // Mismo flujo que "Trabajar" en la tarjeta del proyecto (P8): antes este botón
-  // abría el terminal sin arrancar la sesión, y el tiempo no se medía.
+  // Mismo flujo que "Trabajar" en la tarjeta del proyecto (P8): `trabajar` crea o
+  // reutiliza la sesión y abre la terminal con su marca.
   const handleOpenProject = async (project: Project) => {
-    await trabajarEnProyecto(project, abrirTerminal);
+    await trabajarEnProyecto(project);
   };
 
   const handleNavigateToProject = (project: Project) => {

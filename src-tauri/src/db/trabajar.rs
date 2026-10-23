@@ -12,14 +12,15 @@
 //! transacción `IMMEDIATE` toma el lock de escritura antes de leer, así que la
 //! comprobación y la escritura ven la misma base.
 //!
-//! Sin llamadores hasta Trabajar y Parar (commit 17) y el escritor del demonio
-//! (commit 44): el `allow(dead_code)` de cada método lo dice.
+//! Trabajar, Parar y el cierre de la ventana (commit 17) componen los helpers
+//! privados `*_en(tx)` dentro de **una** transacción. Lo que todavía no tiene
+//! llamadores (el escritor del demonio, commit 44) lo dice su `allow(dead_code)`.
 
 use chrono::{DateTime, Duration, Utc};
 use rusqlite::types::Type;
 use rusqlite::{params, Connection, OptionalExtension, Result, Transaction, TransactionBehavior};
 
-use super::tracking::cerrar_sesion_en;
+use super::tracking::{cerrar_sesion_en, cerrar_y_acreditar_en};
 use super::Database;
 use crate::commands::duracion_a_guardar;
 use crate::time;
@@ -28,10 +29,14 @@ use crate::time;
 /// Los tramos de un token `dueno = app` siguen siendo `work_button`.
 pub(crate) const FUENTE_TERMINAL: &str = "terminal";
 
-/// Tope de un tramo medido por la app sin el demonio (U6). La constante de la app
-/// (`TOPE_SIN_TRACKER`) llega con el commit 17; acá la usa solo el cierre de un tramo
-/// `work_button` sin el `Instant` de la app, con la regla de huérfanas (§3.2).
-const TOPE_SIN_TRACKER_S: i64 = 43_200;
+/// Fuente de los tramos que mide la app con su `Instant` (Trabajar sin demonio vivo,
+/// `dueno = app`).
+pub(crate) const FUENTE_TRABAJAR: &str = "work_button";
+
+/// Tope de un tramo medido por la app sin el demonio: 12 h (U6, 3.10.13). No es
+/// configurable. Lo aplican Parar, Trabajar en otro proyecto, el cierre de la ventana
+/// y el cierre de un `work_button` sin el `Instant` (regla de huérfanas, §3.2).
+pub(crate) const TOPE_SIN_TRACKER: i64 = 43_200;
 
 /// El demonio está vivo si su último latido tiene menos que esto (3.10.7).
 const LATIDO_VIGENTE_S: i64 = 45;
@@ -41,7 +46,7 @@ const LARGO_MINUTO: usize = 16;
 
 /// Por qué terminó una sesión (3.10.15). Es la lista del `CHECK` de
 /// `trabajar_sesiones.motivo_cierre`.
-#[allow(dead_code)] // Sin llamadores hasta Trabajar y Parar (commit 17)
+#[allow(dead_code)] // Los motivos del demonio y de la CLI llegan con los commits 44 y 61
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MotivoSesion {
     TerminalCerrada,
@@ -240,7 +245,7 @@ fn cerrar_tramo_en_ua(tx: &Transaction, token: &str, motivo: MotivoTramo) -> Res
     } else {
         duracion_a_guardar(
             &source,
-            medido.unwrap_or(0).min(bruto).min(TOPE_SIN_TRACKER_S),
+            medido.unwrap_or(0).min(bruto).min(TOPE_SIN_TRACKER),
         )
     };
 
@@ -307,6 +312,208 @@ fn terminar_token_en(
     Ok(true)
 }
 
+/// Abre un tramo de `source` para el token en `inicio` si el token sigue vivo, en la
+/// transacción del llamador. Ver [`Database::abrir_tramo`].
+fn abrir_tramo_en(
+    tx: &Transaction,
+    token: &str,
+    source: &str,
+    inicio: DateTime<Utc>,
+) -> Result<Option<i64>> {
+    let abiertos = tx.execute(
+        "INSERT INTO time_tracking_sessions
+             (project_id, started_at, last_activity_at, duration_seconds, source, terminal_token)
+         SELECT project_id, ?2, ?2, CASE WHEN ?3 = 'terminal' THEN 0 END, ?3, token
+         FROM trabajar_sesiones
+         WHERE token = ?1 AND estado <> 'cerrada'",
+        params![token, time::formatear(inicio), source],
+    )?;
+    Ok((abiertos > 0).then(|| tx.last_insert_rowid()))
+}
+
+/// Traspaso `app → demonio` en la transacción del llamador. Ver
+/// [`Database::pasar_a_esperando_demonio`].
+fn pasar_a_esperando_demonio_en(tx: &Transaction, token: &str) -> Result<bool> {
+    let pasadas = tx.execute(
+        "UPDATE trabajar_sesiones
+         SET dueno = 'demonio', estado = 'esperando_demonio', adoptada_at = NULL
+         WHERE token = ?1 AND estado <> 'cerrada'
+           AND NOT EXISTS (SELECT 1 FROM time_tracking_sessions
+                           WHERE terminal_token = ?1 AND ended_at IS NULL)",
+        params![token],
+    )?;
+    Ok(pasadas > 0)
+}
+
+/// Suma de las duraciones de los tramos del token: el total de la sesión que muestra
+/// el toast de Parar (3.10.9) y la tarjeta.
+fn segundos_del_token_en(conn: &Connection, token: &str) -> Result<i64> {
+    conn.query_row(
+        "SELECT COALESCE(SUM(duration_seconds), 0) FROM time_tracking_sessions
+         WHERE terminal_token = ?1",
+        params![token],
+        |row| row.get(0),
+    )
+}
+
+/// Dueño **actual** de una sesión (3.10.7): quién mide sus tramos de ahora en más.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Dueno {
+    Demonio,
+    App,
+}
+
+impl Dueno {
+    pub fn como_texto(self) -> &'static str {
+        match self {
+            Dueno::Demonio => "demonio",
+            Dueno::App => "app",
+        }
+    }
+}
+
+/// Lo que la app mide con su `Instant` (la `MedicionApp` de `ActiveSession`), en el
+/// momento de soltarlo: el token, su tramo `work_button` abierto y los segundos medidos.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MedidoPorLaApp<'a> {
+    pub token: &'a str,
+    pub tramo_id: i64,
+    /// Lo medido con el `Instant`, sin la regla de los 10 s ni el tope: los aplica el
+    /// cierre.
+    pub segundos: i64,
+}
+
+/// Cierra con el `Instant` el tramo que mide la app (`ended_at` = `fin`, la pared de
+/// ahora) con la regla de los 10 s y el tope de 12 h (U6). Devuelve los segundos
+/// guardados, o `None` si el tramo ya estaba cerrado. Suma también al contador
+/// deprecado del proyecto, como el cierre de Trabajar de antes de R8, hasta que el
+/// contador desaparezca (commit 25).
+fn cerrar_tramo_de_la_app_en(
+    tx: &Transaction,
+    medido: &MedidoPorLaApp,
+    fin: DateTime<Utc>,
+    motivo: MotivoTramo,
+) -> Result<Option<i64>> {
+    let guardado = duracion_a_guardar(FUENTE_TRABAJAR, medido.segundos.min(TOPE_SIN_TRACKER));
+    let cerrado = cerrar_y_acreditar_en(tx, medido.tramo_id, fin, guardado, Some(motivo))?;
+    Ok(cerrado.then_some(guardado))
+}
+
+/// La app deja de medir una sesión que no terminó (3.10.7): cierra su tramo con el
+/// `Instant` y, en la misma transacción, la pasa a `esperando_demonio` para que la
+/// adopte el demonio. Con la adopción imposible la sesión **termina** con ese mismo
+/// motivo (U4). Devuelve los segundos guardados del tramo (`None` si ya estaba
+/// cerrado).
+fn soltar_medicion_en(
+    tx: &Transaction,
+    medido: &MedidoPorLaApp,
+    fin: DateTime<Utc>,
+    motivo: MotivoSesion,
+    adopcion_imposible: bool,
+) -> Result<Option<i64>> {
+    let guardado = cerrar_tramo_de_la_app_en(tx, medido, fin, MotivoTramo::Sesion(motivo))?;
+    if adopcion_imposible {
+        terminar_token_en(tx, medido.token, fin, motivo)?;
+    } else {
+        pasar_a_esperando_demonio_en(tx, medido.token)?;
+    }
+    Ok(guardado)
+}
+
+/// Anota un clic (Trabajar sobre la sesión): el demonio lo relee y lo trata como
+/// actividad válida en ese instante (3.10.1).
+fn anotar_clic_en(tx: &Transaction, token: &str, clic: &str) -> Result<()> {
+    tx.execute(
+        "UPDATE trabajar_sesiones SET ultimo_clic_at = ?2
+         WHERE token = ?1 AND estado <> 'cerrada'",
+        params![token, clic],
+    )?;
+    Ok(())
+}
+
+/// Lo que necesita [`Database::iniciar_trabajar`].
+#[derive(Debug, Clone, Copy)]
+pub struct PedidoTrabajar<'a> {
+    pub project_id: i64,
+    /// El clic: `creada_at`, `ultimo_clic_at` y el inicio del tramo de la app.
+    pub ahora: DateTime<Utc>,
+    /// El token que se usa si hay que crear una sesión (32 hex).
+    pub token_nuevo: &'a str,
+    /// La sesión que mide la app ahora, si mide alguna.
+    pub medida_por_la_app: Option<MedidoPorLaApp<'a>>,
+    pub adopcion_imposible: bool,
+}
+
+/// Qué pasa con la medición de la app después de Trabajar.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MedicionTrabajar {
+    /// La app ya medía esta sesión: sigue con el mismo tramo y el mismo `Instant`.
+    Sigue,
+    /// La app empieza a medir este tramo `work_button`, abierto en el clic.
+    Nueva(i64),
+    /// La sesión es del demonio: la app no mide nada.
+    Ninguna,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum InicioTrabajar {
+    NoExiste,
+    EnPapelera,
+    Iniciada {
+        token: String,
+        dueno: Dueno,
+        /// `false` si se reutilizó el token vivo del proyecto (D-R8-4).
+        nueva: bool,
+        medicion: MedicionTrabajar,
+        /// Segundos guardados del tramo que la app soltó por Trabajar en otro
+        /// proyecto, si soltó alguno.
+        guardado_anterior: Option<i64>,
+    },
+}
+
+/// Resultado de Parar (3.10.9).
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[serde(tag = "resultado", rename_all = "snake_case")]
+pub enum ResultadoParar {
+    /// La sesión terminó ahora. `segundos` es la suma de sus tramos, para el toast.
+    Cerrada { segundos: i64 },
+    /// La sesión ya había terminado por otra vía: su motivo y su total.
+    YaCerrada { motivo: String, segundos: i64 },
+    /// No había sesión que parar.
+    Ninguna,
+}
+
+/// [`ResultadoParar`] y el token al que se refiere, para que la app suelte su
+/// `MedicionApp` si era esa.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Parada {
+    pub token: Option<String>,
+    pub resultado: ResultadoParar,
+}
+
+/// Una sesión viva de la base, como la lee la tarjeta (`estado_trabajar`, 3.10.7).
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct SesionViva {
+    pub token: String,
+    pub project_id: i64,
+    pub estado: String,
+    pub dueno: String,
+    pub origen: String,
+    pub creada_at: String,
+    pub last_seen_at: Option<String>,
+    pub tramo_abierto: Option<TramoVivo>,
+    /// Suma de las duraciones de los tramos del token.
+    pub segundos: i64,
+}
+
+/// El tramo abierto de una sesión viva.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct TramoVivo {
+    pub started_at: String,
+    pub last_activity_at: Option<String>,
+    pub duration_seconds: Option<i64>,
+}
+
 impl Database {
     /// Corre `f` en una transacción `IMMEDIATE`: el lock de escritura se toma antes de
     /// la primera lectura, así que lo que `f` comprueba sigue valiendo cuando escribe.
@@ -326,24 +533,14 @@ impl Database {
     ///
     /// Un segundo tramo abierto del mismo token es un error del índice único
     /// `idx_sessions_tramo_abierto`: serían dos escritores.
-    #[allow(dead_code)] // Sin llamadores hasta Trabajar (commit 17) y el escritor del demonio (commit 44)
+    #[allow(dead_code)] // Sin llamadores hasta el escritor del demonio (commit 44); Trabajar usa `abrir_tramo_en`
     pub fn abrir_tramo(
         &self,
         token: &str,
         source: &str,
         inicio: DateTime<Utc>,
     ) -> Result<Option<i64>> {
-        self.en_transaccion_inmediata(|tx| {
-            let abiertos = tx.execute(
-                "INSERT INTO time_tracking_sessions
-                     (project_id, started_at, last_activity_at, duration_seconds, source, terminal_token)
-                 SELECT project_id, ?2, ?2, CASE WHEN ?3 = 'terminal' THEN 0 END, ?3, token
-                 FROM trabajar_sesiones
-                 WHERE token = ?1 AND estado <> 'cerrada'",
-                params![token, time::formatear(inicio), source],
-            )?;
-            Ok((abiertos > 0).then(|| tx.last_insert_rowid()))
-        })
+        self.en_transaccion_inmediata(|tx| abrir_tramo_en(tx, token, source, inicio))
     }
 
     /// Termina las sesiones vivas de esos proyectos con `motivo` (Parar, papelera,
@@ -388,19 +585,9 @@ impl Database {
     /// `adoptada_at`, para que el demonio la adopte. `dueno` nunca cambia con un tramo
     /// abierto (DT14): si el token tiene uno, o ya está cerrado, devuelve `false` y no
     /// toca nada.
-    #[allow(dead_code)] // Sin llamadores hasta Trabajar en otro proyecto y el cierre de la app (commit 17)
+    #[allow(dead_code)] // Trabajar y el cierre de la app usan `pasar_a_esperando_demonio_en`
     pub fn pasar_a_esperando_demonio(&self, token: &str) -> Result<bool> {
-        self.en_transaccion_inmediata(|tx| {
-            let pasadas = tx.execute(
-                "UPDATE trabajar_sesiones
-                 SET dueno = 'demonio', estado = 'esperando_demonio', adoptada_at = NULL
-                 WHERE token = ?1 AND estado <> 'cerrada'
-                   AND NOT EXISTS (SELECT 1 FROM time_tracking_sessions
-                                   WHERE terminal_token = ?1 AND ended_at IS NULL)",
-                params![token],
-            )?;
-            Ok(pasadas > 0)
-        })
+        self.en_transaccion_inmediata(|tx| pasar_a_esperando_demonio_en(tx, token))
     }
 
     /// El demonio termina la sesión con `terminal_cerrada` porque el escaneo que
@@ -483,6 +670,322 @@ impl Database {
             )
         })
     }
+
+    /// Nombre, carpeta y si está en la papelera, para que Trabajar avise antes de tocar
+    /// nada. `None` si el proyecto no existe.
+    pub fn proyecto_para_trabajar(
+        &self,
+        project_id: i64,
+    ) -> Result<Option<(String, String, bool)>> {
+        self.conn()
+            .query_row(
+                "SELECT name, local_path, deleted_at IS NOT NULL FROM projects WHERE id = ?1",
+                params![project_id],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .optional()
+    }
+
+    /// Trabajar en un proyecto (3.10.6, 3.10.7), todo en **una** transacción
+    /// `IMMEDIATE`:
+    ///
+    /// - Si la app ya mide la sesión viva del proyecto, solo anota el clic
+    ///   (`ultimo_clic_at`) y sigue midiendo.
+    /// - Si no, la app suelta lo que medía (motivo `cambio_de_proyecto`): un proyecto a
+    ///   la vez con `dueno = app`. La sesión soltada pasa a `esperando_demonio`, o
+    ///   termina si la adopción es imposible.
+    /// - Con una sesión viva en el proyecto, **reutiliza el token** (D-R8-4) y anota el
+    ///   clic. Si es del demonio y el demonio está vivo, la sigue él. Si no (demonio
+    ///   caído, o una sesión de la app que nadie mide porque la app se cortó), la toma
+    ///   la app: el tramo que haya quedado abierto se cierra en su última actividad
+    ///   (`tracker_caido` o `huerfana`) y se abre un `work_button` en el clic.
+    /// - Sin sesión viva, crea el token: `dueno = demonio` en `esperando_terminal` si el
+    ///   demonio está vivo, o `dueno = app` en `viva_activa` con su tramo abierto.
+    ///
+    /// Un proyecto en la papelera o inexistente no crea nada.
+    pub fn iniciar_trabajar(&self, pedido: &PedidoTrabajar) -> Result<InicioTrabajar> {
+        self.en_transaccion_inmediata(|tx| {
+            let en_papelera: Option<bool> = tx
+                .query_row(
+                    "SELECT deleted_at IS NOT NULL FROM projects WHERE id = ?1",
+                    params![pedido.project_id],
+                    |row| row.get(0),
+                )
+                .optional()?;
+            match en_papelera {
+                None => return Ok(InicioTrabajar::NoExiste),
+                Some(true) => return Ok(InicioTrabajar::EnPapelera),
+                Some(false) => {}
+            }
+
+            let clic = time::formatear(pedido.ahora);
+            let viva: Option<(String, String)> = tx
+                .query_row(
+                    "SELECT token, dueno FROM trabajar_sesiones
+                     WHERE project_id = ?1 AND estado <> 'cerrada'",
+                    params![pedido.project_id],
+                    |row| Ok((row.get(0)?, row.get(1)?)),
+                )
+                .optional()?;
+
+            if let (Some((token, _)), Some(medido)) = (&viva, &pedido.medida_por_la_app) {
+                if token == medido.token {
+                    anotar_clic_en(tx, token, &clic)?;
+                    return Ok(InicioTrabajar::Iniciada {
+                        token: token.clone(),
+                        dueno: Dueno::App,
+                        nueva: false,
+                        medicion: MedicionTrabajar::Sigue,
+                        guardado_anterior: None,
+                    });
+                }
+            }
+
+            let guardado_anterior = match &pedido.medida_por_la_app {
+                Some(medido) => soltar_medicion_en(
+                    tx,
+                    medido,
+                    pedido.ahora,
+                    MotivoSesion::CambioDeProyecto,
+                    pedido.adopcion_imposible,
+                )?,
+                None => None,
+            };
+
+            let demonio = demonio_vivo(tx, pedido.ahora)?;
+            let (token, nueva) = match viva {
+                Some((token, dueno)) if dueno == Dueno::Demonio.como_texto() && demonio => {
+                    anotar_clic_en(tx, &token, &clic)?;
+                    return Ok(InicioTrabajar::Iniciada {
+                        token,
+                        dueno: Dueno::Demonio,
+                        nueva: false,
+                        medicion: MedicionTrabajar::Ninguna,
+                        guardado_anterior,
+                    });
+                }
+                Some((token, dueno)) => {
+                    let motivo = if dueno == Dueno::Demonio.como_texto() {
+                        MotivoSesion::TrackerCaido
+                    } else {
+                        MotivoSesion::Huerfana
+                    };
+                    cerrar_tramo_en_ua(tx, &token, MotivoTramo::Sesion(motivo))?;
+                    tx.execute(
+                        "UPDATE trabajar_sesiones
+                         SET dueno = 'app', estado = 'viva_activa', adoptada_at = NULL,
+                             ultimo_clic_at = ?2
+                         WHERE token = ?1",
+                        params![token, clic],
+                    )?;
+                    (token, false)
+                }
+                None => {
+                    let (dueno, estado) = if demonio {
+                        (Dueno::Demonio, "esperando_terminal")
+                    } else {
+                        (Dueno::App, "viva_activa")
+                    };
+                    tx.execute(
+                        "INSERT INTO trabajar_sesiones
+                             (token, project_id, dueno, origen, estado, creada_at, ultimo_clic_at)
+                         VALUES (?1, ?2, ?3, 'boton', ?4, ?5, ?5)",
+                        params![
+                            pedido.token_nuevo,
+                            pedido.project_id,
+                            dueno.como_texto(),
+                            estado,
+                            clic
+                        ],
+                    )?;
+                    if dueno == Dueno::Demonio {
+                        return Ok(InicioTrabajar::Iniciada {
+                            token: pedido.token_nuevo.to_string(),
+                            dueno,
+                            nueva: true,
+                            medicion: MedicionTrabajar::Ninguna,
+                            guardado_anterior,
+                        });
+                    }
+                    (pedido.token_nuevo.to_string(), true)
+                }
+            };
+
+            // El token está vivo en esta misma transacción: el tramo se abre siempre.
+            let tramo = abrir_tramo_en(tx, &token, FUENTE_TRABAJAR, pedido.ahora)?
+                .ok_or(rusqlite::Error::QueryReturnedNoRows)?;
+            Ok(InicioTrabajar::Iniciada {
+                token,
+                dueno: Dueno::App,
+                nueva,
+                medicion: MedicionTrabajar::Nueva(tramo),
+                guardado_anterior,
+            })
+        })
+    }
+
+    /// Borra una sesión recién creada cuya terminal no se pudo abrir, con sus tramos:
+    /// sin terminal no hay nada que medir y el token no vuelve a usarse. Solo si sigue
+    /// viva. Devuelve `true` si la borró.
+    pub fn descartar_sesion_nueva(&self, token: &str) -> Result<bool> {
+        self.en_transaccion_inmediata(|tx| {
+            let viva: bool = tx.query_row(
+                "SELECT EXISTS (SELECT 1 FROM trabajar_sesiones
+                                WHERE token = ?1 AND estado <> 'cerrada')",
+                params![token],
+                |row| row.get(0),
+            )?;
+            if !viva {
+                return Ok(false);
+            }
+            tx.execute(
+                "DELETE FROM time_tracking_sessions WHERE terminal_token = ?1",
+                params![token],
+            )?;
+            tx.execute(
+                "DELETE FROM trabajar_sesiones WHERE token = ?1",
+                params![token],
+            )?;
+            Ok(true)
+        })
+    }
+
+    /// `true` si el token ya no está vivo (cerrado o inexistente). Trabajar lo mira
+    /// después de abrir la terminal: si perdió la carrera con un cierre (3.10.2), crea
+    /// un token nuevo.
+    pub fn sesion_terminada(&self, token: &str) -> Result<bool> {
+        let viva: bool = self.conn().query_row(
+            "SELECT EXISTS (SELECT 1 FROM trabajar_sesiones
+                            WHERE token = ?1 AND estado <> 'cerrada')",
+            params![token],
+            |row| row.get(0),
+        )?;
+        Ok(!viva)
+    }
+
+    /// Parar (3.10.9): termina la sesión `token` del proyecto, o su sesión viva si no
+    /// viene token, con `motivo` y `terminada_at` en `fin` (el clic). Si la app la
+    /// medía (`medida`), su tramo se cierra antes con el `Instant`; el resto, en la
+    /// última actividad. Un token ya cerrado devuelve `YaCerrada` con su motivo, y sin
+    /// sesión, `Ninguna`.
+    pub fn parar_trabajar(
+        &self,
+        project_id: i64,
+        token: Option<&str>,
+        fin: DateTime<Utc>,
+        motivo: MotivoSesion,
+        medida: Option<MedidoPorLaApp>,
+    ) -> Result<Parada> {
+        self.en_transaccion_inmediata(|tx| {
+            let mapear = |row: &rusqlite::Row| Ok((row.get(0)?, row.get(1)?, row.get(2)?));
+            let objetivo: Option<(String, String, Option<String>)> = match token {
+                Some(token) => tx
+                    .query_row(
+                        "SELECT token, estado, motivo_cierre FROM trabajar_sesiones
+                         WHERE token = ?1 AND project_id = ?2",
+                        params![token, project_id],
+                        mapear,
+                    )
+                    .optional()?,
+                None => tx
+                    .query_row(
+                        "SELECT token, estado, motivo_cierre FROM trabajar_sesiones
+                         WHERE project_id = ?1 AND estado <> 'cerrada'",
+                        params![project_id],
+                        mapear,
+                    )
+                    .optional()?,
+            };
+            let Some((token, estado, motivo_previo)) = objetivo else {
+                return Ok(Parada {
+                    token: None,
+                    resultado: ResultadoParar::Ninguna,
+                });
+            };
+
+            if estado == "cerrada" {
+                let segundos = segundos_del_token_en(tx, &token)?;
+                return Ok(Parada {
+                    token: Some(token),
+                    resultado: ResultadoParar::YaCerrada {
+                        motivo: motivo_previo.unwrap_or_default(),
+                        segundos,
+                    },
+                });
+            }
+
+            if let Some(medido) = medida.filter(|medido| medido.token == token) {
+                cerrar_tramo_de_la_app_en(tx, &medido, fin, MotivoTramo::Sesion(motivo))?;
+            }
+            terminar_token_en(tx, &token, fin, motivo)?;
+            let segundos = segundos_del_token_en(tx, &token)?;
+            Ok(Parada {
+                token: Some(token),
+                resultado: ResultadoParar::Cerrada { segundos },
+            })
+        })
+    }
+
+    /// La app deja de medir su sesión (se cierra la ventana): ver
+    /// [`soltar_medicion_en`]. Devuelve los segundos guardados del tramo.
+    pub fn soltar_medicion_app(
+        &self,
+        medido: &MedidoPorLaApp,
+        fin: DateTime<Utc>,
+        motivo: MotivoSesion,
+        adopcion_imposible: bool,
+    ) -> Result<Option<i64>> {
+        self.en_transaccion_inmediata(|tx| {
+            soltar_medicion_en(tx, medido, fin, motivo, adopcion_imposible)
+        })
+    }
+
+    /// Las sesiones vivas de la base (todas las que no están `cerradas`), con su tramo
+    /// abierto si lo tienen y el total de sus tramos. Es lo que lee la tarjeta: la base
+    /// es la fuente de verdad (DT2).
+    pub fn sesiones_vivas(&self) -> Result<Vec<SesionViva>> {
+        let conn = self.conn();
+        let mut stmt = conn.prepare(
+            "SELECT s.token, s.project_id, s.estado, s.dueno, s.origen, s.creada_at,
+                    s.last_seen_at, t.started_at, t.last_activity_at, t.duration_seconds,
+                    (SELECT COALESCE(SUM(duration_seconds), 0) FROM time_tracking_sessions
+                     WHERE terminal_token = s.token)
+             FROM trabajar_sesiones s
+             LEFT JOIN time_tracking_sessions t
+                 ON t.terminal_token = s.token AND t.ended_at IS NULL
+             WHERE s.estado <> 'cerrada'
+             ORDER BY s.creada_at, s.token",
+        )?;
+        let sesiones = stmt
+            .query_map([], |row| {
+                let started_at: Option<String> = row.get(7)?;
+                Ok(SesionViva {
+                    token: row.get(0)?,
+                    project_id: row.get(1)?,
+                    estado: row.get(2)?,
+                    dueno: row.get(3)?,
+                    origen: row.get(4)?,
+                    creada_at: row.get(5)?,
+                    last_seen_at: row.get(6)?,
+                    tramo_abierto: match started_at {
+                        Some(started_at) => Some(TramoVivo {
+                            started_at,
+                            last_activity_at: row.get(8)?,
+                            duration_seconds: row.get(9)?,
+                        }),
+                        None => None,
+                    },
+                    segundos: row.get(10)?,
+                })
+            })?
+            .collect::<Result<Vec<_>>>()?;
+        Ok(sesiones)
+    }
+
+    /// [`demonio_vivo`] sobre la conexión de la app.
+    pub fn demonio_vivo(&self, ahora: DateTime<Utc>) -> Result<bool> {
+        demonio_vivo(&self.conn(), ahora)
+    }
 }
 
 /// ¿Está vivo el demonio? La **única** definición (3.10.7). Verdadero si:
@@ -494,7 +997,6 @@ impl Database {
 ///   reutilizado en esos 45 s también.
 ///
 /// No lee la config: con el tracker apagado, el demonio deja `pid = NULL` al salir.
-#[allow(dead_code)] // Sin llamadores hasta Trabajar (commit 17)
 pub(crate) fn demonio_vivo(conn: &Connection, ahora: DateTime<Utc>) -> Result<bool> {
     let fila: Option<(String, Option<i64>, Option<String>)> = conn
         .query_row(

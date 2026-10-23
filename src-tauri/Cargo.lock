@@ -1434,6 +1434,7 @@ dependencies = [
  "chrono-tz",
  "dirs 5.0.1",
  "env_logger",
+ "getrandom 0.3.3",
  "log",
  "printpdf",
  "rusqlite",

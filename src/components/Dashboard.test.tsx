@@ -8,14 +8,14 @@ vi.mock('../services/api', () => ({
   getDashboardData: vi.fn(),
   openTerminal: vi.fn(),
   trackProjectOpen: vi.fn(),
-  startWorkSession: vi.fn(),
+  trabajar: vi.fn(),
 }));
 
 import toast from 'solid-toast';
 import {
   getDashboardData,
   openTerminal,
-  startWorkSession,
+  trabajar,
   trackProjectOpen,
 } from '../services/api';
 
@@ -234,43 +234,46 @@ describe('Dashboard', () => {
       screen.getAllByTitle(TITULO)[0].click();
     };
 
-    it('arranca la sesión de trabajo y abre el terminal', async () => {
+    it('llama a trabajar, que abre la terminal con la marca de la sesión', async () => {
       vi.mocked(trackProjectOpen).mockResolvedValue(undefined);
-      vi.mocked(startWorkSession).mockResolvedValue({
-        session_id: 7,
+      vi.mocked(trabajar).mockResolvedValue({
+        token: '0123456789abcdef0123456789abcdef',
         project_id: 1,
         project_name: 'Proyecto Alpha',
-        previous_session_stopped: false,
+        dueno: 'app',
+        sesion_anterior: false,
         tracking_initialized: false,
+        aviso_sin_tracker: false,
       });
-      vi.mocked(openTerminal).mockResolvedValue(undefined);
 
       await clickAbrir();
 
       await waitFor(() => {
-        expect(openTerminal).toHaveBeenCalledWith('/home/user/alpha');
+        expect(trabajar).toHaveBeenCalledWith(1);
       });
       expect(trackProjectOpen).toHaveBeenCalledWith(1);
-      expect(startWorkSession).toHaveBeenCalledWith(1);
+      // La terminal la abre el backend: el Dashboard ya no llama a open_terminal.
+      expect(openTerminal).not.toHaveBeenCalled();
       expect(toast.error).not.toHaveBeenCalled();
     });
 
-    it('si la sesión no arranca, avisa en español y abre el terminal igual', async () => {
+    it('si trabajar falla, avisa en español', async () => {
       vi.mocked(trackProjectOpen).mockResolvedValue(undefined);
-      vi.mocked(startWorkSession).mockRejectedValue(
-        'El directorio del proyecto no existe: /home/user/alpha'
+      vi.mocked(trabajar).mockRejectedValue(
+        'La carpeta del proyecto no existe: /home/user/alpha. Revisá la ruta del proyecto.'
       );
-      vi.mocked(openTerminal).mockResolvedValue(undefined);
 
       await clickAbrir();
 
       await waitFor(() => {
-        expect(openTerminal).toHaveBeenCalledWith('/home/user/alpha');
+        expect(toast.error).toHaveBeenCalledTimes(1);
       });
-      expect(toast.error).toHaveBeenCalledTimes(1);
       const mensaje = vi.mocked(toast.error).mock.calls[0][0] as string;
-      expect(mensaje).toContain('No se pudo empezar a medir el tiempo');
-      expect(mensaje).toContain('El directorio del proyecto no existe');
+      expect(mensaje).toContain(
+        'No se pudo empezar a trabajar en Proyecto Alpha'
+      );
+      expect(mensaje).toContain('La carpeta del proyecto no existe');
+      expect(openTerminal).not.toHaveBeenCalled();
     });
   });
 

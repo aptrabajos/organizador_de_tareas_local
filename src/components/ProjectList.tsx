@@ -4,6 +4,7 @@ import {
   Show,
   createSignal,
   createEffect,
+  onCleanup,
   onMount,
 } from 'solid-js';
 import toast from 'solid-toast';
@@ -35,10 +36,11 @@ import {
   updateProjectOrder,
   countSubprojects,
   exportProjectToPdf,
-  stopWorkSession,
-  getWorkSessionStatus,
+  parar,
+  estadoTrabajar,
 } from '../services/api';
-import { trabajarEnProyecto } from '../utils/workSession';
+import type { SesionViva } from '../services/api';
+import { textoMotivoSesion, trabajarEnProyecto } from '../utils/workSession';
 import { open } from '@tauri-apps/plugin-dialog';
 import { writeTextFile } from '@tauri-apps/plugin-fs';
 import { join, normalize, sep } from '@tauri-apps/api/path';
@@ -54,7 +56,6 @@ interface ProjectListProps {
   projects: Project[];
   onEdit: (project: Project) => void;
   onDelete: (project: Project) => void;
-  onOpenTerminal: (project: Project) => void;
   onProjectsChanged?: () => void; // Callback para refrescar proyectos
   // Props para controlar filtros desde el padre (App.tsx)
   renderFilters?: (filterProps: {
@@ -208,60 +209,73 @@ const ProjectList: Component<ProjectListProps> = (props) => {
     return DOMPurify.sanitize(html);
   };
 
-  // Proyecto con la sesión de trabajo activa (la que mide "Trabajar"). Decide en
-  // qué tarjeta aparece el botón "Parar". Se lee del backend al montar porque la
-  // sesión pudo haber arrancado desde otra vista (el Dashboard).
-  const [activeWorkProjectId, setActiveWorkProjectId] = createSignal<
-    number | null
-  >(null);
+  // Sesiones de Trabajar vivas, por proyecto. La base es la fuente de verdad: se
+  // leen al montar, al ganar el foco la ventana y después de cada acción, porque la
+  // sesión pudo haber arrancado desde otra vista (el Dashboard) o desde otro proceso.
+  // Deciden en qué tarjetas aparece "Parar" y con qué token.
+  const [sesionesVivas, setSesionesVivas] = createSignal<
+    Record<number, SesionViva>
+  >({});
 
-  onMount(async () => {
+  const releerSesiones = async () => {
     try {
-      const status = await getWorkSessionStatus();
-      setActiveWorkProjectId(
-        status.is_tracking ? (status.project_id ?? null) : null
-      );
+      const estado = await estadoTrabajar();
+      const porProyecto: Record<number, SesionViva> = {};
+      for (const sesion of estado.sesiones) {
+        porProyecto[sesion.project_id] = sesion;
+      }
+      setSesionesVivas(porProyecto);
     } catch (error) {
-      logger.error('Error leyendo la sesión de trabajo activa:', error);
+      logger.error('Error leyendo las sesiones de trabajo:', error);
     }
+  };
+
+  onMount(() => {
+    void releerSesiones();
+    window.addEventListener('focus', releerSesiones);
   });
+  onCleanup(() => window.removeEventListener('focus', releerSesiones));
 
   const handleOpenTerminal = async (project: Project) => {
-    const session = await trabajarEnProyecto(project, (p) =>
-      props.onOpenTerminal(p)
-    );
-    if (session) {
-      setActiveWorkProjectId(session.project_id);
-      // Cerrar la sesión anterior le sumó tiempo a otro proyecto: sin recargar,
-      // su tarjeta seguiría mostrando el total viejo.
-      if (session.previous_session_stopped) {
-        props.onProjectsChanged?.();
-      }
+    const session = await trabajarEnProyecto(project);
+    await releerSesiones();
+    // Cerrar la sesión anterior le sumó tiempo a otro proyecto: sin recargar, su
+    // tarjeta seguiría mostrando el total viejo.
+    if (session?.sesion_anterior) {
+      props.onProjectsChanged?.();
     }
   };
 
   const handleStopWork = async (project: Project) => {
     try {
-      const seconds = await stopWorkSession();
-      setActiveWorkProjectId(null);
-      // La sesión cerrada cambió el tiempo total del proyecto: se recarga la lista
-      // para que la tarjeta no siga mostrando el valor de antes de "Trabajar".
-      if (seconds !== null && seconds > 0) {
-        props.onProjectsChanged?.();
-      }
-      if (seconds === null) {
-        toast('No había una sesión activa para parar', { icon: 'ℹ️' });
-      } else if (seconds > 0) {
-        toast.success(
-          `⏹️ Sesión de ${project.name} guardada: ${formatStoppedDuration(seconds)}`,
-          { duration: 2500 }
+      const resultado = await parar(
+        project.id,
+        sesionesVivas()[project.id]?.token
+      );
+      if (resultado.resultado === 'cerrada') {
+        const seconds = resultado.segundos;
+        // La sesión cerrada cambió el tiempo total del proyecto: se recarga la lista
+        // para que la tarjeta no siga mostrando el valor de antes de "Trabajar".
+        if (seconds > 0) {
+          props.onProjectsChanged?.();
+          toast.success(
+            `⏹️ Sesión de ${project.name} guardada: ${formatStoppedDuration(seconds)}`,
+            { duration: 2500 }
+          );
+        } else {
+          toast.success(
+            `⏹️ Sesión de ${project.name} parada. Duró muy poco y no suma tiempo.`,
+            { duration: 2500 }
+          );
+        }
+      } else if (resultado.resultado === 'ya_cerrada') {
+        toast(
+          `La sesión de ${project.name} ya había terminado: ${textoMotivoSesion(resultado.motivo)} (${formatStoppedDuration(resultado.segundos)}).`,
+          { duration: 4000, icon: 'ℹ️' }
         );
-      } else {
-        toast.success(
-          `⏹️ Sesión de ${project.name} parada. Duró muy poco y no suma tiempo.`,
-          { duration: 2500 }
-        );
       }
+      // `ninguna`: no había nada que parar; solo se refresca la tarjeta.
+      await releerSesiones();
     } catch (error) {
       logger.error('Error al parar la sesión de trabajo:', error);
       toast.error(
@@ -878,7 +892,7 @@ const ProjectList: Component<ProjectListProps> = (props) => {
               </svg>
               Trabajar
             </button>
-            <Show when={activeWorkProjectId() === project.id}>
+            <Show when={sesionesVivas()[project.id]}>
               <button
                 onClick={() => handleStopWork(project)}
                 class="btn-danger justify-center gap-2"

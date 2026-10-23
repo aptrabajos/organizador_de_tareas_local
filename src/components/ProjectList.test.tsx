@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@solidjs/testing-library';
+import { render, screen, waitFor } from '@solidjs/testing-library';
+import { invoke } from '@tauri-apps/api/core';
 import userEvent from '@testing-library/user-event';
 import ProjectList from './ProjectList';
 import type { Project } from '../types/project';
@@ -28,12 +29,7 @@ describe('ProjectList', () => {
 
   it('should render empty state when no projects', () => {
     render(() => (
-      <ProjectList
-        projects={[]}
-        onEdit={vi.fn()}
-        onDelete={vi.fn()}
-        onOpenTerminal={vi.fn()}
-      />
+      <ProjectList projects={[]} onEdit={vi.fn()} onDelete={vi.fn()} />
     ));
 
     expect(screen.getByText(/no hay proyectos/i)).toBeTruthy();
@@ -45,7 +41,6 @@ describe('ProjectList', () => {
         projects={mockProjects}
         onEdit={vi.fn()}
         onDelete={vi.fn()}
-        onOpenTerminal={vi.fn()}
       />
     ));
 
@@ -60,7 +55,6 @@ describe('ProjectList', () => {
         projects={mockProjects}
         onEdit={vi.fn()}
         onDelete={vi.fn()}
-        onOpenTerminal={vi.fn()}
       />
     ));
 
@@ -72,23 +66,23 @@ describe('ProjectList', () => {
     ).toBeTruthy();
   });
 
-  it('should call onOpenTerminal when work button is clicked', async () => {
+  it('Trabajar llama a trabajar del backend, que abre la terminal', async () => {
     const user = userEvent.setup();
-    const onOpenTerminal = vi.fn();
 
     render(() => (
       <ProjectList
         projects={mockProjects}
         onEdit={vi.fn()}
         onDelete={vi.fn()}
-        onOpenTerminal={onOpenTerminal}
       />
     ));
 
     const workButtons = screen.getAllByRole('button', { name: /trabajar/i });
     await user.click(workButtons[0]);
 
-    expect(onOpenTerminal).toHaveBeenCalledWith(mockProjects[0]);
+    await waitFor(() => {
+      expect(invoke).toHaveBeenCalledWith('trabajar', { projectId: 1 });
+    });
   });
 
   it('should call onEdit when edit button is clicked', async () => {
@@ -96,12 +90,7 @@ describe('ProjectList', () => {
     const onEdit = vi.fn();
 
     render(() => (
-      <ProjectList
-        projects={mockProjects}
-        onEdit={onEdit}
-        onDelete={vi.fn()}
-        onOpenTerminal={vi.fn()}
-      />
+      <ProjectList projects={mockProjects} onEdit={onEdit} onDelete={vi.fn()} />
     ));
 
     const editButtons = screen.getAllByRole('button', { name: /editar/i });
@@ -119,7 +108,6 @@ describe('ProjectList', () => {
         projects={mockProjects}
         onEdit={vi.fn()}
         onDelete={onDelete}
-        onOpenTerminal={vi.fn()}
       />
     ));
 
@@ -135,7 +123,6 @@ describe('ProjectList', () => {
         projects={mockProjects}
         onEdit={vi.fn()}
         onDelete={vi.fn()}
-        onOpenTerminal={vi.fn()}
       />
     ));
 
@@ -151,7 +138,6 @@ describe('ProjectList', () => {
         projects={mockProjects}
         onEdit={vi.fn()}
         onDelete={vi.fn()}
-        onOpenTerminal={vi.fn()}
       />
     ));
 
