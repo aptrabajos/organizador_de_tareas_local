@@ -22,7 +22,7 @@ use tauri::State;
 
 use crate::config::ConfigManager;
 use crate::db::{
-    Database, Dueno, InicioTrabajar, MedicionTrabajar, MedidoPorLaApp, MotivoSesion,
+    Database, Dueno, InicioTrabajar, LatidoApp, MedicionTrabajar, MedidoPorLaApp, MotivoSesion,
     PedidoTrabajar, ResultadoParar, SesionCortada, SesionViva,
 };
 use crate::platform::{get_platform, MarcaSesion};
@@ -431,6 +431,84 @@ pub(crate) fn mandar_a_papelera_sync(
     Ok(cortadas)
 }
 
+/// Cada cuánto late la sesión que mide la app (§3.2): dos latidos son los 2 min que
+/// espera la recuperación de huérfanas antes de tocar una sesión.
+pub const LATIDO_TRABAJAR: std::time::Duration = std::time::Duration::from_secs(60);
+
+/// Latido de la única `MedicionApp` (commit 19): `last_activity_at` y lo medido con el
+/// `Instant`. Al llegar al tope de 12 h cierra el tramo con `tope_sin_tracker` y la app
+/// deja de medir; lo mismo si el tramo ya estaba cerrado. Sin medición, no hace nada.
+pub(crate) fn latir_trabajar_sync(
+    db: &Database,
+    active_session: &ActiveSession,
+    entorno: &Entorno,
+    reloj: Reloj,
+) -> Result<Option<LatidoApp>, String> {
+    let mut medicion = active_session.tomar()?;
+    let Some(medida) = medicion.as_ref() else {
+        return Ok(None);
+    };
+    let latido = db
+        .latir_medicion_app(
+            &medida.medido(reloj.mono),
+            reloj.pared,
+            adopcion_imposible(entorno),
+        )
+        .map_err(|e| format!("Error writing work session heartbeat: {}", e))?;
+
+    match latido {
+        LatidoApp::Latio => {}
+        LatidoApp::Tope => {
+            info!(
+                "⏹️ [WORK] La sesión {} llegó a 12 h sin el tracker y se cortó",
+                corto(&medida.token)
+            );
+            *medicion = None;
+        }
+        LatidoApp::Cerrado => *medicion = None,
+    }
+    Ok(Some(latido))
+}
+
+/// Latido de Trabajar en un hilo propio, cada 60 s, mientras viva la app. Lanzado
+/// desde `.setup()`: el estado ya está registrado. Un error se loguea y el hilo sigue.
+pub fn lanzar_latido(handle: tauri::AppHandle) {
+    use tauri::Manager;
+
+    std::thread::Builder::new()
+        .name("latido-trabajar".to_string())
+        .spawn(move || loop {
+            std::thread::sleep(LATIDO_TRABAJAR);
+            let db = handle.state::<Database>();
+            let active_session = handle.state::<ActiveSession>();
+            let latido = Entorno::del_sistema().and_then(|entorno| {
+                latir_trabajar_sync(&db, &active_session, &entorno, Reloj::ahora())
+            });
+            if let Err(e) = latido {
+                warn!("⚠️ [WORK] No se pudo escribir el latido de Trabajar: {}", e);
+            }
+        })
+        .map(|_| ())
+        .unwrap_or_else(|e| warn!("⚠️ [WORK] No se pudo lanzar el latido de Trabajar: {}", e));
+}
+
+/// Recuperación de huérfanas `work_button` al arrancar (§3.2, 3.10.11, commit 19): las
+/// sesiones que la app medía cuando se cortó sin cerrar la ventana.
+pub(crate) fn recuperar_huerfanas_sync(
+    db: &Database,
+    entorno: &Entorno,
+    reloj: Reloj,
+) -> Result<usize, String> {
+    db.recuperar_huerfanas_app(reloj.pared, adopcion_imposible(entorno))
+        .map_err(|e| format!("Error recovering orphan sessions: {}", e))
+}
+
+/// `recuperar_huerfanas_sync` con el entorno y el reloj reales, para `.setup()`.
+pub fn recuperar_huerfanas(db: &Database) -> Result<usize, String> {
+    let entorno = Entorno::del_sistema()?;
+    recuperar_huerfanas_sync(db, &entorno, Reloj::ahora())
+}
+
 /// Lo que decide el aviso de cabecera sin tracker (U6, 3.10.14).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct EntradaAviso<'a> {
@@ -745,6 +823,39 @@ mod tests {
 
         fn papelera(&self, project_id: i64, segundos: u64) -> Result<Vec<SesionCortada>, String> {
             mandar_a_papelera_sync(&self.db, &self.active, self.reloj(segundos), project_id)
+        }
+
+        fn latir(&self, segundos: u64) -> Option<LatidoApp> {
+            latir_trabajar_sync(&self.db, &self.active, &self.entorno, self.reloj(segundos))
+                .unwrap()
+        }
+
+        fn recuperar(&self, segundos: u64) -> usize {
+            recuperar_huerfanas_sync(&self.db, &self.entorno, self.reloj(segundos)).unwrap()
+        }
+
+        /// La app se cortó sin cerrar la ventana: la memoria se pierde, la base queda.
+        fn cortar_la_app(&self) {
+            *self.active.0.lock().unwrap() = None;
+        }
+
+        /// Siembra un tramo abierto y devuelve su id.
+        fn sembrar_tramo(
+            &self,
+            project_id: i64,
+            source: &str,
+            started_at: &str,
+            last_activity_at: Option<&str>,
+            duration_seconds: Option<i64>,
+        ) -> i64 {
+            self.db.execute_batch_para_tests(&format!(
+                "INSERT INTO time_tracking_sessions
+                     (project_id, started_at, last_activity_at, duration_seconds, source)
+                 VALUES ({project_id}, '{started_at}', {}, {}, '{source}');",
+                last_activity_at.map_or("NULL".to_string(), |t| format!("'{t}'")),
+                duration_seconds.map_or("NULL".to_string(), |d| d.to_string()),
+            ));
+            self.contar("SELECT MAX(id) FROM time_tracking_sessions")
         }
 
         fn cerrar_ventana(&self, segundos: u64) -> Result<Option<i64>, String> {
@@ -1271,6 +1382,316 @@ mod tests {
             err,
             "Hijo está en la papelera: restauralo para trabajar en él."
         );
+        assert_eq!(p.contar("SELECT COUNT(*) FROM trabajar_sesiones"), 0);
+    }
+
+    // ============ Latido y huérfanas (commit 19) ============
+
+    /// El latido escribe la última actividad y lo medido con el `Instant`.
+    #[test]
+    fn el_latido_escribe_la_ultima_actividad_y_lo_medido() {
+        let p = Prueba::sin_tracker();
+        let a = p.proyecto("A");
+        p.trabajar(a, 0).unwrap();
+        let tramo = p.medicion().unwrap().tramo_id;
+
+        assert_eq!(p.latir(60), Some(LatidoApp::Latio));
+
+        let (ultima, medido): (String, i64) = p.db.fila_para_tests(
+            "SELECT last_activity_at, duration_seconds FROM time_tracking_sessions WHERE id = ?1",
+            params![tramo],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        );
+        assert_eq!((ultima.as_str(), medido), ("2026-10-20 09:01:00", 60));
+        assert_eq!(p.tramo(tramo).0, None, "el tramo sigue abierto");
+        assert!(p.medicion().is_some());
+    }
+
+    #[test]
+    fn sin_medicion_el_latido_no_hace_nada() {
+        let p = Prueba::sin_tracker();
+        assert_eq!(p.latir(60), None);
+    }
+
+    /// Si el tramo ya no está abierto (Parar desde la CLI, un restore), la app suelta su
+    /// medición.
+    #[test]
+    fn el_latido_de_un_tramo_cerrado_suelta_la_medicion() {
+        let p = Prueba::sin_tracker();
+        let a = p.proyecto("A");
+        let token = p.trabajar(a, 0).unwrap().token;
+        p.db.execute_batch_para_tests(&format!(
+            "UPDATE time_tracking_sessions SET ended_at = '2026-10-20 09:00:30',
+                 duration_seconds = 30, motivo_cierre = 'parar_cli'
+             WHERE terminal_token = '{token}';"
+        ));
+
+        assert_eq!(p.latir(60), Some(LatidoApp::Cerrado));
+        assert!(p.medicion().is_none());
+    }
+
+    /// U6: el latido a las 12 h + 1 s cierra el tramo en `started_at + 12 h` con
+    /// 43200 s y `tope_sin_tracker`, y el token queda esperando al tracker.
+    #[test]
+    fn el_latido_a_las_12_h_corta_con_tope_y_deja_el_token_esperando() {
+        let p = Prueba::con_tracker();
+        let a = p.proyecto("A");
+        let token = p.trabajar(a, 0).unwrap().token;
+        let tramo = p.medicion().unwrap().tramo_id;
+        assert_eq!(p.latir(43_140), Some(LatidoApp::Latio));
+
+        assert_eq!(p.latir(43_201), Some(LatidoApp::Tope));
+
+        assert_eq!(
+            p.tramo(tramo),
+            (
+                Some("2026-10-20 21:00:00".into()),
+                Some(43_200),
+                Some("tope_sin_tracker".into())
+            )
+        );
+        assert_eq!(
+            p.sesion(&token),
+            ("demonio".into(), "esperando_demonio".into(), None)
+        );
+        assert!(p.medicion().is_none(), "la app deja de medir");
+    }
+
+    #[test]
+    fn con_windows_simulado_el_latido_a_las_12_h_termina_con_tope_sin_tracker() {
+        let mut p = Prueba::con_tracker();
+        p.entorno.linux = false;
+        let a = p.proyecto("A");
+        let token = p.trabajar(a, 0).unwrap().token;
+
+        assert_eq!(p.latir(43_201), Some(LatidoApp::Tope));
+
+        assert_eq!(
+            p.sesion(&token),
+            (
+                "app".into(),
+                "cerrada".into(),
+                Some("tope_sin_tracker".into())
+            )
+        );
+    }
+
+    /// Con una suspensión entre latidos, la huérfana cierra con lo medido por el
+    /// `Instant` (50 min), no con `last_activity_at − started_at` (2 h).
+    #[test]
+    fn una_huerfana_con_latido_y_suspension_cierra_con_la_duracion_no_con_la_diferencia() {
+        let p = Prueba::sin_tracker();
+        let a = p.proyecto("A");
+        let id = p.sembrar_tramo(
+            a,
+            "work_button",
+            "2026-10-20 06:00:00",
+            Some("2026-10-20 08:00:00"),
+            Some(3000),
+        );
+
+        assert_eq!(p.recuperar(0), 1);
+
+        assert_eq!(
+            p.tramo(id),
+            (
+                Some("2026-10-20 08:00:00".into()),
+                Some(3000),
+                Some("huerfana".into())
+            )
+        );
+    }
+
+    #[test]
+    fn una_huerfana_sin_latido_cierra_en_su_inicio_con_0_s() {
+        let p = Prueba::sin_tracker();
+        let a = p.proyecto("A");
+        let sin_ultima = p.sembrar_tramo(a, "work_button", "2026-10-20 06:00:00", None, None);
+        let abierta = p.sembrar_tramo(
+            a,
+            "work_button",
+            "2026-10-20 07:00:00",
+            Some("2026-10-20 07:00:00"),
+            None,
+        );
+
+        assert_eq!(p.recuperar(0), 2);
+
+        assert_eq!(
+            p.tramo(sin_ultima),
+            (
+                Some("2026-10-20 06:00:00".into()),
+                Some(0),
+                Some("huerfana".into())
+            )
+        );
+        assert_eq!(p.tramo(abierta).1, Some(0));
+    }
+
+    /// Un latido de hace 2 min o menos es de una sesión viva (otra instancia): no se
+    /// toca.
+    #[test]
+    fn la_sesion_de_otra_instancia_con_latido_reciente_queda_intacta() {
+        let p = Prueba::sin_tracker();
+        let a = p.proyecto("A");
+        let hace_1_min = p.sembrar_tramo(
+            a,
+            "work_button",
+            "2026-10-20 08:00:00",
+            Some("2026-10-20 08:59:00"),
+            Some(3540),
+        );
+        let hace_2_min = p.sembrar_tramo(
+            a,
+            "work_button",
+            "2026-10-20 08:00:00",
+            Some("2026-10-20 08:58:00"),
+            Some(3480),
+        );
+
+        assert_eq!(p.recuperar(0), 0);
+
+        assert_eq!(p.tramo(hace_1_min), (None, Some(3540), None));
+        assert_eq!(p.tramo(hace_2_min), (None, Some(3480), None));
+    }
+
+    /// Las 81 huérfanas reales no tienen latido ni duración: cierran con 0 s y
+    /// `huerfana`, el total no cambia y no se toca ninguna sesión de Trabajar.
+    #[test]
+    fn las_81_huerfanas_sin_latido_no_cambian_el_total() {
+        let p = Prueba::sin_tracker();
+        let a = p.proyecto("A");
+        p.db.execute_batch_para_tests(&format!(
+            "INSERT INTO time_tracking_sessions
+                 (project_id, started_at, ended_at, duration_seconds, source)
+             VALUES ({a}, '2026-10-01 10:00:00', '2026-10-01 11:00:00', 3600, 'work_button');"
+        ));
+        for dia in 0..81 {
+            p.sembrar_tramo(
+                a,
+                "work_button",
+                &format!("2026-07-{:02} 10:00:00", dia % 28 + 1),
+                None,
+                None,
+            );
+        }
+        let otro = p.proyecto("Otro");
+        let token = p.trabajar(otro, 0).unwrap().token;
+        let antes = p.db.get_time_stats(a).unwrap().total_seconds;
+
+        assert_eq!(p.recuperar(0), 81);
+
+        assert_eq!(p.db.get_time_stats(a).unwrap().total_seconds, antes);
+        assert_eq!(antes, 3600);
+        assert_eq!(
+            p.contar(
+                "SELECT COUNT(*) FROM time_tracking_sessions
+                 WHERE project_id IN (SELECT id FROM projects WHERE name = 'A')
+                   AND motivo_cierre = 'huerfana' AND duration_seconds = 0"
+            ),
+            81
+        );
+        assert_eq!(
+            p.sesion(&token).1,
+            "viva_activa",
+            "la sesión viva de Trabajar no se toca"
+        );
+    }
+
+    /// Una huérfana de 13 h medidas se recorta a 12 h, con `tope_sin_tracker`.
+    #[test]
+    fn una_huerfana_de_13_h_se_recorta_a_43200() {
+        let p = Prueba::sin_tracker();
+        let a = p.proyecto("A");
+        let id = p.sembrar_tramo(
+            a,
+            "work_button",
+            "2026-10-19 19:00:00",
+            Some("2026-10-20 08:00:00"),
+            Some(46_800),
+        );
+
+        p.recuperar(0);
+
+        assert_eq!(
+            p.tramo(id),
+            (
+                Some("2026-10-20 08:00:00".into()),
+                Some(43_200),
+                Some("tope_sin_tracker".into())
+            )
+        );
+    }
+
+    /// La app se cortó midiendo: con el tracker posible, la huérfana cierra su tramo y
+    /// el token pasa a `esperando_demonio`, como si se hubiera cerrado la ventana.
+    #[test]
+    fn una_huerfana_con_token_pasa_a_esperando_demonio() {
+        let p = Prueba::con_tracker();
+        let a = p.proyecto("A");
+        let token = p.trabajar(a, 0).unwrap().token;
+        let tramo = p.medicion().unwrap().tramo_id;
+        p.latir(60);
+        p.cortar_la_app();
+
+        assert_eq!(p.recuperar(600), 1);
+
+        assert_eq!(
+            p.tramo(tramo),
+            (
+                Some("2026-10-20 09:01:00".into()),
+                Some(60),
+                Some("huerfana".into())
+            )
+        );
+        assert_eq!(
+            p.sesion(&token),
+            ("demonio".into(), "esperando_demonio".into(), None)
+        );
+    }
+
+    #[test]
+    fn con_windows_simulado_una_huerfana_con_token_termina_con_huerfana() {
+        let mut p = Prueba::con_tracker();
+        p.entorno.linux = false;
+        let a = p.proyecto("A");
+        let token = p.trabajar(a, 0).unwrap().token;
+        p.latir(60);
+        p.cortar_la_app();
+
+        p.recuperar(600);
+
+        assert_eq!(
+            p.sesion(&token),
+            ("app".into(), "cerrada".into(), Some("huerfana".into()))
+        );
+    }
+
+    /// Una huérfana sin token solo cierra su tramo; una fila `terminal` nunca se toca
+    /// acá (la recupera el demonio).
+    #[test]
+    fn una_huerfana_sin_token_solo_cierra_el_tramo_y_una_terminal_no_se_toca() {
+        let p = Prueba::sin_tracker();
+        let a = p.proyecto("A");
+        let sin_token = p.sembrar_tramo(
+            a,
+            "work_button",
+            "2026-10-20 07:00:00",
+            Some("2026-10-20 07:30:00"),
+            Some(1800),
+        );
+        let terminal = p.sembrar_tramo(
+            a,
+            "terminal",
+            "2026-10-20 07:00:00",
+            Some("2026-10-20 07:30:00"),
+            Some(1800),
+        );
+
+        assert_eq!(p.recuperar(0), 1);
+
+        assert_eq!(p.tramo(sin_token).2.as_deref(), Some("huerfana"));
+        assert_eq!(p.tramo(terminal), (None, Some(1800), None));
         assert_eq!(p.contar("SELECT COUNT(*) FROM trabajar_sesiones"), 0);
     }
 

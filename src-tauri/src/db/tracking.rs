@@ -72,6 +72,28 @@ pub(super) fn cerrar_y_acreditar_en(
     Ok(true)
 }
 
+/// El latido de [`Database::latir`], sobre la conexión o transacción que le pasen: el
+/// latido de Trabajar lo necesita dentro de la suya, junto al control del tope.
+pub(super) fn latir_en(
+    conn: &Connection,
+    session_id: i64,
+    last_activity_at: DateTime<Utc>,
+    duration_seconds: Option<i64>,
+) -> Result<bool> {
+    let latidas = conn.execute(
+        "UPDATE time_tracking_sessions
+         SET last_activity_at = ?1, duration_seconds = COALESCE(?2, duration_seconds)
+         WHERE id = ?3 AND ended_at IS NULL",
+        params![
+            time::formatear(last_activity_at),
+            duration_seconds,
+            session_id
+        ],
+    )?;
+
+    Ok(latidas > 0)
+}
+
 impl Database {
     // ==================== TIME TRACKING METHODS ====================
 
@@ -107,27 +129,14 @@ impl Database {
     ///
     /// Devuelve `false` si no tocó ninguna fila: la sesión ya estaba cerrada o no
     /// existe (por ejemplo, el proyecto se purgó). Quien late la suelta.
-    #[allow(dead_code)] // Sin llamadores hasta el latido de Trabajar (commit 19) y el demonio
+    #[allow(dead_code)] // El latido de Trabajar usa `latir_en` en su transacción; sin llamadores hasta el demonio
     pub fn latir(
         &self,
         session_id: i64,
         last_activity_at: DateTime<Utc>,
         duration_seconds: Option<i64>,
     ) -> Result<bool> {
-        let conn = self.conn();
-
-        let latidas = conn.execute(
-            "UPDATE time_tracking_sessions
-             SET last_activity_at = ?1, duration_seconds = COALESCE(?2, duration_seconds)
-             WHERE id = ?3 AND ended_at IS NULL",
-            params![
-                time::formatear(last_activity_at),
-                duration_seconds,
-                session_id
-            ],
-        )?;
-
-        Ok(latidas > 0)
+        latir_en(&self.conn(), session_id, last_activity_at, duration_seconds)
     }
 
     /// Cierra una sesión abierta: `ended_at`, `duration_seconds` y el motivo juntos, en
@@ -138,7 +147,7 @@ impl Database {
     /// No toca `projects.total_time_seconds`: el contador está deprecado y solo lo
     /// siguen sumando `end_tracking_session` y el cierre con el `Instant` de Trabajar
     /// (`cerrar_y_acreditar_en`) hasta que desaparezca.
-    #[allow(dead_code)] // Sin llamadores hasta la recuperación de huérfanas (commit 19) y el demonio
+    #[allow(dead_code)] // Los cierres de la app usan `cerrar_sesion_en`; sin llamadores hasta el demonio
     pub fn cerrar_sesion(
         &self,
         session_id: i64,

@@ -32,8 +32,8 @@ pub(crate) use trabajar::FUENTE_TERMINAL;
 
 /// Lo que usan Trabajar, Parar y la tarjeta (`commands/trabajar.rs`, commit 17).
 pub(crate) use trabajar::{
-    Dueno, InicioTrabajar, MedicionTrabajar, MedidoPorLaApp, MotivoSesion, PedidoTrabajar,
-    ResultadoParar, SesionCortada, SesionViva,
+    Dueno, InicioTrabajar, LatidoApp, MedicionTrabajar, MedidoPorLaApp, MotivoSesion,
+    PedidoTrabajar, ResultadoParar, SesionCortada, SesionViva,
 };
 
 pub struct Database {

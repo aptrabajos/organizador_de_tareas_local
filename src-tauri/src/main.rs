@@ -82,6 +82,17 @@ fn run() -> Result<(), String> {
         // Lo único que corre en `.setup()` es lo que puede esperar: la ventana ya
         // existe y el estado ya está registrado (ver `run`).
         .setup(|app| {
+            // Antes del latido y del backup: las sesiones que la app medía cuando se
+            // cortó sin cerrar la ventana (3.10.11 del diseño del tracker).
+            match commands::recuperar_huerfanas(&app.state::<Database>()) {
+                Ok(0) => {}
+                Ok(n) => info!("🩹 [WORK] {} sesiones huérfanas de Trabajar recuperadas", n),
+                Err(e) => warn!(
+                    "⚠️ [WORK] No se pudieron recuperar las sesiones huérfanas: {}",
+                    e
+                ),
+            }
+            commands::lanzar_latido(app.handle().clone());
             spawn_auto_backup(app.handle().clone());
             Ok(())
         })

@@ -15,7 +15,7 @@ use crate::models::project::{
 
 pub mod trabajar;
 
-pub use trabajar::{al_cerrar_ventana, ActiveSession};
+pub use trabajar::{al_cerrar_ventana, lanzar_latido, recuperar_huerfanas, ActiveSession};
 
 #[tauri::command]
 pub async fn get_dashboard_data(db: State<'_, Database>) -> Result<DashboardData, String> {

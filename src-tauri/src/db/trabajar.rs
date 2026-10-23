@@ -20,7 +20,7 @@ use chrono::{DateTime, Duration, Utc};
 use rusqlite::types::Type;
 use rusqlite::{params, Connection, OptionalExtension, Result, Transaction, TransactionBehavior};
 
-use super::tracking::{cerrar_sesion_en, cerrar_y_acreditar_en};
+use super::tracking::{cerrar_sesion_en, cerrar_y_acreditar_en, latir_en};
 use super::Database;
 use crate::commands::duracion_a_guardar;
 use crate::time;
@@ -491,6 +491,21 @@ fn anotar_clic_en(tx: &Transaction, token: &str, clic: &str) -> Result<()> {
         params![token, clic],
     )?;
     Ok(())
+}
+
+/// `(id, started_at, last_activity_at, duration_seconds, terminal_token)` de un tramo
+/// `work_button` huérfano.
+type Huerfana = (i64, String, Option<String>, Option<i64>, Option<String>);
+
+/// Resultado del latido de la sesión que mide la app.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LatidoApp {
+    /// Se escribió el latido.
+    Latio,
+    /// Llegó al tope de 12 h: el tramo se cerró y la app deja de medir.
+    Tope,
+    /// El tramo ya estaba cerrado: la app deja de medir.
+    Cerrado,
 }
 
 /// Lo que necesita [`Database::iniciar_trabajar`].
@@ -1027,6 +1042,129 @@ impl Database {
             })?
             .collect::<Result<Vec<_>>>()?;
         Ok(sesiones)
+    }
+
+    /// Latido de 60 s de la sesión que mide la app (§3.2, commit 19): escribe
+    /// `last_activity_at = ahora` y lo medido con el `Instant` en `duration_seconds`, así
+    /// una huérfana se recupera con tiempo medido, que excluye la suspensión.
+    ///
+    /// **Tope de 12 h** (U6, 3.10.13): si `started_at + 12 h ≤ ahora`, cierra el tramo en
+    /// `started_at + 12 h` con `tope_sin_tracker` y, en la misma transacción, pasa el
+    /// token a `esperando_demonio` (o lo termina con `tope_sin_tracker` si la adopción es
+    /// imposible). La duración es lo medido, recortado a 12 h: con una suspensión
+    /// adentro, el `Instant` mide menos y no se inventa tiempo.
+    ///
+    /// `Cerrado` si el tramo ya no estaba abierto (Parar desde la CLI, un restore): la
+    /// app suelta su medición.
+    pub fn latir_medicion_app(
+        &self,
+        medido: &MedidoPorLaApp,
+        ahora: DateTime<Utc>,
+        adopcion_imposible: bool,
+    ) -> Result<LatidoApp> {
+        self.en_transaccion_inmediata(|tx| {
+            let started_at: Option<String> = tx
+                .query_row(
+                    "SELECT started_at FROM time_tracking_sessions
+                     WHERE id = ?1 AND ended_at IS NULL",
+                    params![medido.tramo_id],
+                    |row| row.get(0),
+                )
+                .optional()?;
+            let Some(started_at) = started_at else {
+                return Ok(LatidoApp::Cerrado);
+            };
+            let segundos = medido.segundos.min(TOPE_SIN_TRACKER);
+
+            let tope = leer_instante(&started_at)? + Duration::seconds(TOPE_SIN_TRACKER);
+            if tope <= ahora {
+                let motivo = MotivoSesion::TopeSinTracker;
+                cerrar_y_acreditar_en(
+                    tx,
+                    medido.tramo_id,
+                    tope,
+                    duracion_a_guardar(FUENTE_TRABAJAR, segundos),
+                    Some(MotivoTramo::Sesion(motivo)),
+                )?;
+                if adopcion_imposible {
+                    terminar_token_en(tx, medido.token, tope, motivo)?;
+                } else {
+                    pasar_a_esperando_demonio_en(tx, medido.token)?;
+                }
+                return Ok(LatidoApp::Tope);
+            }
+
+            latir_en(tx, medido.tramo_id, ahora, Some(segundos))?;
+            Ok(LatidoApp::Latio)
+        })
+    }
+
+    /// Recupera las huérfanas de la app al arrancar (§3.2 y 3.10.11, commit 19): los
+    /// tramos `work_button` abiertos cuyo último latido
+    /// (`COALESCE(last_activity_at, started_at)`) tiene **más de 2 min**, así nunca se
+    /// toca la sesión viva de otra instancia. Una fila `terminal` nunca se toca: la
+    /// recupera el demonio.
+    ///
+    /// Cada una cierra en su último latido con
+    /// `MIN(COALESCE(duration_seconds, 0), ended_at − started_at, 12 h)` y la regla de
+    /// los 10 s, con motivo `huerfana` (o `tope_sin_tracker` si lo medido pasaba las
+    /// 12 h). Si tiene token, el token pasa a `esperando_demonio`, como si se hubiera
+    /// cerrado la ventana; con la adopción imposible termina con ese motivo (U4). Una
+    /// sin token (las 81 de antes de R8) solo cierra el tramo. Devuelve cuántas cerró.
+    pub fn recuperar_huerfanas_app(
+        &self,
+        ahora: DateTime<Utc>,
+        adopcion_imposible: bool,
+    ) -> Result<usize> {
+        self.en_transaccion_inmediata(|tx| {
+            let limite = time::formatear(ahora - Duration::minutes(2));
+            let huerfanas: Vec<Huerfana> = tx
+                .prepare(
+                    "SELECT id, started_at, last_activity_at, duration_seconds, terminal_token
+                     FROM time_tracking_sessions
+                     WHERE source = ?1 AND ended_at IS NULL
+                       AND COALESCE(last_activity_at, started_at) < ?2",
+                )?
+                .query_map(params![FUENTE_TRABAJAR, limite], |row| {
+                    Ok((
+                        row.get(0)?,
+                        row.get(1)?,
+                        row.get(2)?,
+                        row.get(3)?,
+                        row.get(4)?,
+                    ))
+                })?
+                .collect::<Result<_>>()?;
+
+            for (id, started_at, last_activity_at, medido, token) in &huerfanas {
+                let inicio = leer_instante(started_at)?;
+                let fin = match last_activity_at {
+                    Some(texto) => leer_instante(texto)?.max(inicio),
+                    None => inicio,
+                };
+                let reconocido = medido.unwrap_or(0).min((fin - inicio).num_seconds());
+                let motivo = if reconocido > TOPE_SIN_TRACKER {
+                    MotivoSesion::TopeSinTracker
+                } else {
+                    MotivoSesion::Huerfana
+                };
+                cerrar_sesion_en(
+                    tx,
+                    *id,
+                    fin,
+                    duracion_a_guardar(FUENTE_TRABAJAR, reconocido.min(TOPE_SIN_TRACKER)),
+                    Some(MotivoTramo::Sesion(motivo)),
+                )?;
+                if let Some(token) = token {
+                    if adopcion_imposible {
+                        terminar_token_en(tx, token, fin, motivo)?;
+                    } else {
+                        pasar_a_esperando_demonio_en(tx, token)?;
+                    }
+                }
+            }
+            Ok(huerfanas.len())
+        })
     }
 
     /// [`demonio_vivo`] sobre la conexión de la app.
