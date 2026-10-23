@@ -1,9 +1,23 @@
 import toast from 'solid-toast';
 import type { Project } from '../types/project';
 import { trabajar, trackProjectOpen } from '../services/api';
-import type { RespuestaTrabajar } from '../services/api';
+import type { RespuestaTrabajar, SesionCortada } from '../services/api';
 import { getErrorMessage } from './errors';
 import { logger } from './logger';
+
+/**
+ * Duración legible para el aviso de "Parar" (ej: "1h 5m", "6m 57s", "3m", "40 s").
+ * Por debajo de la hora muestra los segundos: truncar 6m 57s a "6m" escondía casi
+ * un minuto de lo que se acababa de guardar.
+ */
+export function formatStoppedDuration(seconds: number): string {
+  const hrs = Math.floor(seconds / 3600);
+  const mins = Math.floor((seconds % 3600) / 60);
+  const secs = seconds % 60;
+  if (hrs > 0) return mins > 0 ? `${hrs}h ${mins}m` : `${hrs}h`;
+  if (mins > 0) return secs > 0 ? `${mins}m ${secs}s` : `${mins}m`;
+  return `${seconds} s`;
+}
 
 /** Toast al empezar Trabajar cuando mide la app y se esperaba el tracker (U6). */
 export const AVISO_SIN_TRACKER =
@@ -74,4 +88,17 @@ const TEXTO_MOTIVO_SESION: Record<string, string> = {
 
 export function textoMotivoSesion(motivo: string): string {
   return TEXTO_MOTIVO_SESION[motivo] ?? motivo;
+}
+
+/**
+ * Toast por cada sesión que se cortó al mandar su proyecto (o un ancestro) a la
+ * papelera (3.10.9): un proyecto en la papelera no se mide.
+ */
+export function avisarSesionesCortadas(cortadas: SesionCortada[]): void {
+  for (const cortada of cortadas) {
+    toast(
+      `Se cortó la sesión de ${cortada.nombre} (${formatStoppedDuration(cortada.segundos)}) porque lo mandaste a la papelera.`,
+      { duration: 5000, icon: '🗑️' }
+    );
+  }
 }

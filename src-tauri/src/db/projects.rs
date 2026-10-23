@@ -406,7 +406,8 @@ mod tests {
     fn test_get_project_rejects_trashed_project() {
         let db = test_db();
         let created = db.create_project(test_project_dto()).unwrap();
-        db.delete_project(created.id).unwrap();
+        db.delete_project(created.id, chrono::Utc::now(), None)
+            .unwrap();
 
         let err = db
             .get_project(created.id)
@@ -443,7 +444,8 @@ mod tests {
         let id = seed_project_at(&db, "Alpha", "/home/user/alpha");
         assert!(db.is_registered_project_path("/home/user/alpha").unwrap());
 
-        db.delete_project(id).expect("no se pudo borrar");
+        db.delete_project(id, chrono::Utc::now(), None)
+            .expect("no se pudo borrar");
 
         assert!(
             !db.is_registered_project_path("/home/user/alpha").unwrap(),
@@ -480,7 +482,8 @@ mod tests {
         paths.sort();
         assert_eq!(paths, vec!["/home/user/alpha", "/home/user/beta"]);
 
-        db.delete_project(beta).expect("no se pudo borrar");
+        db.delete_project(beta, chrono::Utc::now(), None)
+            .expect("no se pudo borrar");
 
         assert_eq!(db.active_project_paths().unwrap(), vec!["/home/user/alpha"]);
     }
@@ -687,7 +690,8 @@ mod tests {
     fn test_create_project_rejects_trashed_parent_id() {
         let db = test_db();
         let parent = db.create_project(test_project_dto()).unwrap();
-        db.delete_project(parent.id).unwrap(); // el padre ahora está en papelera
+        db.delete_project(parent.id, chrono::Utc::now(), None)
+            .unwrap(); // el padre ahora está en papelera
 
         let mut dto = test_project_dto();
         dto.name = "Hijo".to_string();

@@ -144,10 +144,16 @@ pub async fn update_project(
     result
 }
 
+/// Manda el proyecto (y sus descendientes) a la papelera y corta sus sesiones de
+/// Trabajar vivas en la misma transacción (3.10.9). Devuelve las cortadas, para el
+/// toast.
 #[tauri::command]
-pub async fn delete_project(db: State<'_, Database>, id: i64) -> Result<(), String> {
-    db.delete_project(id)
-        .map_err(|e| format!("Error deleting project: {}", e))
+pub async fn delete_project(
+    db: State<'_, Database>,
+    active_session: State<'_, ActiveSession>,
+    id: i64,
+) -> Result<Vec<crate::db::SesionCortada>, String> {
+    trabajar::mandar_a_papelera_sync(&db, &active_session, trabajar::Reloj::ahora(), id)
 }
 
 #[tauri::command]

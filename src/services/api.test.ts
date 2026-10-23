@@ -112,12 +112,13 @@ describe('API Service', () => {
   });
 
   describe('deleteProject', () => {
-    it('should call delete_project command with id', async () => {
-      vi.mocked(invoke).mockResolvedValue(undefined);
+    it('should call delete_project command with id and return the cut sessions', async () => {
+      vi.mocked(invoke).mockResolvedValue([]);
 
-      await api.deleteProject(1);
+      const cortadas = await api.deleteProject(1);
 
       expect(invoke).toHaveBeenCalledWith('delete_project', { id: 1 });
+      expect(cortadas).toEqual([]);
     });
   });
 

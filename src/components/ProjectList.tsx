@@ -40,7 +40,11 @@ import {
   estadoTrabajar,
 } from '../services/api';
 import type { SesionViva } from '../services/api';
-import { textoMotivoSesion, trabajarEnProyecto } from '../utils/workSession';
+import {
+  formatStoppedDuration,
+  textoMotivoSesion,
+  trabajarEnProyecto,
+} from '../utils/workSession';
 import { open } from '@tauri-apps/plugin-dialog';
 import { writeTextFile } from '@tauri-apps/plugin-fs';
 import { join, normalize, sep } from '@tauri-apps/api/path';
@@ -71,20 +75,6 @@ interface ProjectListProps {
   onViewGroup?: (project: Project) => void; // Callback para navegar a subproyectos
   searchActive?: boolean; // Indica si hay una búsqueda activa (mostrar todos los resultados)
   currentGroup?: Project | null; // Grupo actual al que se ingresó (para mostrar su tarjeta como cabecera)
-}
-
-/**
- * Duración legible para el aviso de "Parar" (ej: "1h 5m", "6m 57s", "3m", "40 s").
- * Por debajo de la hora muestra los segundos: truncar 6m 57s a "6m" escondía casi
- * un minuto de lo que se acababa de guardar.
- */
-function formatStoppedDuration(seconds: number): string {
-  const hrs = Math.floor(seconds / 3600);
-  const mins = Math.floor((seconds % 3600) / 60);
-  const secs = seconds % 60;
-  if (hrs > 0) return mins > 0 ? `${hrs}h ${mins}m` : `${hrs}h`;
-  if (mins > 0) return secs > 0 ? `${mins}m ${secs}s` : `${mins}m`;
-  return `${seconds} s`;
 }
 
 const ProjectList: Component<ProjectListProps> = (props) => {

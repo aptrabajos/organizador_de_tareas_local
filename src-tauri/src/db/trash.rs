@@ -1,5 +1,7 @@
-use rusqlite::{params, Connection, Result};
+use chrono::{DateTime, Utc};
+use rusqlite::{params, Connection, Result, TransactionBehavior};
 
+use super::trabajar::{cortar_por_papelera_en, MedidoPorLaApp, SesionCortada};
 use super::Database;
 
 /// Item de la papelera. Struct dedicado (no toca el modelo Project) que SÍ lleva la
@@ -16,15 +18,39 @@ impl Database {
     /// Soft-delete: mueve el proyecto a la papelera marcando deleted_at.
     /// Cascada: marca también los hijos directos AÚN activos con el MISMO
     /// timestamp (eso identifica el batch para restaurarlo en bloque).
-    pub fn delete_project(&self, id: i64) -> Result<()> {
-        let conn = self.conn();
+    ///
+    /// Un proyecto en la papelera no se mide (excepción a D-R8-1, 3.10.9 del diseño
+    /// del tracker): en la **misma** transacción `IMMEDIATE` corta con
+    /// `proyecto_a_papelera` las sesiones de Trabajar vivas de todos los proyectos que
+    /// marca, en `fin`. `medida` es la sesión que mide la app, si mide alguna: su tramo
+    /// se cierra con el `Instant`. Devuelve las sesiones cortadas, para el toast.
+    pub fn delete_project(
+        &self,
+        id: i64,
+        fin: DateTime<Utc>,
+        medida: Option<MedidoPorLaApp>,
+    ) -> Result<Vec<SesionCortada>> {
+        let mut conn = self.conn();
         let now = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
-        let tx = conn.unchecked_transaction()?;
+        let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
         // Soft-delete del proyecto + TODOS sus descendientes activos (cualquier
         // profundidad, no solo hijos directos) con el MISMO timestamp: así no quedan
         // nietos activos colgando de un padre borrado (invisibles), e identifica el
         // batch para restaurar/purgar en bloque. `AND deleted_at IS NULL` preserva
         // los que ya estaban en papelera de antes.
+        let marcados: Vec<i64> = tx
+            .prepare(
+                "WITH RECURSIVE descendants(did) AS (
+                     SELECT ?1
+                     UNION ALL
+                     SELECT p.id FROM projects p JOIN descendants ON p.parent_id = descendants.did
+                 )
+                 SELECT id FROM projects
+                 WHERE deleted_at IS NULL AND id IN (SELECT did FROM descendants)",
+            )?
+            .query_map(params![id], |row| row.get(0))?
+            .collect::<Result<_>>()?;
+        let cortadas = cortar_por_papelera_en(&tx, &marcados, fin, medida)?;
         tx.execute(
             "UPDATE projects SET deleted_at = ?1
              WHERE deleted_at IS NULL AND id IN (
@@ -38,7 +64,7 @@ impl Database {
             params![now, id],
         )?;
         tx.commit()?;
-        Ok(())
+        Ok(cortadas)
     }
 
     /// Restaurar un proyecto de la papelera (deleted_at -> NULL).
@@ -256,7 +282,8 @@ mod tests {
     fn test_restore_project_still_works_after_trash_filter() {
         let db = test_db();
         let created = db.create_project(test_project_dto()).unwrap();
-        db.delete_project(created.id).unwrap();
+        db.delete_project(created.id, chrono::Utc::now(), None)
+            .unwrap();
 
         // Invisible mientras está en papelera...
         assert!(db.get_project(created.id).is_err());
@@ -275,7 +302,8 @@ mod tests {
     fn test_purge_project_still_works_after_trash_filter() {
         let db = test_db();
         let created = db.create_project(test_project_dto()).unwrap();
-        db.delete_project(created.id).unwrap();
+        db.delete_project(created.id, chrono::Utc::now(), None)
+            .unwrap();
         assert!(db.get_project(created.id).is_err());
 
         db.purge_project(created.id)
@@ -288,7 +316,8 @@ mod tests {
         // delete_project ahora es SOFT: desaparece de las listas pero queda en la papelera.
         let db = test_db();
         let created = db.create_project(test_project_dto()).unwrap();
-        db.delete_project(created.id).unwrap();
+        db.delete_project(created.id, chrono::Utc::now(), None)
+            .unwrap();
         // No aparece en la lista principal ni en raíz...
         assert!(db
             .get_all_projects()
@@ -318,7 +347,8 @@ mod tests {
     fn test_restore_project() {
         let db = test_db();
         let created = db.create_project(test_project_dto()).unwrap();
-        db.delete_project(created.id).unwrap();
+        db.delete_project(created.id, chrono::Utc::now(), None)
+            .unwrap();
         db.restore_project(created.id).unwrap();
         // Vuelve a la lista y sale de la papelera.
         assert!(db
@@ -365,7 +395,8 @@ mod tests {
         db.assign_project_to_group(child.id, Some(group.id))
             .unwrap();
 
-        db.delete_project(group.id).unwrap();
+        db.delete_project(group.id, chrono::Utc::now(), None)
+            .unwrap();
         // Grupo + hijo en la papelera, ninguno visible (sin huérfanos colgados).
         assert_eq!(db.list_trash().unwrap().len(), 2);
         assert!(db.get_root_projects().unwrap().is_empty());
@@ -387,7 +418,7 @@ mod tests {
         db.assign_project_to_group(b.id, Some(a.id)).unwrap();
         db.assign_project_to_group(c.id, Some(b.id)).unwrap();
 
-        db.delete_project(a.id).unwrap();
+        db.delete_project(a.id, chrono::Utc::now(), None).unwrap();
         // Los 3 en la papelera, ninguno activo/visible.
         assert_eq!(db.list_trash().unwrap().len(), 3);
         assert!(db.get_all_projects().unwrap().is_empty());
@@ -405,7 +436,8 @@ mod tests {
         // Purgar un proyecto ACTIVO debe rechazarse (solo se purga lo que está en papelera).
         assert!(db.purge_project(created.id).is_err());
         // Tras mandarlo a la papelera, el purge sí lo borra DE VERDAD.
-        db.delete_project(created.id).unwrap();
+        db.delete_project(created.id, chrono::Utc::now(), None)
+            .unwrap();
         db.purge_project(created.id).unwrap();
         assert!(db.get_project(created.id).is_err());
         assert!(db.list_trash().unwrap().is_empty());
@@ -425,7 +457,8 @@ mod tests {
             "sanity: las 6 tablas hijas deben tener su fila sembrada antes de purgar"
         );
 
-        db.delete_project(created.id).unwrap();
+        db.delete_project(created.id, chrono::Utc::now(), None)
+            .unwrap();
         db.purge_project(created.id).unwrap();
 
         assert_eq!(
@@ -442,7 +475,8 @@ mod tests {
         let created = db.create_project(test_project_dto()).unwrap();
         seed_all_child_tables(&db, created.id);
 
-        db.delete_project(created.id).unwrap();
+        db.delete_project(created.id, chrono::Utc::now(), None)
+            .unwrap();
         db.empty_trash().unwrap();
 
         assert_eq!(

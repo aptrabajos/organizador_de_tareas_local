@@ -24,6 +24,7 @@ import type { Project } from './types/project';
 import { confirm } from '@tauri-apps/plugin-dialog';
 import { getConfig, countSubprojects } from './services/api';
 import { logger } from './utils/logger';
+import { avisarSesionesCortadas } from './utils/workSession';
 
 // Componente interno que usa shortcuts
 const AppContent: Component = () => {
@@ -165,7 +166,8 @@ const AppContent: Component = () => {
       // Si borramos el grupo en el que estamos parados, salimos de su vista
       // para no quedar mostrando una cabecera de un grupo ya eliminado.
       const wasCurrentGroup = project.id === store.currentGroup()?.id;
-      await store.deleteProject(project.id);
+      const cortadas = await store.deleteProject(project.id);
+      avisarSesionesCortadas(cortadas);
       if (wasCurrentGroup) {
         await store.navigateBack();
       }

@@ -51,8 +51,20 @@ export async function updateProject(
   return await invoke('update_project', { id, updates });
 }
 
-export async function deleteProject(id: number): Promise<void> {
-  await invoke('delete_project', { id });
+/** Una sesión de Trabajar que se cortó porque su proyecto fue a la papelera. */
+export interface SesionCortada {
+  token: string;
+  project_id: number;
+  nombre: string;
+  segundos: number;
+}
+
+/**
+ * Manda el proyecto (y sus subproyectos) a la papelera. Las sesiones de Trabajar
+ * vivas de esos proyectos se cortan en la misma operación y vuelven para el aviso.
+ */
+export async function deleteProject(id: number): Promise<SesionCortada[]> {
+  return await invoke('delete_project', { id });
 }
 
 export async function restoreProject(id: number): Promise<void> {

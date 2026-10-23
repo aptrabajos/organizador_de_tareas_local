@@ -121,14 +121,33 @@ describe('ProjectStore', () => {
     });
   });
 
-  it('should delete a project', async () => {
-    vi.mocked(api.deleteProject).mockResolvedValue();
+  it('al mandar a la papelera devuelve las sesiones de Trabajar que se cortaron', async () => {
+    const cortada = {
+      token: '0123456789abcdef0123456789abcdef',
+      project_id: 2,
+      nombre: 'Hijo',
+      segundos: 4320,
+    };
+    vi.mocked(api.deleteProject).mockResolvedValue([cortada]);
     vi.mocked(api.getRootProjects).mockResolvedValue([]);
 
     await createRoot(async (dispose) => {
       const store = createProjectStore();
 
-      await store.deleteProject(1);
+      expect(await store.deleteProject(1)).toEqual([cortada]);
+
+      dispose();
+    });
+  });
+
+  it('should delete a project', async () => {
+    vi.mocked(api.deleteProject).mockResolvedValue([]);
+    vi.mocked(api.getRootProjects).mockResolvedValue([]);
+
+    await createRoot(async (dispose) => {
+      const store = createProjectStore();
+
+      expect(await store.deleteProject(1)).toEqual([]);
 
       expect(api.deleteProject).toHaveBeenCalledWith(1);
       // After delete, store reloads via getRootProjects (groups mode)
@@ -304,7 +323,7 @@ describe('ProjectStore', () => {
     it('should reload root projects after deleting project in groups mode', async () => {
       const mockRootProjects = [mockProject];
       vi.mocked(api.getRootProjects).mockResolvedValue(mockRootProjects);
-      vi.mocked(api.deleteProject).mockResolvedValue();
+      vi.mocked(api.deleteProject).mockResolvedValue([]);
 
       await createRoot(async (dispose) => {
         const store = createProjectStore();
@@ -314,7 +333,7 @@ describe('ProjectStore', () => {
         vi.clearAllMocks();
 
         vi.mocked(api.getRootProjects).mockResolvedValue([]);
-        vi.mocked(api.deleteProject).mockResolvedValue();
+        vi.mocked(api.deleteProject).mockResolvedValue([]);
 
         await store.deleteProject(1);
 

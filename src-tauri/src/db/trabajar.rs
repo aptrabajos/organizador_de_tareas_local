@@ -356,6 +356,68 @@ fn segundos_del_token_en(conn: &Connection, token: &str) -> Result<i64> {
     )
 }
 
+/// Los tokens vivos de esos proyectos, con su proyecto.
+fn tokens_vivos_de_en(tx: &Transaction, project_ids: &[i64]) -> Result<Vec<(String, i64)>> {
+    let mut stmt = tx.prepare(
+        "SELECT token FROM trabajar_sesiones
+         WHERE project_id = ?1 AND estado <> 'cerrada'",
+    )?;
+    let mut tokens = Vec::new();
+    for &project_id in project_ids {
+        for token in stmt.query_map(params![project_id], |row| row.get::<_, String>(0))? {
+            tokens.push((token?, project_id));
+        }
+    }
+    Ok(tokens)
+}
+
+/// Una sesión que se cortó porque su proyecto (o un ancestro) fue a la papelera: lo
+/// que necesita el toast de 3.10.9.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct SesionCortada {
+    pub token: String,
+    pub project_id: i64,
+    pub nombre: String,
+    /// Suma de los tramos de la sesión.
+    pub segundos: i64,
+}
+
+/// Mandar a la papelera corta las sesiones vivas de esos proyectos (el proyecto y sus
+/// descendientes) con `proyecto_a_papelera`, en la transacción `IMMEDIATE` del
+/// soft-delete (3.10.9, commit 18): o quedan el borrado y los cortes, o nada. Si la
+/// app medía una, su tramo se cierra antes con el `Instant`; el resto, en la última
+/// actividad. `fin` es el momento de mandarlo a la papelera.
+pub(super) fn cortar_por_papelera_en(
+    tx: &Transaction,
+    project_ids: &[i64],
+    fin: DateTime<Utc>,
+    medida: Option<MedidoPorLaApp>,
+) -> Result<Vec<SesionCortada>> {
+    let motivo = MotivoSesion::ProyectoAPapelera;
+    let mut cortadas = Vec::new();
+    for (token, project_id) in tokens_vivos_de_en(tx, project_ids)? {
+        if let Some(medido) = medida.filter(|medido| medido.token == token) {
+            cerrar_tramo_de_la_app_en(tx, &medido, fin, MotivoTramo::Sesion(motivo))?;
+        }
+        if !terminar_token_en(tx, &token, fin, motivo)? {
+            continue;
+        }
+        let nombre: String = tx.query_row(
+            "SELECT name FROM projects WHERE id = ?1",
+            params![project_id],
+            |row| row.get(0),
+        )?;
+        let segundos = segundos_del_token_en(tx, &token)?;
+        cortadas.push(SesionCortada {
+            token,
+            project_id,
+            nombre,
+            segundos,
+        });
+    }
+    Ok(cortadas)
+}
+
 /// Dueño **actual** de una sesión (3.10.7): quién mide sus tramos de ahora en más.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Dueno {
@@ -550,7 +612,7 @@ impl Database {
     ///
     /// Un tramo `work_button` que la app sigue midiendo lo cierra antes la app, con su
     /// `Instant`; si quedó abierto, se cierra con la regla de huérfanas.
-    #[allow(dead_code)] // Sin llamadores hasta Parar (commit 17) y la papelera (commit 18)
+    #[allow(dead_code)] // Sin llamadores hasta el restore (27) y el kill switch (55); la papelera usa `cortar_por_papelera_en`
     pub fn terminar_sesiones_de(
         &self,
         project_ids: &[i64],
@@ -558,23 +620,8 @@ impl Database {
         motivo: MotivoSesion,
     ) -> Result<bool> {
         self.en_transaccion_inmediata(|tx| {
-            let mut tokens = Vec::new();
-            {
-                let mut stmt = tx.prepare(
-                    "SELECT token FROM trabajar_sesiones
-                     WHERE project_id = ?1 AND estado <> 'cerrada'",
-                )?;
-                for project_id in project_ids {
-                    for token in
-                        stmt.query_map(params![project_id], |row| row.get::<_, String>(0))?
-                    {
-                        tokens.push(token?);
-                    }
-                }
-            }
-
             let mut alguna = false;
-            for token in &tokens {
+            for (token, _) in &tokens_vivos_de_en(tx, project_ids)? {
                 alguna |= terminar_token_en(tx, token, fin, motivo)?;
             }
             Ok(alguna)
@@ -1328,7 +1375,7 @@ mod tests {
         )
         .unwrap();
 
-        db.delete_project(p).unwrap();
+        db.delete_project(p, chrono::Utc::now(), None).unwrap();
         db.purge_project(p).unwrap();
 
         let conn = db.conn();

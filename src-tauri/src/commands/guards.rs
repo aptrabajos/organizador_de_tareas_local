@@ -137,7 +137,8 @@ mod tests {
 
         assert!(assert_registered_project_path(&db, &path).is_ok());
 
-        db.delete_project(id).expect("no se pudo borrar");
+        db.delete_project(id, chrono::Utc::now(), None)
+            .expect("no se pudo borrar");
         assert!(
             assert_registered_project_path(&db, &path).is_err(),
             "un proyecto en papelera no debe autorizar operaciones git"

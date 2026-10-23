@@ -194,7 +194,8 @@ mod tests {
     fn test_get_project_with_children_rejects_trashed_parent() {
         let db = test_db();
         let parent = db.create_project(test_project_dto()).unwrap();
-        db.delete_project(parent.id).unwrap();
+        db.delete_project(parent.id, chrono::Utc::now(), None)
+            .unwrap();
 
         assert!(
             db.get_project_with_children(parent.id).is_err(),

@@ -23,7 +23,7 @@ use tauri::State;
 use crate::config::ConfigManager;
 use crate::db::{
     Database, Dueno, InicioTrabajar, MedicionTrabajar, MedidoPorLaApp, MotivoSesion,
-    PedidoTrabajar, ResultadoParar, SesionViva,
+    PedidoTrabajar, ResultadoParar, SesionCortada, SesionViva,
 };
 use crate::platform::{get_platform, MarcaSesion};
 use crate::restore_lock;
@@ -398,6 +398,39 @@ pub fn al_cerrar_ventana(
     al_cerrar_ventana_sync(db, active_session, &entorno, Reloj::ahora())
 }
 
+/// Mandar a la papelera (3.10.9, commit 18): el soft-delete del proyecto y sus
+/// descendientes corta sus sesiones vivas en la misma transacción. Si la app medía una,
+/// su tramo se cierra antes con el `Instant` (orden `ActiveSession → Database`) y la
+/// app deja de medirla.
+pub(crate) fn mandar_a_papelera_sync(
+    db: &Database,
+    active_session: &ActiveSession,
+    reloj: Reloj,
+    project_id: i64,
+) -> Result<Vec<SesionCortada>, String> {
+    let mut medicion = active_session.tomar()?;
+    let cortadas = db
+        .delete_project(
+            project_id,
+            reloj.pared,
+            medicion.as_ref().map(|m| m.medido(reloj.mono)),
+        )
+        .map_err(|e| format!("Error deleting project: {}", e))?;
+
+    if let Some(medida) = medicion.as_ref() {
+        if cortadas.iter().any(|cortada| cortada.token == medida.token) {
+            *medicion = None;
+        }
+    }
+    for cortada in &cortadas {
+        info!(
+            "🗑️ [WORK] Sesión {} cortada: su proyecto fue a la papelera",
+            corto(&cortada.token)
+        );
+    }
+    Ok(cortadas)
+}
+
 /// Lo que decide el aviso de cabecera sin tracker (U6, 3.10.14).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct EntradaAviso<'a> {
@@ -652,6 +685,10 @@ mod tests {
         }
 
         fn proyecto(&self, nombre: &str) -> i64 {
+            self.proyecto_en(nombre, None)
+        }
+
+        fn proyecto_en(&self, nombre: &str, padre: Option<i64>) -> i64 {
             self.db
                 .create_project(CreateProjectDTO {
                     name: nombre.to_string(),
@@ -663,7 +700,7 @@ mod tests {
                     drive_link: None,
                     notes: None,
                     image_data: None,
-                    parent_id: None,
+                    parent_id: padre,
                     group_color: None,
                     group_icon: None,
                 })
@@ -704,6 +741,10 @@ mod tests {
                 project_id,
                 token,
             )
+        }
+
+        fn papelera(&self, project_id: i64, segundos: u64) -> Result<Vec<SesionCortada>, String> {
+            mandar_a_papelera_sync(&self.db, &self.active, self.reloj(segundos), project_id)
         }
 
         fn cerrar_ventana(&self, segundos: u64) -> Result<Option<i64>, String> {
@@ -1108,6 +1149,129 @@ mod tests {
         assert_eq!(marcas, vec![primero, respuesta.token.clone()]);
         assert_eq!(p.sesion(&respuesta.token).1, "viva_activa");
         assert_eq!(p.medicion().unwrap().token, respuesta.token);
+    }
+
+    // ============ Papelera (3.10.9, commit 18) ============
+
+    /// Un padre con una sesión del demonio (tramo `terminal` abierto) y un hijo con la
+    /// sesión que mide la app. Devuelve (padre, hijo, otro, token del padre, token del
+    /// hijo, tramo del hijo).
+    fn padre_e_hijo_con_sesiones(p: &Prueba) -> (i64, i64, i64, String, String, i64) {
+        let padre = p.proyecto("Padre");
+        let hijo = p.proyecto_en("Hijo", Some(padre));
+        let otro = p.proyecto("Otro");
+        let token_padre = "0123456789abcdef0123456789abcdef".to_string();
+        p.db.execute_batch_para_tests(&format!(
+            "INSERT INTO trabajar_sesiones
+                 (token, project_id, dueno, origen, estado, creada_at, ultimo_clic_at, adoptada_at)
+             VALUES ('{token_padre}', {padre}, 'demonio', 'boton', 'viva_activa',
+                     '2026-10-20 08:00:00', '2026-10-20 08:00:00', '2026-10-20 08:00:00');
+             INSERT INTO time_tracking_sessions
+                 (project_id, started_at, last_activity_at, duration_seconds, source, terminal_token)
+             VALUES ({padre}, '2026-10-20 08:00:00', '2026-10-20 08:30:00', 1800, 'terminal', '{token_padre}');"
+        ));
+        let token_hijo = p.trabajar(hijo, 0).unwrap().token;
+        let tramo_hijo = p.medicion().unwrap().tramo_id;
+        (padre, hijo, otro, token_padre, token_hijo, tramo_hijo)
+    }
+
+    /// Papelera de un padre con sesiones en el padre y en el hijo: las dos terminan con
+    /// `proyecto_a_papelera`. La del hijo, que medía la app, cierra con el `Instant`.
+    #[test]
+    fn la_papelera_de_un_padre_corta_las_sesiones_del_padre_y_del_hijo() {
+        let p = Prueba::sin_tracker();
+        let (padre, hijo, otro, token_padre, token_hijo, tramo_hijo) =
+            padre_e_hijo_con_sesiones(&p);
+        let token_otro = {
+            // Una sesión del demonio en otro proyecto, que no se toca.
+            p.db.execute_batch_para_tests(&format!(
+                "INSERT INTO trabajar_sesiones
+                     (token, project_id, dueno, origen, estado, creada_at, ultimo_clic_at)
+                 VALUES ('fedcba9876543210fedcba9876543210', {otro}, 'demonio', 'boton',
+                         'viva_pausada', '2026-10-20 08:00:00', '2026-10-20 08:00:00');"
+            ));
+            "fedcba9876543210fedcba9876543210"
+        };
+
+        let mut cortadas = p.papelera(padre, 600).unwrap();
+        cortadas.sort_by_key(|c| c.project_id);
+
+        let papelera = Some("proyecto_a_papelera".to_string());
+        assert_eq!(p.sesion(&token_padre).1, "cerrada");
+        assert_eq!(p.sesion(&token_padre).2, papelera);
+        assert_eq!(p.sesion(&token_hijo).1, "cerrada");
+        assert_eq!(p.sesion(&token_hijo).2, papelera);
+        assert_eq!(
+            p.tramo(tramo_hijo),
+            (
+                Some("2026-10-20 09:10:00".into()),
+                Some(600),
+                papelera.clone()
+            ),
+            "el tramo de la app cierra con el Instant"
+        );
+        assert!(p.medicion().is_none(), "la app deja de medir");
+        assert_eq!(
+            cortadas
+                .iter()
+                .map(|c| (c.project_id, c.nombre.as_str(), c.segundos))
+                .collect::<Vec<_>>(),
+            vec![(padre, "Padre", 1800), (hijo, "Hijo", 600)]
+        );
+        assert_eq!(p.sesion(token_otro).1, "viva_pausada");
+        assert_eq!(
+            p.contar(
+                "SELECT COUNT(*) FROM trabajar_sesiones s JOIN projects p ON p.id = s.project_id
+                 WHERE p.deleted_at IS NOT NULL AND s.estado <> 'cerrada'"
+            ),
+            0,
+            "invariante 12: ninguna sesión viva en la papelera"
+        );
+    }
+
+    /// El corte va en la transacción del soft-delete: si el `UPDATE` falla, no queda
+    /// ninguna sesión cortada y la app sigue midiendo.
+    #[test]
+    fn si_el_update_de_la_papelera_falla_no_queda_ninguna_sesion_cortada() {
+        let p = Prueba::sin_tracker();
+        let (padre, _, _, token_padre, token_hijo, tramo_hijo) = padre_e_hijo_con_sesiones(&p);
+        let medicion = p.medicion();
+        p.db.execute_batch_para_tests(
+            "CREATE TRIGGER papelera_rota BEFORE UPDATE OF deleted_at ON projects
+             BEGIN SELECT RAISE(ABORT, 'papelera rota'); END;",
+        );
+
+        let err = p.papelera(padre, 600).unwrap_err();
+
+        assert!(err.contains("papelera rota"), "mensaje: {err}");
+        assert_eq!(p.sesion(&token_padre).1, "viva_activa");
+        assert_eq!(p.sesion(&token_hijo).1, "viva_activa");
+        assert_eq!(
+            p.tramo(tramo_hijo).0,
+            None,
+            "el tramo de la app sigue abierto"
+        );
+        assert_eq!(p.medicion(), medicion);
+        assert_eq!(
+            p.contar("SELECT COUNT(*) FROM projects WHERE deleted_at IS NOT NULL"),
+            0
+        );
+    }
+
+    #[test]
+    fn trabajar_sobre_un_proyecto_en_la_papelera_es_un_error_en_espanol() {
+        let p = Prueba::sin_tracker();
+        let padre = p.proyecto("Padre");
+        let hijo = p.proyecto_en("Hijo", Some(padre));
+        assert!(p.papelera(padre, 0).unwrap().is_empty());
+
+        let err = p.trabajar(hijo, 60).unwrap_err();
+
+        assert_eq!(
+            err,
+            "Hijo está en la papelera: restauralo para trabajar en él."
+        );
+        assert_eq!(p.contar("SELECT COUNT(*) FROM trabajar_sesiones"), 0);
     }
 
     // ============ Aviso sin tracker (U6) ============

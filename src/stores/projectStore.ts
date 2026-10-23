@@ -124,13 +124,15 @@ export function createProjectStore() {
     }
   }
 
-  async function deleteProject(id: number) {
+  /** Devuelve las sesiones de Trabajar que se cortaron, para avisarlo. */
+  async function deleteProject(id: number): Promise<api.SesionCortada[]> {
     setIsLoading(true);
     setError(null);
     try {
-      await api.deleteProject(id);
+      const cortadas = await api.deleteProject(id);
       // Recargar respetando la búsqueda/vista activa (fuente única)
       await reloadCurrentView();
+      return cortadas;
     } catch (err) {
       setError(getErrorMessage(err));
       throw err;
