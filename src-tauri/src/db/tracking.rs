@@ -1,9 +1,10 @@
 use chrono::{DateTime, Utc};
 use rusqlite::{params, Connection, Result, TransactionBehavior};
 
+use super::tiempo::{segundos_en, union_del_proyecto, SesionActiva};
 use super::trabajar::{MotivoTramo, FUENTE_TERMINAL};
 use super::Database;
-use crate::time;
+use crate::time::{self, RangoUtc};
 
 /// El cierre de [`Database::cerrar_sesion`], sobre la conexión o transacción que le
 /// pasen: `end_tracking_session` y los cierres de `db/trabajar.rs` lo necesitan
@@ -241,73 +242,51 @@ impl Database {
         Ok(sessions)
     }
 
-    /// Obtener estadísticas de tiempo para un proyecto
+    /// Estadísticas de tiempo de un proyecto (3.3, 9a de la auditoría).
+    ///
+    /// - `total_seconds`, `today_seconds` y `week_seconds`: la **unión** de los tramos
+    ///   (`tiempo_trabajado`) recortada a su rango, con la `activa`. `hoy` y `semana`
+    ///   son días locales ya convertidos a UTC por el llamador (`time::rango_dia` y
+    ///   `time::rango_semana`): la semana son 7 fechas, incluido hoy.
+    /// - `session_count`, `avg_session_seconds` y `longest_session_seconds`: sobre las
+    ///   sesiones **individuales** cerradas con duración > 0, sin unir. Describen
+    ///   sesiones, no el total.
+    ///
+    /// Un error de base se propaga (D6, P18): antes se mostraba como 0 s.
     pub fn get_time_stats(
         &self,
         project_id: i64,
+        hoy: RangoUtc,
+        semana: RangoUtc,
+        activa: Option<SesionActiva>,
     ) -> Result<crate::tracking::aggregator::TimeStats> {
         use crate::tracking::aggregator::TimeStats;
 
         let conn = self.conn();
 
-        // Tiempo total y número de sesiones
-        let (total_seconds, session_count): (i64, i64) = conn
-            .query_row(
-                "SELECT COALESCE(SUM(duration_seconds), 0), COUNT(*)
-             FROM time_tracking_sessions
-             WHERE project_id = ?1 AND duration_seconds IS NOT NULL",
-                params![project_id],
-                |row| Ok((row.get(0)?, row.get(1)?)),
-            )
-            .unwrap_or((0, 0));
+        // Una sola consulta: la unión de siempre sirve para los tres rangos.
+        let unidos = union_del_proyecto(&conn, project_id, &time::rango_total(), activa)?;
 
-        // Promedio de duración
+        let (session_count, suma, longest_session_seconds): (i64, i64, i64) = conn.query_row(
+            "SELECT COUNT(*), COALESCE(SUM(duration_seconds), 0), COALESCE(MAX(duration_seconds), 0)
+             FROM time_tracking_sessions
+             WHERE project_id = ?1 AND ended_at IS NOT NULL AND duration_seconds > 0",
+            params![project_id],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        )?;
         let avg_session_seconds = if session_count > 0 {
-            total_seconds / session_count
+            suma / session_count
         } else {
             0
         };
 
-        // Sesión más larga
-        let longest_session_seconds: i64 = conn
-            .query_row(
-                "SELECT COALESCE(MAX(duration_seconds), 0)
-             FROM time_tracking_sessions
-             WHERE project_id = ?1",
-                params![project_id],
-                |row| row.get(0),
-            )
-            .unwrap_or(0);
-
-        // Tiempo hoy
-        let today_seconds: i64 = conn
-            .query_row(
-                "SELECT COALESCE(SUM(duration_seconds), 0)
-             FROM time_tracking_sessions
-             WHERE project_id = ?1 AND DATE(started_at) = DATE('now')",
-                params![project_id],
-                |row| row.get(0),
-            )
-            .unwrap_or(0);
-
-        // Tiempo esta semana (últimos 7 días)
-        let week_seconds: i64 = conn
-            .query_row(
-                "SELECT COALESCE(SUM(duration_seconds), 0)
-             FROM time_tracking_sessions
-             WHERE project_id = ?1 AND started_at >= DATE('now', '-7 days')",
-                params![project_id],
-                |row| row.get(0),
-            )
-            .unwrap_or(0);
-
         Ok(TimeStats {
-            total_seconds,
+            total_seconds: segundos_en(&unidos, &time::rango_total()),
             session_count,
             avg_session_seconds,
             longest_session_seconds,
-            today_seconds,
-            week_seconds,
+            today_seconds: segundos_en(&unidos, &hoy),
+            week_seconds: segundos_en(&unidos, &semana),
         })
     }
 }
@@ -318,8 +297,11 @@ mod tests {
     use rusqlite::params;
 
     use super::super::test_support::*;
+    use super::super::tiempo::SesionActiva;
     use super::super::trabajar::MotivoTramo;
     use crate::db::Database;
+    use crate::time::{self, RangoUtc};
+    use chrono_tz::America::Argentina::Buenos_Aires;
 
     // --- Time Tracking DB ---
 
@@ -388,19 +370,176 @@ mod tests {
         assert_eq!(despues[0].ended_at, antes[0].ended_at);
     }
 
+    // --- 9a: estadísticas sobre la unión en hora local (commit 21) ---
+
+    /// Rangos de "hoy" y "semana" de Buenos Aires para el 2026-10-20.
+    fn rangos_del_20() -> (RangoUtc, RangoUtc) {
+        let hoy = chrono::NaiveDate::from_ymd_opt(2026, 10, 20).unwrap();
+        (
+            time::rango_dia(&Buenos_Aires, hoy),
+            time::rango_semana(&Buenos_Aires, hoy),
+        )
+    }
+
+    fn stats(db: &Database, project_id: i64) -> crate::tracking::aggregator::TimeStats {
+        let (hoy, semana) = rangos_del_20();
+        db.get_time_stats(project_id, hoy, semana, None).unwrap()
+    }
+
+    fn sesion_cerrada(db: &Database, project_id: i64, source: &str, desde: &str, segundos: i64) {
+        let inicio = instante(desde);
+        db.conn()
+            .execute(
+                "INSERT INTO time_tracking_sessions
+                     (project_id, source, started_at, ended_at, duration_seconds)
+                 VALUES (?1, ?2, ?3, ?4, ?5)",
+                params![
+                    project_id,
+                    source,
+                    time::formatear(inicio),
+                    time::formatear(inicio + chrono::Duration::seconds(segundos)),
+                    segundos
+                ],
+            )
+            .unwrap();
+    }
+
+    /// Sin superposición, los números son los del SQL de antes (copiado acá). Las
+    /// correcciones documentadas no aparecen en estos datos: sesiones abiertas, de 0 s
+    /// o superpuestas, y "hoy" y "semana" en hora local.
     #[test]
-    fn test_get_time_stats() {
+    fn sin_superposicion_da_los_mismos_numeros_que_el_sql_de_antes() {
         let db = test_db();
-        let p = db.create_project(test_project_dto()).unwrap();
-        let s1 = db.create_tracking_session(p.id, "test").unwrap();
-        db.end_tracking_session(s1, 600).unwrap();
-        let s2 = db.create_tracking_session(p.id, "test").unwrap();
-        db.end_tracking_session(s2, 300).unwrap();
-        let stats = db.get_time_stats(p.id).unwrap();
-        assert_eq!(stats.total_seconds, 900);
-        assert_eq!(stats.session_count, 2);
-        assert_eq!(stats.avg_session_seconds, 450);
-        assert_eq!(stats.longest_session_seconds, 600);
+        let p = db.create_project(test_project_dto()).unwrap().id;
+        sesion_cerrada(&db, p, "work_button", "2026-10-01 10:00:00", 600);
+        sesion_cerrada(&db, p, "file_watch", "2026-10-01 12:00:00", 300);
+        sesion_cerrada(&db, p, "terminal", "2026-10-02 09:00:00", 5400);
+
+        let (total, cantidad): (i64, i64) = db
+            .conn()
+            .query_row(
+                "SELECT COALESCE(SUM(duration_seconds), 0), COUNT(*)
+                 FROM time_tracking_sessions
+                 WHERE project_id = ?1 AND duration_seconds IS NOT NULL",
+                params![p],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .unwrap();
+        let mas_larga: i64 = db
+            .conn()
+            .query_row(
+                "SELECT COALESCE(MAX(duration_seconds), 0)
+                 FROM time_tracking_sessions WHERE project_id = ?1",
+                params![p],
+                |row| row.get(0),
+            )
+            .unwrap();
+
+        let nuevas = stats(&db, p);
+        assert_eq!(nuevas.total_seconds, total);
+        assert_eq!(nuevas.total_seconds, 6300);
+        assert_eq!(nuevas.session_count, cantidad);
+        assert_eq!(nuevas.avg_session_seconds, total / cantidad);
+        assert_eq!(nuevas.longest_session_seconds, mas_larga);
+    }
+
+    /// Con superposición, el total no cuenta dos veces el mismo instante. Las sesiones
+    /// individuales siguen describiendo sesiones: no se unen.
+    #[test]
+    fn con_superposicion_no_hay_doble_conteo() {
+        let db = test_db();
+        let p = db.create_project(test_project_dto()).unwrap().id;
+        sesion_cerrada(&db, p, "work_button", "2026-10-20 13:00:00", 7200);
+        sesion_cerrada(&db, p, "file_watch", "2026-10-20 14:00:00", 7200);
+
+        let s = stats(&db, p);
+        assert_eq!(s.total_seconds, 3 * 3600, "no 4 h");
+        assert_eq!(s.today_seconds, 3 * 3600);
+        assert_eq!(s.session_count, 2);
+        assert_eq!(s.avg_session_seconds, 7200);
+        assert_eq!(s.longest_session_seconds, 7200);
+    }
+
+    /// Las sesiones de 0 s y las abiertas no cuentan como sesiones (corrección
+    /// documentada: antes una cerrada de 0 s sumaba al conteo y bajaba el promedio).
+    #[test]
+    fn session_count_solo_cuenta_cerradas_con_duracion() {
+        let db = test_db();
+        let p = db.create_project(test_project_dto()).unwrap().id;
+        sesion_cerrada(&db, p, "work_button", "2026-10-20 13:00:00", 600);
+        sesion_cerrada(&db, p, "work_button", "2026-10-20 14:00:00", 0);
+        db.abrir_sesion(p, "work_button", instante("2026-10-20 15:00:00"))
+            .unwrap();
+
+        let s = stats(&db, p);
+        assert_eq!(s.session_count, 1);
+        assert_eq!(s.avg_session_seconds, 600);
+        assert_eq!(s.total_seconds, 600);
+    }
+
+    /// La semana son 7 fechas locales incluido hoy: hace 6 días entra, hace 7 no (antes
+    /// entraba: eran 8 fechas, P3).
+    #[test]
+    fn semana_son_7_fechas_locales() {
+        let db = test_db();
+        let p = db.create_project(test_project_dto()).unwrap().id;
+        // 2026-10-14 12:00 en Buenos Aires: hace 6 días.
+        sesion_cerrada(&db, p, "terminal", "2026-10-14 15:00:00", 600);
+        // 2026-10-13 12:00 en Buenos Aires: hace 7 días.
+        sesion_cerrada(&db, p, "terminal", "2026-10-13 15:00:00", 300);
+
+        let s = stats(&db, p);
+        assert_eq!(s.week_seconds, 600);
+        assert_eq!(s.today_seconds, 0);
+        assert_eq!(s.total_seconds, 900);
+    }
+
+    /// "Hoy" es el día local: a las 22:00 de Buenos Aires (01:00 UTC del día
+    /// siguiente) lo trabajado a la tarde sigue siendo de hoy.
+    #[test]
+    fn hoy_es_el_dia_local() {
+        let db = test_db();
+        let p = db.create_project(test_project_dto()).unwrap().id;
+        // 21:00 a 21:30 de Buenos Aires = 00:00 a 00:30 UTC del 21.
+        sesion_cerrada(&db, p, "terminal", "2026-10-21 00:00:00", 1800);
+        // 23:30 de Buenos Aires del 19 = 02:30 UTC del 20: es de ayer.
+        sesion_cerrada(&db, p, "terminal", "2026-10-20 02:30:00", 600);
+
+        assert_eq!(stats(&db, p).today_seconds, 1800);
+    }
+
+    /// La `activa` entra en los tres totales con los segundos del `Instant`.
+    #[test]
+    fn la_activa_entra_en_los_totales() {
+        let db = test_db();
+        let p = db.create_project(test_project_dto()).unwrap().id;
+        let viva = db
+            .abrir_sesion(p, "work_button", instante("2026-10-20 15:00:00"))
+            .unwrap();
+        let (hoy, semana) = rangos_del_20();
+        let activa = Some(SesionActiva {
+            session_id: viva,
+            segundos: 900,
+        });
+
+        let s = db.get_time_stats(p, hoy, semana, activa).unwrap();
+        assert_eq!(
+            (s.total_seconds, s.today_seconds, s.week_seconds),
+            (900, 900, 900)
+        );
+        assert_eq!(s.session_count, 0, "abierta: todavía no es una sesión");
+    }
+
+    /// Un error de base sube en vez de mostrarse como 0 s (P18, D6).
+    #[test]
+    fn tabla_borrada_es_un_error_y_no_0() {
+        let db = test_db();
+        let p = db.create_project(test_project_dto()).unwrap().id;
+        db.conn()
+            .execute_batch("DROP TABLE time_tracking_sessions")
+            .unwrap();
+        let (hoy, semana) = rangos_del_20();
+        assert!(db.get_time_stats(p, hoy, semana, None).is_err());
     }
 
     // --- D14/M7: sesiones con instante explícito ---

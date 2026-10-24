@@ -23,7 +23,7 @@ use tauri::State;
 use crate::config::ConfigManager;
 use crate::db::{
     Database, Dueno, InicioTrabajar, LatidoApp, MedicionTrabajar, MedidoPorLaApp, MotivoSesion,
-    PedidoTrabajar, ResultadoParar, SesionCortada, SesionViva,
+    PedidoTrabajar, ResultadoParar, SesionActiva, SesionCortada, SesionViva,
 };
 use crate::platform::{get_platform, MarcaSesion};
 use crate::restore_lock;
@@ -75,6 +75,23 @@ impl ActiveSession {
             .lock()
             .map_err(|_| "Error locking session state".to_string())
     }
+}
+
+/// La copia de la `MedicionApp` para las estadísticas (3.3, commit 21): el id de su
+/// tramo y lo medido con el `Instant` hasta `ahora`. Se toma el lock, se copia y se
+/// **suelta** antes de tocar la base, así el orden sigue siendo `ActiveSession →
+/// Database`.
+pub(crate) fn sesion_activa(
+    active_session: &ActiveSession,
+    ahora: Instant,
+) -> Result<Option<SesionActiva>, String> {
+    Ok(active_session
+        .tomar()?
+        .as_ref()
+        .map(|medicion| SesionActiva {
+            session_id: medicion.tramo_id,
+            segundos: segundos_desde(medicion.inicio, ahora),
+        }))
 }
 
 /// El instante de una acción: la pared que se guarda en la base y el monotónico con
@@ -701,6 +718,7 @@ mod tests {
     use super::*;
     use crate::commands::duracion_a_guardar;
     use crate::models::project::CreateProjectDTO;
+    use chrono_tz::America::Argentina::Buenos_Aires;
     use rusqlite::params;
     use std::sync::Arc;
     use std::time::Duration;
@@ -869,6 +887,22 @@ mod tests {
                 &self.entorno,
                 self.reloj(segundos),
                 sondeos,
+            )
+            .unwrap()
+        }
+
+        /// `total_seconds` de `get_time_stats` en el instante `t0`, con la `activa`.
+        fn total(&self, project_id: i64) -> i64 {
+            self.stats(project_id, self.reloj(0)).total_seconds
+        }
+
+        fn stats(&self, project_id: i64, reloj: Reloj) -> crate::tracking::aggregator::TimeStats {
+            crate::commands::get_time_stats_sync(
+                &self.db,
+                &self.active,
+                &Buenos_Aires,
+                reloj,
+                project_id,
             )
             .unwrap()
         }
@@ -1577,11 +1611,11 @@ mod tests {
         }
         let otro = p.proyecto("Otro");
         let token = p.trabajar(otro, 0).unwrap().token;
-        let antes = p.db.get_time_stats(a).unwrap().total_seconds;
+        let antes = p.total(a);
 
         assert_eq!(p.recuperar(0), 81);
 
-        assert_eq!(p.db.get_time_stats(a).unwrap().total_seconds, antes);
+        assert_eq!(p.total(a), antes);
         assert_eq!(antes, 3600);
         assert_eq!(
             p.contar(
@@ -1894,7 +1928,7 @@ mod tests {
             ),
             "la fila se cierra con su ended_at"
         );
-        assert_eq!(p.db.get_time_stats(a).unwrap().total_seconds, 0);
+        assert_eq!(p.total(a), 0);
     }
 
     /// Con el tracker posible, A además queda esperando al demonio (§5.6).
@@ -1955,7 +1989,7 @@ mod tests {
 
         assert_eq!(p.cerrar_ventana(11).unwrap(), Some(11));
 
-        assert_eq!(p.db.get_time_stats(a).unwrap().total_seconds, 11);
+        assert_eq!(p.total(a), 11);
         assert_eq!(p.sesion(&token).1, "esperando_demonio");
     }
 
@@ -1999,5 +2033,100 @@ mod tests {
         assert!(err.contains("cierre roto"), "mensaje: {err}");
         assert_eq!(p.medicion(), medicion);
         assert_eq!(p.sesion(&token).1, "viva_activa");
+    }
+
+    // ============ Estadísticas sobre la unión (commit 21) ============
+
+    /// Lo que mide la app entra en las estadísticas con los segundos del `Instant`, no
+    /// con lo del último latido.
+    #[test]
+    fn get_time_stats_cuenta_la_medicion_de_la_app() {
+        let p = Prueba::sin_tracker();
+        let a = p.proyecto("A");
+        p.trabajar(a, 0).unwrap();
+
+        let stats = p.stats(a, p.reloj(1800));
+        assert_eq!(stats.total_seconds, 1800);
+        assert_eq!(stats.today_seconds, 1800);
+        assert_eq!(stats.week_seconds, 1800);
+        assert_eq!(p.total(a), 0, "en t0 todavía no midió nada");
+    }
+
+    /// `active_today` en hora local, de punta a punta: Trabajar a las 18:00 de Buenos
+    /// Aires y, a las 22:00 (01:00 UTC del día siguiente), el proyecto sigue activo
+    /// "hoy" aunque en UTC ya sea otro día.
+    #[test]
+    fn active_today_a_las_22_de_buenos_aires_sigue_siendo_hoy() {
+        let p = Prueba::sin_tracker();
+        let a = p.proyecto("A");
+        let _b = p.proyecto("B");
+        // 2026-10-20 09:00 UTC + 12 h = 21:00 UTC = 18:00 de Buenos Aires.
+        p.trabajar(a, 12 * 3600).unwrap();
+        p.parar(a, None, 12 * 3600 + 1800).unwrap();
+
+        let a_las_22 = p.reloj(16 * 3600);
+        assert_eq!(
+            a_las_22.pared,
+            crate::time::parsear("2026-10-21 01:00:00").unwrap()
+        );
+        let stats =
+            crate::commands::get_project_stats_sync(&p.db, &p.active, &Buenos_Aires, a_las_22)
+                .unwrap();
+        assert_eq!(stats.active_today, 1);
+        assert_eq!(stats.total_time_hours, 0.5);
+
+        // En UTC el 21 recién empieza: ahí el proyecto no estuvo activo.
+        let en_utc =
+            crate::commands::get_project_stats_sync(&p.db, &p.active, &Utc, a_las_22).unwrap();
+        assert_eq!(en_utc.active_today, 0);
+    }
+
+    /// Orden de locks `ActiveSession → Database` (M6): `trabajar` (que sostiene el lock
+    /// de la sesión mientras escribe en la base) y `get_time_stats` (que lo copia y lo
+    /// suelta antes de leer) en paralelo 1.000 veces, sin deadlock.
+    #[test]
+    fn trabajar_y_get_time_stats_en_paralelo_sin_deadlock() {
+        const VUELTAS: u64 = 1_000;
+        let p = Arc::new(Prueba::sin_tracker());
+        let a = p.proyecto("A");
+        let b = p.proyecto("B");
+        let (listo, terminado) = std::sync::mpsc::channel();
+
+        let trabajador = {
+            let p = Arc::clone(&p);
+            let listo = listo.clone();
+            std::thread::spawn(move || {
+                for vuelta in 0..VUELTAS {
+                    let proyecto = if vuelta % 2 == 0 { a } else { b };
+                    p.trabajar(proyecto, vuelta * 20).unwrap();
+                }
+                listo.send(()).unwrap();
+            })
+        };
+        let lector = {
+            let p = Arc::clone(&p);
+            std::thread::spawn(move || {
+                for vuelta in 0..VUELTAS {
+                    let proyecto = if vuelta % 2 == 0 { a } else { b };
+                    crate::commands::get_time_stats_sync(
+                        &p.db,
+                        &p.active,
+                        &Buenos_Aires,
+                        Reloj::ahora(),
+                        proyecto,
+                    )
+                    .unwrap();
+                }
+                listo.send(()).unwrap();
+            })
+        };
+
+        for _ in 0..2 {
+            terminado
+                .recv_timeout(Duration::from_secs(120))
+                .expect("deadlock: trabajar y get_time_stats no terminaron");
+        }
+        trabajador.join().unwrap();
+        lector.join().unwrap();
     }
 }

@@ -11,11 +11,6 @@
 //! Fusionar en SQL exigiría consultas recursivas; en Rust es un recorrido lineal sobre
 //! la lista ordenada.
 
-// `get_time_stats` y `get_project_stats` pasan a la unión en el commit 21; la
-// simultaneidad la muestra el desglose (commit 69). Hasta entonces solo la usan sus
-// tests.
-#![allow(dead_code)]
-
 use std::collections::HashMap;
 
 use rusqlite::types::Type;
@@ -41,7 +36,7 @@ pub struct SesionActiva {
 }
 
 /// Un tramo `[desde, hasta)` en segundos Unix.
-type Tramo = (i64, i64);
+pub(super) type Tramo = (i64, i64);
 
 /// Lo que la unión lee de cada fila de `time_tracking_sessions`.
 struct Fila {
@@ -138,8 +133,19 @@ fn sumar(unidos: &[Tramo]) -> i64 {
     unidos.iter().map(|(desde, hasta)| hasta - desde).sum()
 }
 
+/// Segundos de una unión que caen dentro de `rango`: recortar tramos disjuntos los deja
+/// disjuntos, así que una unión sirve para varios rangos con una sola consulta.
+pub(super) fn segundos_en(unidos: &[Tramo], rango: &RangoUtc) -> i64 {
+    unidos
+        .iter()
+        .map(|tramo| recortar(*tramo, rango))
+        .map(|(desde, hasta)| (hasta - desde).max(0))
+        .sum()
+}
+
 /// Segundos que cubren a la vez dos uniones (listas ordenadas y disjuntas): un
 /// recorrido lineal de las dos.
+#[allow(dead_code)] // La usa `simultaneidad`, que muestra el desglose (commit 69)
 fn interseccion(a: &[Tramo], b: &[Tramo]) -> i64 {
     let (mut i, mut j, mut total) = (0, 0, 0);
     while i < a.len() && j < b.len() {
@@ -218,6 +224,7 @@ impl Database {
     /// Segundos trabajados en `project_id` dentro de `[desde, hasta)`, contando cada
     /// instante una sola vez aunque haya sesiones superpuestas (3.3). `activa` solo se
     /// aplica a la fila con ese id que siga abierta. El demonio llama con `None`.
+    #[allow(dead_code)] // Las estadísticas usan `union_del_proyecto` bajo un solo lock; la llaman el desglose y el demonio
     pub fn tiempo_trabajado(
         &self,
         project_id: i64,
@@ -234,6 +241,7 @@ impl Database {
 
     /// [`Database::tiempo_trabajado`] de todos los proyectos fuera de la papelera, con
     /// una sola consulta. Un proyecto sin tramos en el rango no aparece.
+    #[allow(dead_code)] // `get_project_stats` usa `uniones_por_proyecto` bajo un solo lock; la llama el desglose
     pub fn tiempo_trabajado_por_proyecto(
         &self,
         rango: RangoUtc,
@@ -249,6 +257,7 @@ impl Database {
     /// segundos que su unión comparte con la de `project_id`. Se calcula, no se guarda,
     /// y no se reparte: cada proyecto conserva su total. Los ajustes no entran. Solo
     /// aparecen los proyectos con algún segundo en común.
+    #[allow(dead_code)] // La muestra el desglose (commit 69)
     pub fn simultaneidad(&self, project_id: i64, rango: RangoUtc) -> Result<Vec<(i64, i64)>> {
         let mut uniones = uniones_por_proyecto(&self.conn(), &rango, None)?;
         let Some(propia) = uniones.remove(&project_id) else {

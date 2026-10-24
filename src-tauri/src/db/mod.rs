@@ -31,6 +31,9 @@ pub use trash::TrashItem;
 /// de `commands/mod.rs`.
 pub(crate) use trabajar::FUENTE_TERMINAL;
 
+/// La copia de lo que mide la app, para las estadísticas (`commands`, commit 21).
+pub(crate) use tiempo::SesionActiva;
+
 /// Lo que usan Trabajar, Parar y la tarjeta (`commands/trabajar.rs`, commit 17).
 pub(crate) use trabajar::{
     Dueno, InicioTrabajar, LatidoApp, MedicionTrabajar, MedidoPorLaApp, MotivoSesion,

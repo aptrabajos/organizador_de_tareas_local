@@ -531,13 +531,28 @@ pub async fn add_project_time(
         .map_err(|e| format!("Error adding project time: {}", e))
 }
 
+/// `get_project_stats` con la zona y el reloj inyectados: "hoy" es el día local de
+/// `reloj.pared` en `tz`. Copia lo que mide la app y suelta el lock antes de leer la
+/// base (orden `ActiveSession → Database`).
+pub(crate) fn get_project_stats_sync<Tz: chrono::TimeZone>(
+    db: &Database,
+    active_session: &ActiveSession,
+    tz: &Tz,
+    reloj: trabajar::Reloj,
+) -> Result<crate::models::project::ProjectStats, String> {
+    let activa = trabajar::sesion_activa(active_session, reloj.mono)?;
+    let hoy = reloj.pared.with_timezone(tz).date_naive();
+    db.get_project_stats(crate::time::rango_dia(tz, hoy), activa)
+        .map_err(|e| format!("Error getting project stats: {}", e))
+}
+
 #[tauri::command]
 pub async fn get_project_stats(
     db: State<'_, Database>,
+    active_session: State<'_, ActiveSession>,
 ) -> Result<crate::models::project::ProjectStats, String> {
     debug!("📈 [ANALYTICS] Obteniendo estadísticas globales");
-    db.get_project_stats()
-        .map_err(|e| format!("Error getting project stats: {}", e))
+    get_project_stats_sync(&db, &active_session, &Local, trabajar::Reloj::ahora())
 }
 
 #[tauri::command]
@@ -1526,11 +1541,41 @@ pub async fn find_tracking_project(path: String) -> Result<Option<GestorConfig>,
     }
 }
 
-/// Obtener estadísticas de tiempo para un proyecto
+/// `get_time_stats` con la zona y el reloj inyectados: "hoy" y la semana son días
+/// locales de `reloj.pared` en `tz`. Copia lo que mide la app y suelta el lock antes de
+/// leer la base (orden `ActiveSession → Database`).
+pub(crate) fn get_time_stats_sync<Tz: chrono::TimeZone>(
+    db: &Database,
+    active_session: &ActiveSession,
+    tz: &Tz,
+    reloj: trabajar::Reloj,
+    project_id: i64,
+) -> Result<TimeStats, String> {
+    let activa = trabajar::sesion_activa(active_session, reloj.mono)?;
+    let hoy = reloj.pared.with_timezone(tz).date_naive();
+    db.get_time_stats(
+        project_id,
+        crate::time::rango_dia(tz, hoy),
+        crate::time::rango_semana(tz, hoy),
+        activa,
+    )
+    .map_err(|e| format!("Error getting time stats: {}", e))
+}
+
+/// Estadísticas de tiempo de un proyecto, sobre la unión de sus tramos y en hora local.
 #[tauri::command]
-pub async fn get_time_stats(db: State<'_, Database>, project_id: i64) -> Result<TimeStats, String> {
-    db.get_time_stats(project_id)
-        .map_err(|e| format!("Error getting time stats: {}", e))
+pub async fn get_time_stats(
+    db: State<'_, Database>,
+    active_session: State<'_, ActiveSession>,
+    project_id: i64,
+) -> Result<TimeStats, String> {
+    get_time_stats_sync(
+        &db,
+        &active_session,
+        &Local,
+        trabajar::Reloj::ahora(),
+        project_id,
+    )
 }
 
 /// Fuente de las sesiones que abrirá el demonio por cambios en archivos. No tiene

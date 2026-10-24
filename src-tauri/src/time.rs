@@ -18,10 +18,6 @@
 // `deleted_at IS NULL`. Pasarlo a UTC cambiaría lo que se ve en la papelera y
 // obligaría a reescribir filas, sin ganar nada.
 
-// Los llamadores (`get_time_stats`, `get_project_stats`) pasan a usar este módulo
-// en un commit posterior; hasta entonces solo lo usan sus tests.
-#![allow(dead_code)]
-
 use chrono::{DateTime, Duration, NaiveDate, NaiveDateTime, NaiveTime, ParseError, TimeZone, Utc};
 
 /// Formato con el que se guardan las fechas en la base: el de `CURRENT_TIMESTAMP`.
@@ -45,9 +41,22 @@ impl RangoUtc {
         formatear(self.hasta)
     }
 
-    /// Duración del rango en segundos.
+    /// Duración del rango en segundos. Solo la usan los tests de zonas.
+    #[cfg(test)]
     pub fn segundos(&self) -> i64 {
         (self.hasta - self.desde).num_seconds()
+    }
+}
+
+/// Rango que contiene cualquier fecha de la base, para el total "desde siempre". Los
+/// extremos se formatean con cuatro cifras de año, así que la comparación de texto
+/// sigue valiendo.
+pub fn rango_total() -> RangoUtc {
+    RangoUtc {
+        desde: DateTime::UNIX_EPOCH,
+        hasta: NaiveDate::from_ymd_opt(9999, 12, 31)
+            .and_then(|fecha| fecha.and_hms_opt(23, 59, 59))
+            .map_or(DateTime::UNIX_EPOCH, |fin| fin.and_utc()),
     }
 }
 
@@ -291,6 +300,17 @@ mod tests {
         assert_eq!(r.segundos(), 0);
         assert_eq!(rango_dia(&Apia, fecha(2011, 12, 29)).hasta, r.desde);
         assert_eq!(rango_dia(&Apia, fecha(2011, 12, 31)).desde, r.hasta);
+    }
+
+    // --- Total ---
+
+    #[test]
+    fn rango_total_se_compara_bien_como_texto() {
+        let r = rango_total();
+        assert_eq!(r.desde_texto(), "1970-01-01 00:00:00");
+        assert_eq!(r.hasta_texto(), "9999-12-31 23:59:59");
+        assert!(r.desde_texto().as_str() < "2026-10-20 09:00:00");
+        assert!("2026-10-20 09:00:00" < r.hasta_texto().as_str());
     }
 
     // --- Semana ---
