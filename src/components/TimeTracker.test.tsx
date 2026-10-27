@@ -21,28 +21,41 @@ describe('TimeTracker', () => {
   });
 
   it('shows loading state initially', () => {
-    vi.mocked(checkTrackingConfig).mockImplementation(
-      () => new Promise(() => {})
-    );
+    vi.mocked(getTimeStats).mockImplementation(() => new Promise(() => {}));
 
     render(() => <TimeTracker projectId={1} projectPath="/test/path" />);
 
     expect(screen.getByText('Cargando...')).toBeTruthy();
   });
 
-  it('shows setup button for untracked projects', async () => {
+  // B2/P15: sin `.gestor/` y con sesiones en la base, la tarjeta muestra el total, y
+  // ya no pregunta por la carpeta.
+  it('shows the total without .gestor/ and never checks the tracking config', async () => {
     vi.mocked(checkTrackingConfig).mockResolvedValue(false);
-
-    render(() => <TimeTracker projectId={1} projectPath="/test/path" />);
-
-    // Esperar a que cargue
-    await vi.waitFor(() => {
-      expect(screen.getByText('Activar Time Tracking')).toBeTruthy();
+    vi.mocked(getTimeStats).mockResolvedValue({
+      total_seconds: 5400,
+      session_count: 2,
+      avg_session_seconds: 2700,
+      longest_session_seconds: 3600,
+      today_seconds: 0,
+      week_seconds: 5400,
     });
+
+    render(() => <TimeTracker projectId={7} projectPath="/sin/gestor" />);
+
+    await vi.waitFor(() => {
+      expect(screen.getAllByText('1h 30m').length).toBeGreaterThan(0);
+    });
+    expect(getTimeStats).toHaveBeenCalledWith(7);
+    expect(checkTrackingConfig).not.toHaveBeenCalled();
+    expect(initTracking).not.toHaveBeenCalled();
+    expect(screen.queryByText('Activar Time Tracking')).toBeNull();
+    expect(
+      screen.queryByText(/El tracking de tiempo no esta activado/)
+    ).toBeNull();
   });
 
   it('shows time stats when tracking is enabled', async () => {
-    vi.mocked(checkTrackingConfig).mockResolvedValue(true);
     vi.mocked(getTimeStats).mockResolvedValue({
       total_seconds: 7200, // 2 horas
       session_count: 5,
@@ -64,7 +77,6 @@ describe('TimeTracker', () => {
   });
 
   it('displays time in human-readable format', async () => {
-    vi.mocked(checkTrackingConfig).mockResolvedValue(true);
     vi.mocked(getTimeStats).mockResolvedValue({
       total_seconds: 3661, // 1h 1m 1s
       session_count: 1,
@@ -84,7 +96,6 @@ describe('TimeTracker', () => {
   });
 
   it('shows compact view when compact prop is true', async () => {
-    vi.mocked(checkTrackingConfig).mockResolvedValue(true);
     vi.mocked(getTimeStats).mockResolvedValue({
       total_seconds: 3600,
       session_count: 2,
@@ -107,33 +118,24 @@ describe('TimeTracker', () => {
     expect(screen.queryByText('Time Tracking')).toBeNull();
   });
 
-  it('shows track button in compact mode for untracked projects', async () => {
-    vi.mocked(checkTrackingConfig).mockResolvedValue(false);
+  it('shows the total in compact mode without .gestor/ and no Track button', async () => {
+    vi.mocked(getTimeStats).mockResolvedValue({
+      total_seconds: 1800,
+      session_count: 1,
+      avg_session_seconds: 1800,
+      longest_session_seconds: 1800,
+      today_seconds: 1800,
+      week_seconds: 1800,
+    });
 
     render(() => (
-      <TimeTracker projectId={1} projectPath="/test/path" compact={true} />
+      <TimeTracker projectId={1} projectPath="/sin/gestor" compact={true} />
     ));
 
     await vi.waitFor(() => {
-      expect(screen.getByText('Track')).toBeTruthy();
+      expect(screen.getByText('30m')).toBeTruthy();
     });
-  });
-
-  it('calls initTracking on setup button click', async () => {
-    vi.mocked(checkTrackingConfig).mockResolvedValue(false);
-    vi.mocked(initTracking).mockResolvedValue('OK');
-
-    render(() => <TimeTracker projectId={1} projectPath="/test/path" />);
-
-    await vi.waitFor(() => {
-      expect(screen.getByText('Activar Time Tracking')).toBeTruthy();
-    });
-
-    const button = screen.getByText('Activar Time Tracking');
-    button.click();
-
-    await vi.waitFor(() => {
-      expect(initTracking).toHaveBeenCalledWith(1);
-    });
+    expect(screen.queryByText('Track')).toBeNull();
+    expect(checkTrackingConfig).not.toHaveBeenCalled();
   });
 });
