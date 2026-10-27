@@ -170,13 +170,6 @@ export async function trackProjectOpen(projectId: number): Promise<void> {
   await invoke('track_project_open', { projectId });
 }
 
-export async function addProjectTime(
-  projectId: number,
-  seconds: number
-): Promise<void> {
-  await invoke('add_project_time', { projectId, seconds });
-}
-
 export async function getProjectStats(): Promise<ProjectStats> {
   return await invoke('get_project_stats');
 }

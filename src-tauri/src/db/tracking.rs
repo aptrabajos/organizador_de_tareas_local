@@ -47,33 +47,6 @@ pub(super) fn cerrar_sesion_en(
     Ok(cerradas > 0)
 }
 
-/// [`cerrar_sesion_en`] más el contador deprecado `projects.total_time_seconds`, en la
-/// transacción del llamador: si no cerró nada (ya estaba cerrada o no existe), el
-/// contador no se toca (P2/B3). Lo usan el envoltorio `end_tracking_session` y el
-/// cierre con el `Instant` de Trabajar (commit 17), para que el total del Dashboard
-/// siga sumando hasta que la lectura pase a la unión (commit 21) y el contador
-/// desaparezca (commit 25).
-pub(super) fn cerrar_y_acreditar_en(
-    conn: &Connection,
-    session_id: i64,
-    ended_at: DateTime<Utc>,
-    duration_seconds: i64,
-    motivo: Option<MotivoTramo>,
-) -> Result<bool> {
-    if !cerrar_sesion_en(conn, session_id, ended_at, duration_seconds, motivo)? {
-        return Ok(false);
-    }
-
-    // También actualizar el tiempo total del proyecto
-    conn.execute(
-        "UPDATE projects
-         SET total_time_seconds = COALESCE(total_time_seconds, 0) + ?1
-         WHERE id = (SELECT project_id FROM time_tracking_sessions WHERE id = ?2)",
-        params![duration_seconds, session_id],
-    )?;
-    Ok(true)
-}
-
 /// El latido de [`Database::latir`], sobre la conexión o transacción que le pasen: el
 /// latido de Trabajar lo necesita dentro de la suya, junto al control del tope.
 pub(super) fn latir_en(
@@ -145,10 +118,6 @@ impl Database {
     /// un solo `UPDATE` (M7). Desde el paso 4 todo cierre lleva motivo (3.10.15): la
     /// firma lo exige. Devuelve `false` si ya estaba cerrada o no existe. Un tramo
     /// `terminal` de 0 s se borra (DT5) y cuenta como cerrado.
-    ///
-    /// No toca `projects.total_time_seconds`: el contador está deprecado y solo lo
-    /// siguen sumando `end_tracking_session` y el cierre con el `Instant` de Trabajar
-    /// (`cerrar_y_acreditar_en`) hasta que desaparezca.
     #[allow(dead_code)] // Los cierres de la app usan `cerrar_sesion_en`; sin llamadores hasta el demonio
     pub fn cerrar_sesion(
         &self,
@@ -173,22 +142,17 @@ impl Database {
         self.abrir_sesion(project_id, source, Utc::now())
     }
 
-    /// Terminar una sesión de tracking: cerrarla y acreditar su duración al proyecto.
+    /// Terminar una sesión de tracking ahora.
     ///
-    /// Los dos UPDATE van en UNA transacción. Antes eran dos `execute` sueltos bajo el
-    /// mismo lock: si el segundo fallaba, la sesión quedaba cerrada y el tiempo
-    /// trabajado se perdía en silencio, sin error y sin forma de recuperarlo.
+    /// Idempotente (P2/B3): sólo cierra una sesión que siga abierta. Devuelve `true` si
+    /// cerró la sesión y `false` si no había nada que cerrar (ya estaba cerrada o el id
+    /// no existe).
     ///
-    /// Idempotente (P2/B3): sólo cierra una sesión que siga abierta. Si el primer
-    /// UPDATE no afecta ninguna fila (ya estaba cerrada o el id no existe), el del
-    /// contador NO corre: filtrar sólo el primero no alcanzaba, porque el segundo
-    /// sumaba igual y cerrar dos veces acreditaba dos veces. Devuelve `true` si cerró
-    /// la sesión y `false` si no había nada que cerrar.
-    ///
-    /// Envoltorio de [`Database::cerrar_sesion`] con "ahora", más el contador. Cierra
-    /// sin motivo, así que solo sirve para filas sin token: desde el commit 17 Trabajar
-    /// cierra sus tramos con motivo y este envoltorio queda sin llamadores fuera de los
-    /// tests.
+    /// Envoltorio de [`Database::cerrar_sesion`] con "ahora". Cierra sin motivo, así
+    /// que solo sirve para filas sin token: desde el commit 17 Trabajar cierra sus
+    /// tramos con motivo y este envoltorio queda sin llamadores fuera de los tests.
+    /// Desde el commit 25 no suma a ningún contador: el total sale de la unión de
+    /// tramos (P1, D2).
     ///
     /// La transacción es `IMMEDIATE` (R8-1): toma el lock de escritura antes de leer.
     /// En una diferida que lee antes de escribir, la conexión puede quedar con el lock
@@ -200,7 +164,7 @@ impl Database {
         let mut conn = self.conn();
         let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
 
-        if !cerrar_y_acreditar_en(&tx, session_id, Utc::now(), duration_seconds, None)? {
+        if !cerrar_sesion_en(&tx, session_id, Utc::now(), duration_seconds, None)? {
             // Nada que cerrar: soltar `tx` sin commit es un rollback.
             return Ok(false);
         }
@@ -324,22 +288,16 @@ mod tests {
         let sessions = db.get_tracking_sessions(p.id, 10).unwrap();
         assert_eq!(sessions.len(), 1);
         assert_eq!(sessions[0].duration_seconds, Some(300));
-        // Verify total_time updated on project
-        let fetched = db.get_project(p.id).unwrap();
-        assert_eq!(fetched.total_time_seconds, Some(300));
     }
 
-    /// B8: cerrar una sesión inexistente no debe acreditarle tiempo a NINGÚN proyecto.
-    /// El segundo UPDATE resuelve su `WHERE id = (SELECT project_id ...)` a NULL y no
-    /// matchea nada; este test lo fija para que un refactor del subquery no empiece a
-    /// repartir tiempo fantasma.
+    /// B8: cerrar una sesión inexistente no debe acreditarle tiempo a NINGÚN proyecto
+    /// ni tocar las sesiones que existen.
     #[test]
     fn test_end_tracking_session_with_unknown_id_credits_no_project() {
         let db = test_db();
         let p = db.create_project(test_project_dto()).unwrap();
         let session_id = db.create_tracking_session(p.id, "test").unwrap();
         db.end_tracking_session(session_id, 300).unwrap();
-        assert_eq!(db.get_project(p.id).unwrap().total_time_seconds, Some(300));
 
         // Sesión que no existe: no explota y no toca el total.
         let cerro = db
@@ -347,17 +305,18 @@ mod tests {
             .expect("cerrar una sesión inexistente no debe ser un error duro");
         assert!(!cerro, "una sesión inexistente no se cierra");
 
+        let sesiones = db.get_tracking_sessions(p.id, 10).unwrap();
+        assert_eq!(sesiones.len(), 1);
         assert_eq!(
-            db.get_project(p.id).unwrap().total_time_seconds,
+            sesiones[0].duration_seconds,
             Some(300),
             "una sesión inexistente no debe sumar tiempo a ningún proyecto"
         );
-        assert_eq!(db.get_tracking_sessions(p.id, 10).unwrap().len(), 1);
     }
 
     /// P2/B3: cerrar dos veces la misma sesión suma UNA vez. El segundo cierre (una
-    /// carrera entre dos caminos que cierran) devuelve `false` y no toca ni el
-    /// contador del proyecto ni la duración ni el `ended_at` de la sesión.
+    /// carrera entre dos caminos que cierran) devuelve `false` y no toca ni la duración
+    /// ni el `ended_at` de la sesión.
     #[test]
     fn test_end_tracking_session_twice_credits_once() {
         let db = test_db();
@@ -372,7 +331,6 @@ mod tests {
             "el segundo cierre no debe cerrar nada"
         );
 
-        assert_eq!(db.get_project(p.id).unwrap().total_time_seconds, Some(300));
         let despues = db.get_tracking_sessions(p.id, 10).unwrap();
         assert_eq!(despues.len(), 1);
         assert_eq!(despues[0].duration_seconds, Some(300));
@@ -707,7 +665,8 @@ mod tests {
 
     /// R8-1: `end_tracking_session` en `IMMEDIATE`. Dos conexiones cierran la misma
     /// sesión a la vez (Parar contra el cierre de otra conexión): una sola cierra,
-    /// ninguna recibe `SQLITE_BUSY` y el contador suma una vez. Fija el contrato
+    /// ninguna recibe `SQLITE_BUSY` y cada sesión queda con la duración del cierre que
+    /// ganó. Fija el contrato
     /// para cuando el cierre lea antes de escribir (commit 17): con una transacción
     /// diferida, ese patrón puede devolver `SQLITE_BUSY` sin esperar el
     /// `busy_timeout`.
@@ -745,10 +704,9 @@ mod tests {
             );
         }
 
-        assert_eq!(
-            una.get_project(p.id).unwrap().total_time_seconds,
-            Some(3000)
-        );
+        let sesiones = una.get_tracking_sessions(p.id, 100).unwrap();
+        assert_eq!(sesiones.len(), 30);
+        assert!(sesiones.iter().all(|s| s.duration_seconds == Some(100)));
     }
 
     /// `cerrar_sesion` guarda el motivo del tramo (3.10.15).
@@ -775,24 +733,5 @@ mod tests {
             )
             .unwrap();
         assert_eq!(motivo.as_deref(), Some("sin_vigilancia"));
-    }
-
-    /// `cerrar_sesion` no suma al contador deprecado; eso lo sigue haciendo solo el
-    /// envoltorio `end_tracking_session`.
-    #[test]
-    fn cerrar_sesion_no_suma_al_contador_del_proyecto() {
-        let db = test_db();
-        let p = db.create_project(test_project_dto()).unwrap();
-        let id = db
-            .abrir_sesion(p.id, "file_watch", instante("2026-10-20 09:00:00"))
-            .unwrap();
-        db.cerrar_sesion(
-            id,
-            instante("2026-10-20 09:30:00"),
-            1800,
-            MotivoTramo::Inactividad,
-        )
-        .unwrap();
-        assert_eq!(db.get_project(p.id).unwrap().total_time_seconds, Some(0));
     }
 }

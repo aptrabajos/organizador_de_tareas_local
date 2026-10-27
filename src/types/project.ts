@@ -30,7 +30,6 @@ export interface Project {
   // Analytics fields
   last_opened_at?: string;
   opened_count?: number;
-  total_time_seconds?: number;
   // Quick Start & Context fields
   status?: string; // 'activo' | 'pausado' | 'completado' | 'archivado'
   status_changed_at?: string;

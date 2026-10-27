@@ -439,8 +439,10 @@ Hay **un solo camino** de tracking, y es el de `work_session`:
    ventana (`on_window_event` con `CloseRequested`, `main.rs`), que llama a
    `stop_active_session_sync`. La duración la mide el backend con `Instant`, no
    el cliente.
-4. `end_tracking_session` acredita los segundos en `projects.total_time_seconds`
-   en la misma transacción.
+4. El total se calcula como la unión de los tramos de `time_tracking_sessions`
+   (`db/tiempo.rs`). La columna `projects.total_time_seconds` quedó deprecada: sigue
+   en el esquema para no romper bases viejas ni backups, pero nadie la lee ni la
+   escribe.
 
 **Para saber si hay una sesión activa, el comando es `get_work_session_status`**,
 que lee el `ActiveSession` real.

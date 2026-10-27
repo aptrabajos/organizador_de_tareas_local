@@ -517,20 +517,6 @@ pub async fn track_project_open(db: State<'_, Database>, project_id: i64) -> Res
         .map_err(|e| format!("Error tracking project open: {}", e))
 }
 
-#[tauri::command]
-pub async fn add_project_time(
-    db: State<'_, Database>,
-    project_id: i64,
-    seconds: i64,
-) -> Result<(), String> {
-    debug!(
-        "⏱️ [ANALYTICS] Agregando {} segundos al proyecto ID: {}",
-        seconds, project_id
-    );
-    db.add_project_time(project_id, seconds)
-        .map_err(|e| format!("Error adding project time: {}", e))
-}
-
 /// `get_project_stats` con la zona y el reloj inyectados: "hoy" es el día local de
 /// `reloj.pared` en `tz`. Copia lo que mide la app y suelta el lock antes de leer la
 /// base (orden `ActiveSession → Database`).

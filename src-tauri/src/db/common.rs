@@ -4,7 +4,11 @@ use crate::models::project::Project;
 
 use super::Database;
 
-/// Las 23 columnas de `projects`, EN ORDEN.
+/// Las 22 columnas de `projects` que lee la app, EN ORDEN.
+///
+/// El contador de tiempo deprecado no está (P1, D2): el total sale de la unión de
+/// tramos, y la columna sigue en el esquema solo para no romper bases viejas ni
+/// backups.
 ///
 /// Esta lista aparecía textualmente en siete métodos (`create_project`,
 /// `get_all_projects`, `get_project`, `search_projects`, `get_recent_projects`,
@@ -15,7 +19,7 @@ use super::Database;
 ///
 /// El orden ES el contrato: [`row_to_project`] lee por posición.
 pub(super) const PROJECT_COLUMNS: &str = "id, name, description, local_path, documentation_url, ai_documentation_url, drive_link, notes, image_data,
-                    created_at, updated_at, last_opened_at, opened_count, total_time_seconds,
+                    created_at, updated_at, last_opened_at, opened_count,
                     status, status_changed_at, is_pinned, pinned_order, display_order,
                     parent_id, group_color, group_icon, is_group_expanded";
 
@@ -40,16 +44,15 @@ pub(super) fn row_to_project(row: &Row) -> Result<Project> {
         updated_at: row.get(10)?,
         last_opened_at: row.get(11)?,
         opened_count: row.get(12)?,
-        total_time_seconds: row.get(13)?,
-        status: row.get(14)?,
-        status_changed_at: row.get(15)?,
-        is_pinned: row.get(16)?,
-        pinned_order: row.get(17)?,
-        display_order: row.get(18)?,
-        parent_id: row.get(19)?,
-        group_color: row.get(20)?,
-        group_icon: row.get(21)?,
-        is_group_expanded: row.get(22)?,
+        status: row.get(13)?,
+        status_changed_at: row.get(14)?,
+        is_pinned: row.get(15)?,
+        pinned_order: row.get(16)?,
+        display_order: row.get(17)?,
+        parent_id: row.get(18)?,
+        group_color: row.get(19)?,
+        group_icon: row.get(20)?,
+        is_group_expanded: row.get(21)?,
     })
 }
 

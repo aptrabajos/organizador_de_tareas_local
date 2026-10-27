@@ -30,19 +30,6 @@ impl Database {
         Ok(())
     }
 
-    pub fn add_project_time(&self, id: i64, seconds: i64) -> Result<()> {
-        let conn = self.conn();
-
-        conn.execute(
-            "UPDATE projects
-             SET total_time_seconds = COALESCE(total_time_seconds, 0) + ?2
-             WHERE id = ?1",
-            params![id, seconds],
-        )?;
-
-        Ok(())
-    }
-
     /// Estadísticas globales del Dashboard (3.3, 9a de la auditoría).
     ///
     /// - `total_time_hours`: la suma del `tiempo_total` de cada proyecto fuera de la
@@ -204,16 +191,6 @@ mod tests {
         assert_eq!(fetched2.opened_count, Some(2));
     }
 
-    #[test]
-    fn test_add_project_time() {
-        let db = test_db();
-        let project = db.create_project(test_project_dto()).unwrap();
-        db.add_project_time(project.id, 60).unwrap();
-        db.add_project_time(project.id, 120).unwrap();
-        let fetched = db.get_project(project.id).unwrap();
-        assert_eq!(fetched.total_time_seconds, Some(180));
-    }
-
     fn hoy_en_buenos_aires() -> RangoUtc {
         let hoy = chrono::NaiveDate::from_ymd_opt(2026, 10, 20).unwrap();
         time::rango_dia(&Buenos_Aires, hoy)
@@ -268,8 +245,6 @@ mod tests {
                 params![borrado],
             )
             .unwrap();
-        // El contador deprecado ya no se lee.
-        db.add_project_time(a, 99_999).unwrap();
 
         let stats = db.get_project_stats(hoy_en_buenos_aires(), None).unwrap();
         assert_eq!(stats.total_time_hours, 2.0);

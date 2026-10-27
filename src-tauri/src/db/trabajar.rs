@@ -20,7 +20,7 @@ use chrono::{DateTime, Duration, Utc};
 use rusqlite::types::Type;
 use rusqlite::{params, Connection, OptionalExtension, Result, Transaction, TransactionBehavior};
 
-use super::tracking::{cerrar_sesion_en, cerrar_y_acreditar_en, latir_en};
+use super::tracking::{cerrar_sesion_en, latir_en};
 use super::Database;
 use crate::commands::duracion_a_guardar;
 use crate::time;
@@ -447,9 +447,7 @@ pub struct MedidoPorLaApp<'a> {
 
 /// Cierra con el `Instant` el tramo que mide la app (`ended_at` = `fin`, la pared de
 /// ahora) con la regla de los 10 s y el tope de 12 h (U6). Devuelve los segundos
-/// guardados, o `None` si el tramo ya estaba cerrado. Suma también al contador
-/// deprecado del proyecto, como el cierre de Trabajar de antes de R8, hasta que el
-/// contador desaparezca (commit 25).
+/// guardados, o `None` si el tramo ya estaba cerrado.
 fn cerrar_tramo_de_la_app_en(
     tx: &Transaction,
     medido: &MedidoPorLaApp,
@@ -457,7 +455,7 @@ fn cerrar_tramo_de_la_app_en(
     motivo: MotivoTramo,
 ) -> Result<Option<i64>> {
     let guardado = duracion_a_guardar(FUENTE_TRABAJAR, medido.segundos.min(TOPE_SIN_TRACKER));
-    let cerrado = cerrar_y_acreditar_en(tx, medido.tramo_id, fin, guardado, Some(motivo))?;
+    let cerrado = cerrar_sesion_en(tx, medido.tramo_id, fin, guardado, Some(motivo))?;
     Ok(cerrado.then_some(guardado))
 }
 
@@ -1079,7 +1077,7 @@ impl Database {
             let tope = leer_instante(&started_at)? + Duration::seconds(TOPE_SIN_TRACKER);
             if tope <= ahora {
                 let motivo = MotivoSesion::TopeSinTracker;
-                cerrar_y_acreditar_en(
+                cerrar_sesion_en(
                     tx,
                     medido.tramo_id,
                     tope,

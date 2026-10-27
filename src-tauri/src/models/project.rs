@@ -27,7 +27,6 @@ pub struct Project {
     // Analytics fields
     pub last_opened_at: Option<String>,
     pub opened_count: Option<i64>,
-    pub total_time_seconds: Option<i64>,
     // Quick Start & Context fields
     pub status: Option<String>, // activo, pausado, completado, archivado
     pub status_changed_at: Option<String>,
@@ -246,7 +245,6 @@ mod tests {
             updated_at: "2025-01-02".to_string(),
             last_opened_at: Some("2025-01-02".to_string()),
             opened_count: Some(5),
-            total_time_seconds: Some(3600),
             status: Some("activo".to_string()),
             status_changed_at: None,
             is_pinned: Some(true),

@@ -141,7 +141,6 @@ fn run() -> Result<(), String> {
             commands::update_project_link,
             commands::delete_project_link,
             commands::track_project_open,
-            commands::add_project_time,
             commands::get_project_stats,
             commands::get_project_activities,
             commands::add_attachment,

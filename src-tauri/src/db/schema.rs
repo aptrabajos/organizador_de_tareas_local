@@ -1135,6 +1135,170 @@ mod tests {
         );
     }
 
+    // --- Ninguna migración pierde datos (la app está en producción) ---
+
+    /// Todas las filas de cada tabla de la base, leyendo **solo** las columnas que la
+    /// tabla tenía en ese momento: así se pueden comparar con las de después de migrar,
+    /// que pueden tener columnas nuevas pero nunca menos ni con otros valores.
+    type Foto = Vec<(String, Vec<String>, Vec<Vec<rusqlite::types::Value>>)>;
+
+    fn foto(conn: &Connection) -> Foto {
+        let tablas: Vec<String> = conn
+            .prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
+            .unwrap()
+            .query_map([], |row| row.get(0))
+            .unwrap()
+            .collect::<rusqlite::Result<_>>()
+            .unwrap();
+        tablas
+            .into_iter()
+            .map(|tabla| {
+                let cols = columnas(conn, &tabla);
+                let filas = leer_columnas(conn, &tabla, &cols);
+                (tabla, cols, filas)
+            })
+            .collect()
+    }
+
+    fn leer_columnas(
+        conn: &Connection,
+        tabla: &str,
+        cols: &[String],
+    ) -> Vec<Vec<rusqlite::types::Value>> {
+        let lista = cols
+            .iter()
+            .map(|c| format!("\"{c}\""))
+            .collect::<Vec<_>>()
+            .join(", ");
+        conn.prepare(&format!("SELECT {lista} FROM \"{tabla}\" ORDER BY {lista}"))
+            .unwrap()
+            .query_map([], |row| {
+                (0..cols.len())
+                    .map(|i| row.get::<_, rusqlite::types::Value>(i))
+                    .collect()
+            })
+            .unwrap()
+            .collect::<rusqlite::Result<_>>()
+            .unwrap()
+    }
+
+    /// Migra `db_path` hasta la versión actual y afirma que cada tabla de antes sigue
+    /// ahí, con sus columnas y **exactamente** las mismas filas y valores en ellas.
+    fn migrar_sin_perder_nada(db_path: &std::path::Path, antes: Foto) {
+        let db = Database::new(db_path.to_path_buf()).unwrap();
+        let conn = db.conn();
+        assert_eq!(user_version(&conn), ESQUEMA_ACTUAL);
+        for (tabla, cols, filas) in antes {
+            let ahora = columnas(&conn, &tabla);
+            for c in &cols {
+                assert!(ahora.contains(c), "{tabla}: se perdió la columna {c}");
+            }
+            assert_eq!(
+                leer_columnas(&conn, &tabla, &cols),
+                filas,
+                "{tabla}: las filas cambiaron al migrar"
+            );
+        }
+    }
+
+    /// Una fila en cada tabla de la versión 1 (la base de producción antes de R8), con
+    /// el contador `total_time_seconds` con valor.
+    const FILAS_VERSION_1: &str = "
+        INSERT INTO projects (id, name, description, local_path, notes, opened_count,
+                              total_time_seconds, status, parent_id, deleted_at)
+        VALUES (1, 'P', 'd', '/tmp/p', 'notas', 7, 12345, 'activo', NULL, NULL),
+               (2, 'Hijo', 'd', '/tmp/p/h', NULL, 0, 99, 'pausado', 1, '2026-10-01 09:00:00');
+        INSERT INTO project_activity (project_id, activity_type, description, duration_seconds, created_at)
+        VALUES (1, 'opened', 'Proyecto abierto', NULL, '2026-10-01 10:00:00');
+        INSERT INTO project_links (project_id, link_type, title, url, created_at, updated_at)
+        VALUES (1, 'repo', 'Repo', 'https://example.com', '2026-10-01 10:00:00', NULL);
+        INSERT INTO project_attachments (project_id, filename, file_data, file_size, mime_type, created_at)
+        VALUES (1, 'a.txt', 'ZGF0YQ==', 4, 'text/plain', '2026-10-01 10:00:00');
+        INSERT INTO project_journal (project_id, content, tags, created_at, updated_at)
+        VALUES (1, 'entrada', 'x', '2026-10-01 10:00:00', '2026-10-01 10:00:00');
+        INSERT INTO project_todos (project_id, content, is_completed, created_at, completed_at)
+        VALUES (1, 'tarea', 1, '2026-10-01 10:00:00', '2026-10-02 10:00:00');
+        INSERT INTO time_tracking_sessions (project_id, started_at, ended_at, duration_seconds, source, created_at)
+        VALUES (1, '2026-10-01 10:00:00', '2026-10-01 11:00:00', 3600, 'work_button', '2026-10-01 10:00:00'),
+               (1, '2026-10-02 10:00:00', '2026-10-02 10:00:05', 5, 'shell_hook', '2026-10-02 10:00:00'),
+               (2, '2026-10-03 10:00:00', NULL, NULL, 'work_button', '2026-10-03 10:00:00');";
+
+    /// De la versión 1 (con filas en todas sus tablas) a la actual: ni una fila ni un
+    /// valor cambia, el contador incluido.
+    #[test]
+    fn migrar_de_la_version_1_no_pierde_ni_cambia_ninguna_fila() {
+        let dir = TempDir::new().unwrap();
+        let db_path = dir.path().join("v1_datos.db");
+        let antes = {
+            let conn = base_en_version(&db_path, 1);
+            conn.execute_batch(FILAS_VERSION_1).unwrap();
+            foto(&conn)
+        };
+        assert!(antes
+            .iter()
+            .all(|(tabla, _, filas)| tabla == "sqlite_sequence" || !filas.is_empty()));
+        migrar_sin_perder_nada(&db_path, antes);
+    }
+
+    /// De la versión 4 (con filas en todas sus tablas, también las de Trabajar y el
+    /// estado del demonio) a la actual: ni una fila ni un valor cambia.
+    #[test]
+    fn migrar_de_la_version_4_no_pierde_ni_cambia_ninguna_fila() {
+        let dir = TempDir::new().unwrap();
+        let db_path = dir.path().join("v4_datos.db");
+        let token = "0123456789abcdef0123456789abcdef";
+        let antes = {
+            let conn = base_en_version(&db_path, 4);
+            conn.execute_batch(FILAS_VERSION_1).unwrap();
+            conn.execute_batch(&format!(
+                "INSERT INTO tracker_status (id, pid, estado, last_heartbeat, presencia)
+                 VALUES (1, 4242, 'activo', '2026-10-03 10:00:00', 'kde');
+                 INSERT INTO trabajar_sesiones
+                     (token, project_id, dueno, origen, estado, creada_at, ultimo_clic_at)
+                 VALUES ('{token}', 1, 'demonio', 'cli', 'viva_activa', '2026-10-03 10:00:00',
+                         '2026-10-03 10:00:00');
+                 INSERT INTO time_tracking_sessions
+                     (project_id, started_at, last_activity_at, duration_seconds, source, terminal_token)
+                 VALUES (1, '2026-10-03 10:00:00', '2026-10-03 10:05:00', 300, 'terminal', '{token}');
+                 INSERT INTO trabajar_anclas (token, pid, starttime, tty_nr, desde)
+                 VALUES ('{token}', 100, 200, 34816, '2026-10-03 10:00:00');
+                 INSERT INTO trabajar_evidencia (token, minuto, fuentes, archivo_rel)
+                 VALUES ('{token}', '2026-10-03 10:01', 1, 'src/main.rs');
+                 INSERT INTO archivos_evidencia (project_id, minuto, fuentes, ausente_desde_s, ausente_hasta_s)
+                 VALUES (1, '2026-10-03 11:00', 32, 5, 40);"
+            ))
+            .unwrap();
+            foto(&conn)
+        };
+        assert!(antes
+            .iter()
+            .all(|(tabla, _, filas)| tabla == "sqlite_sequence" || !filas.is_empty()));
+        migrar_sin_perder_nada(&db_path, antes);
+    }
+
+    /// El contador deprecado (P1, D2) se queda en la base con su valor: la app ya no lo
+    /// lee ni lo escribe (commit 25), pero tampoco lo borra al cerrar sesiones.
+    #[test]
+    fn el_contador_viejo_queda_en_la_base_y_cerrar_sesiones_no_lo_toca() {
+        let dir = TempDir::new().unwrap();
+        let db_path = dir.path().join("contador.db");
+        {
+            let conn = base_en_version(&db_path, 1);
+            conn.execute_batch(FILAS_VERSION_1).unwrap();
+        }
+        let db = Database::new(db_path).unwrap();
+        assert!(db.end_tracking_session(3, 0).unwrap());
+        let contador: i64 = db
+            .conn()
+            .query_row(
+                "SELECT total_time_seconds FROM projects WHERE id = 1",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(contador, 12345);
+    }
+
     /// (b) Una base al día no se toca: ni un paso, ni el `user_version`, ni un commit.
     /// `data_version` lo ve otra conexión, y cambia con cualquier commit que escriba
     /// el archivo.
