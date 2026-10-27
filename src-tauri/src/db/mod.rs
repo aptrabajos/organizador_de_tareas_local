@@ -22,6 +22,8 @@ mod tracking;
 mod trash;
 
 #[cfg(test)]
+mod golden_diff;
+#[cfg(test)]
 mod test_support;
 
 /// Único re-export necesario: el comando `list_trash` de `commands/mod.rs`
