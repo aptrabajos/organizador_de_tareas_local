@@ -5,6 +5,7 @@ import { getErrorMessage } from '../utils/errors';
 import type { Project } from '../types/project';
 import { logger } from '../utils/logger';
 import { trabajarEnProyecto } from '../utils/workSession';
+import { fechaDeLaBase } from '../utils/fechas';
 
 interface DashboardProps {
   onProjectClick?: (project: Project) => void;
@@ -19,7 +20,7 @@ const Dashboard: Component<DashboardProps> = (props) => {
 
   const formatDate = (dateString: string) => {
     try {
-      return new Date(dateString).toLocaleDateString('es-ES', {
+      return fechaDeLaBase(dateString).toLocaleDateString('es-ES', {
         day: 'numeric',
         month: 'short',
         year: 'numeric',
@@ -31,7 +32,7 @@ const Dashboard: Component<DashboardProps> = (props) => {
 
   const formatRelativeTime = (dateString: string) => {
     try {
-      const date = new Date(dateString);
+      const date = fechaDeLaBase(dateString);
       const now = new Date();
       const diffMs = now.getTime() - date.getTime();
       const diffMins = Math.floor(diffMs / 60000);

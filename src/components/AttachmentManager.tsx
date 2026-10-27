@@ -10,6 +10,7 @@ import { getImageDataUrl } from '../utils/attachments';
 import { useConfig } from '../contexts/ConfigContext';
 import { shouldConfirm } from '../utils/confirm';
 import { logger } from '../utils/logger';
+import { fechaDeLaBase } from '../utils/fechas';
 
 interface AttachmentManagerProps {
   projectId: number;
@@ -267,7 +268,9 @@ const AttachmentManager: Component<AttachmentManagerProps> = (props) => {
                     </div>
                     <div class="text-sm text-gray-500 dark:text-gray-400">
                       {formatFileSize(attachment.file_size)} •{' '}
-                      {new Date(attachment.created_at).toLocaleDateString()}
+                      {fechaDeLaBase(
+                        attachment.created_at
+                      ).toLocaleDateString()}
                     </div>
                   </div>
                 </div>

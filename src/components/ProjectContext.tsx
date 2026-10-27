@@ -16,6 +16,7 @@ import {
 import { getImageDataUrl } from '../utils/attachments';
 import TimeTracker from './TimeTracker';
 import { logger } from '../utils/logger';
+import { fechaDeLaBase } from '../utils/fechas';
 
 interface ProjectContextProps {
   projectId: number;
@@ -170,7 +171,9 @@ export default function ProjectContext(props: ProjectContextProps) {
                             {entry.content}
                           </p>
                           <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                            {new Date(entry.created_at).toLocaleString('es-ES')}
+                            {fechaDeLaBase(entry.created_at).toLocaleString(
+                              'es-ES'
+                            )}
                           </p>
                         </div>
                       )}

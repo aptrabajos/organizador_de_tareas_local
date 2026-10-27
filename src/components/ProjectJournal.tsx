@@ -11,6 +11,7 @@ import DOMPurify from 'dompurify';
 import { useConfig } from '../contexts/ConfigContext';
 import { shouldConfirm } from '../utils/confirm';
 import { logger } from '../utils/logger';
+import { fechaDeLaBase } from '../utils/fechas';
 
 interface ProjectJournalProps {
   projectId: number;
@@ -118,7 +119,7 @@ export default function ProjectJournal(props: ProjectJournalProps) {
   };
 
   const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
+    const date = fechaDeLaBase(dateStr);
     return date.toLocaleString('es-AR', {
       year: 'numeric',
       month: 'short',
