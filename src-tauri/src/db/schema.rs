@@ -9,11 +9,11 @@ use super::Database;
 ///
 /// Cada paso de [`PASOS`] lleva la base de la versión `n - 1` a la `n`. Para agregar
 /// uno: escribir `paso_n`, sumarlo al final de `PASOS` y subir esta constante.
-pub(crate) const ESQUEMA_ACTUAL: i64 = 4;
+pub(crate) const ESQUEMA_ACTUAL: i64 = 5;
 
 /// Los pasos en orden: `PASOS[0]` es el paso 1, y así.
 const PASOS: [fn(&Transaction) -> Result<()>; ESQUEMA_ACTUAL as usize] =
-    [paso_1, paso_2, paso_3, paso_4];
+    [paso_1, paso_2, paso_3, paso_4, paso_5];
 
 /// Mensaje para el usuario cuando la base la escribió una versión más nueva de la app.
 const MENSAJE_ESQUEMA_NUEVO: &str = "La base de datos es de una versión más nueva de Gestor de Proyectos. Actualizá la app antes de abrirla.";
@@ -570,6 +570,50 @@ fn paso_4(conn: &Transaction) -> Result<()> {
     Ok(())
 }
 
+/// Paso 5 (R8-A1): los ajustes manuales de tiempo (3.10.17 del diseño del tracker).
+///
+/// `ajustes_tiempo` es **solo de agregado** (DT13, decisión 5a): un ajuste no se edita
+/// ni se borra, se revierte con otro (`revierte_id`, `UNIQUE`: no se revierte dos
+/// veces). Lo garantiza la base, no el código: un trigger rechaza todo `UPDATE` y otro
+/// todo `DELETE` de un ajuste cuyo proyecto sigue vivo. La purga de un proyecto (desde
+/// la papelera o directa) sí borra sus ajustes en cascada: durante la cascada la fila
+/// del proyecto ya no existe, así que el `EXISTS` del trigger da falso.
+///
+/// `desde`/`hasta` son opcionales y van juntos: a qué rato o día corresponde el ajuste.
+/// `segundos` lleva signo y no pasa de 24 h.
+fn paso_5(conn: &Transaction) -> Result<()> {
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS ajustes_tiempo (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+            segundos INTEGER NOT NULL CHECK (segundos <> 0 AND abs(segundos) <= 86400),
+            desde DATETIME,
+            hasta DATETIME,
+            nota TEXT NOT NULL CHECK (length(trim(nota)) > 0),
+            creado_en DATETIME NOT NULL,
+            origen TEXT NOT NULL CHECK (origen IN ('app', 'cli')),
+            revierte_id INTEGER UNIQUE REFERENCES ajustes_tiempo(id),
+            CHECK ((desde IS NULL) = (hasta IS NULL)),
+            CHECK (hasta IS NULL OR hasta > desde)
+        )",
+        [],
+    )?;
+
+    conn.execute(
+        "CREATE TRIGGER IF NOT EXISTS ajustes_tiempo_sin_update BEFORE UPDATE ON ajustes_tiempo
+         BEGIN SELECT RAISE(ABORT, 'ajustes_tiempo es solo de agregado'); END",
+        [],
+    )?;
+    conn.execute(
+        "CREATE TRIGGER IF NOT EXISTS ajustes_tiempo_sin_delete BEFORE DELETE ON ajustes_tiempo
+         WHEN EXISTS (SELECT 1 FROM projects WHERE id = OLD.project_id AND deleted_at IS NULL)
+         BEGIN SELECT RAISE(ABORT, 'ajustes_tiempo es solo de agregado'); END",
+        [],
+    )?;
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use rusqlite::Connection;
@@ -754,6 +798,9 @@ mod tests {
 
         // 8. Paso 4 (R8-1): las sesiones de Trabajar, sobre el esquema viejo real.
         afirmar_paso_4(&conn);
+
+        // 9. Paso 5 (R8-A1): los ajustes de tiempo, con sus dos triggers.
+        afirmar_paso_5(&conn);
 
         drop(conn);
         drop(db);
@@ -950,8 +997,7 @@ mod tests {
 
         let db = Database::new(db_path).unwrap();
         let conn = db.conn();
-        assert_eq!(user_version(&conn), 4);
-        assert_eq!(ESQUEMA_ACTUAL, 4);
+        assert_eq!(user_version(&conn), ESQUEMA_ACTUAL);
         afirmar_paso_4(&conn);
 
         let filas: Vec<(Option<i64>, Option<String>, Option<String>)> = conn
@@ -983,6 +1029,110 @@ mod tests {
 
         // Y la huérfana vieja, sin token, se puede seguir cerrando sin motivo.
         assert!(db.end_tracking_session(3, 0).unwrap());
+    }
+
+    /// Lo que deja el paso 5: la tabla de ajustes con sus columnas y los dos triggers
+    /// que la hacen solo de agregado (invariante 16 de 6.2).
+    fn afirmar_paso_5(conn: &Connection) {
+        let objetos = objetos_del_esquema(conn);
+        for esperado in [
+            "table ajustes_tiempo",
+            "trigger ajustes_tiempo_sin_update",
+            "trigger ajustes_tiempo_sin_delete",
+        ] {
+            assert!(
+                objetos.contains(&esperado.to_string()),
+                "falta {esperado}: {objetos:?}"
+            );
+        }
+        assert_eq!(
+            columnas(conn, "ajustes_tiempo"),
+            vec![
+                "id",
+                "project_id",
+                "segundos",
+                "desde",
+                "hasta",
+                "nota",
+                "creado_en",
+                "origen",
+                "revierte_id",
+            ]
+        );
+    }
+
+    /// Paso 5: una base en la versión 4, con proyectos, tramos y una sesión de Trabajar
+    /// cerrada, gana los ajustes sin perder nada. La tabla nace vacía y ya rechaza un
+    /// `UPDATE`.
+    #[test]
+    fn migrar_de_la_version_4_a_la_5_agrega_los_ajustes() {
+        let dir = TempDir::new().unwrap();
+        let db_path = dir.path().join("v4.db");
+        let token = "0123456789abcdef0123456789abcdef";
+        {
+            let conn = base_en_version(&db_path, 4);
+            assert!(!objetos_del_esquema(&conn).contains(&"table ajustes_tiempo".to_string()));
+            conn.execute_batch(&format!(
+                "INSERT INTO projects (id, name, description, local_path) VALUES (1, 'P', 'd', '/tmp/p');
+                 INSERT INTO trabajar_sesiones
+                     (token, project_id, dueno, origen, estado, creada_at, ultimo_clic_at,
+                      terminada_at, motivo_cierre)
+                 VALUES ('{token}', 1, 'app', 'boton', 'cerrada', '2026-10-01 10:00:00',
+                         '2026-10-01 10:00:00', '2026-10-01 11:00:00', 'parar_app');
+                 INSERT INTO time_tracking_sessions
+                     (project_id, started_at, ended_at, duration_seconds, source,
+                      terminal_token, motivo_cierre)
+                 VALUES (1, '2026-10-01 10:00:00', '2026-10-01 11:00:00', 3600, 'work_button',
+                         '{token}', 'parar_app'),
+                        (1, '2026-10-02 10:00:00', '2026-10-02 10:30:00', 1800, 'work_button',
+                         NULL, NULL);"
+            ))
+            .unwrap();
+        }
+
+        let db = Database::new(db_path).unwrap();
+        let conn = db.conn();
+        assert_eq!(user_version(&conn), 5);
+        assert_eq!(ESQUEMA_ACTUAL, 5);
+        afirmar_paso_4(&conn);
+        afirmar_paso_5(&conn);
+
+        let tramos: Vec<(i64, Option<String>)> = conn
+            .prepare(
+                "SELECT duration_seconds, motivo_cierre FROM time_tracking_sessions ORDER BY id",
+            )
+            .unwrap()
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+            .unwrap()
+            .collect::<rusqlite::Result<_>>()
+            .unwrap();
+        assert_eq!(
+            tramos,
+            vec![(3600, Some("parar_app".to_string())), (1800, None)]
+        );
+        let estado: String = conn
+            .query_row("SELECT estado FROM trabajar_sesiones", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(estado, "cerrada");
+        let ajustes: i64 = conn
+            .query_row("SELECT COUNT(*) FROM ajustes_tiempo", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(ajustes, 0);
+
+        conn.execute(
+            "INSERT INTO ajustes_tiempo (project_id, segundos, nota, creado_en, origen)
+             VALUES (1, 600, 'Reunión', '2026-10-03 12:00:00', 'app')",
+            [],
+        )
+        .unwrap();
+        let err = conn
+            .execute("UPDATE ajustes_tiempo SET nota = 'x'", [])
+            .unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("ajustes_tiempo es solo de agregado"),
+            "{err}"
+        );
     }
 
     /// (b) Una base al día no se toca: ni un paso, ni el `user_version`, ni un commit.

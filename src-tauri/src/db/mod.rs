@@ -3,6 +3,7 @@ use rusqlite::Connection;
 use std::sync::Mutex;
 
 mod activity;
+mod ajustes;
 mod attachments;
 mod common;
 mod dashboard;

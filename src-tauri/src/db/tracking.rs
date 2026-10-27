@@ -1,6 +1,7 @@
 use chrono::{DateTime, Utc};
 use rusqlite::{params, Connection, Result, TransactionBehavior};
 
+use super::ajustes::{con_ajustes, suma_de_ajustes};
 use super::tiempo::{segundos_en, union_del_proyecto, SesionActiva};
 use super::trabajar::{MotivoTramo, FUENTE_TERMINAL};
 use super::Database;
@@ -244,13 +245,15 @@ impl Database {
 
     /// Estadísticas de tiempo de un proyecto (3.3, 9a de la auditoría).
     ///
-    /// - `total_seconds`, `today_seconds` y `week_seconds`: la **unión** de los tramos
-    ///   (`tiempo_trabajado`) recortada a su rango, con la `activa`. `hoy` y `semana`
-    ///   son días locales ya convertidos a UTC por el llamador (`time::rango_dia` y
-    ///   `time::rango_semana`): la semana son 7 fechas, incluido hoy.
+    /// - `total_seconds`, `today_seconds` y `week_seconds`: `tiempo_total` de su rango,
+    ///   la **unión** de los tramos (`tiempo_trabajado`) recortada al rango, con la
+    ///   `activa`, más los ajustes de ese rango, recortado en 0 (3.10.8, commit 22).
+    ///   `hoy` y `semana` son días locales ya convertidos a UTC por el llamador
+    ///   (`time::rango_dia` y `time::rango_semana`): la semana son 7 fechas, incluido
+    ///   hoy.
     /// - `session_count`, `avg_session_seconds` y `longest_session_seconds`: sobre las
-    ///   sesiones **individuales** cerradas con duración > 0, sin unir. Describen
-    ///   sesiones, no el total.
+    ///   sesiones **individuales** cerradas con duración > 0, sin unir y sin ajustes.
+    ///   Describen sesiones medidas, no el total.
     ///
     /// Un error de base se propaga (D6, P18): antes se mostraba como 0 s.
     pub fn get_time_stats(
@@ -266,6 +269,12 @@ impl Database {
 
         // Una sola consulta: la unión de siempre sirve para los tres rangos.
         let unidos = union_del_proyecto(&conn, project_id, &time::rango_total(), activa)?;
+        let total_de = |rango: &RangoUtc| -> Result<i64> {
+            Ok(con_ajustes(
+                segundos_en(&unidos, rango),
+                suma_de_ajustes(&conn, project_id, rango)?,
+            ))
+        };
 
         let (session_count, suma, longest_session_seconds): (i64, i64, i64) = conn.query_row(
             "SELECT COUNT(*), COALESCE(SUM(duration_seconds), 0), COALESCE(MAX(duration_seconds), 0)
@@ -281,12 +290,12 @@ impl Database {
         };
 
         Ok(TimeStats {
-            total_seconds: segundos_en(&unidos, &time::rango_total()),
+            total_seconds: total_de(&time::rango_total())?,
             session_count,
             avg_session_seconds,
             longest_session_seconds,
-            today_seconds: segundos_en(&unidos, &hoy),
-            week_seconds: segundos_en(&unidos, &semana),
+            today_seconds: total_de(&hoy)?,
+            week_seconds: total_de(&semana)?,
         })
     }
 }

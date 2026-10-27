@@ -2,6 +2,7 @@ use std::collections::HashSet;
 
 use rusqlite::{params, Result};
 
+use super::ajustes::{con_ajustes, sumas_de_ajustes_por_proyecto};
 use super::tiempo::{segundos_en, uniones_por_proyecto, SesionActiva};
 use super::Database;
 use crate::time::{self, RangoUtc};
@@ -44,8 +45,10 @@ impl Database {
 
     /// Estadísticas globales del Dashboard (3.3, 9a de la auditoría).
     ///
-    /// - `total_time_hours`: la suma de la **unión** de cada proyecto fuera de la
-    ///   papelera, con la `activa`. Una sola consulta para todos.
+    /// - `total_time_hours`: la suma del `tiempo_total` de cada proyecto fuera de la
+    ///   papelera: su **unión**, con la `activa`, más sus ajustes, recortado en 0 por
+    ///   proyecto (3.10.8, commit 22). Una consulta para todos los tramos y otra para
+    ///   todos los ajustes.
     /// - `active_today`: los proyectos con actividad en `project_activity` **o** con
     ///   tiempo trabajado en el día local `hoy` (ya convertido a UTC por el llamador).
     ///   Lo segundo es nuevo: con el demonio, un proyecto editado con la app cerrada
@@ -88,10 +91,20 @@ impl Database {
         }
         let active_today = i64::try_from(activos.len()).unwrap_or(i64::MAX);
 
-        // Tiempo total en horas
-        let total_seconds: i64 = uniones
-            .values()
-            .map(|unidos| segundos_en(unidos, &time::rango_total()))
+        // Tiempo total en horas: lo medido más los ajustes, proyecto por proyecto (uno
+        // puede tener solo ajustes).
+        let ajustes = sumas_de_ajustes_por_proyecto(&conn, &time::rango_total())?;
+        let con_tiempo: HashSet<i64> = uniones.keys().chain(ajustes.keys()).copied().collect();
+        let total_seconds: i64 = con_tiempo
+            .iter()
+            .map(|project_id| {
+                con_ajustes(
+                    uniones
+                        .get(project_id)
+                        .map_or(0, |unidos| segundos_en(unidos, &time::rango_total())),
+                    ajustes.get(project_id).copied().unwrap_or(0),
+                )
+            })
             .sum();
         let total_time_hours = total_seconds as f64 / 3600.0;
 
